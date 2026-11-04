@@ -1,6 +1,8 @@
-# Samson's Dressage Training Plan 2026
+# XSalute — Samson's Dressage Training Plan 2026
 
-Level 2 Super 5 season planner for Jura Samson.
+**XSalute** by Virtual Dressage NZ — PLAN · TRAIN · COMPETE · REFLECT. The name refers to the halt and salute at X that starts and finishes every dressage test.
+
+This is Samson's plan: a Level 2 Super 5 season planner for Jura Samson.
 
 ## Run
 Node.js 22+.

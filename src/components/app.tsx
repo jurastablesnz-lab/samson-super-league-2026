@@ -116,10 +116,11 @@ export function App() {
     <div className="vd-glow min-h-dvh text-fg">
       <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 pb-36 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <div className="mb-3 flex items-center gap-2.5">
-          <img src="/brand/vdnz-icon.svg" alt="Virtual Dressage NZ" className="size-9 rounded-[10px] ring-1 ring-accent/30" />
+          <img src="/brand/vdnz-icon.svg" alt="XSalute by Virtual Dressage NZ" className="size-9 rounded-[10px] ring-1 ring-accent/30" />
           <div className="leading-tight">
-            <p className="font-display text-[13px] font-extrabold tracking-[-0.01em] text-fg">
-              Virtual Dressage <span className="text-accent">NZ</span>
+            <p className="font-display text-[15px] font-extrabold tracking-[-0.02em] text-fg">
+              <span className="text-accent">X</span>Salute{" "}
+              <span className="text-[10px] font-semibold tracking-normal text-muted">by Virtual Dressage NZ</span>
             </p>
             <p className="text-[9.5px] font-semibold tracking-[0.22em] text-muted">PLAN · TRAIN · COMPETE · REFLECT</p>
           </div>

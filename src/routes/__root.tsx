@@ -3,7 +3,8 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Samson's Dressage Training Plan 2026";
+const BRAND_NAME = "XSalute";
+const APP_NAME = `${BRAND_NAME} — Samson's Dressage Training Plan 2026`;
 
 export const Route = createRootRoute({
   head: () => ({
@@ -12,6 +13,8 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_NAME },
       { name: "theme-color", content: "#0B1020" },
+      { name: "application-name", content: BRAND_NAME },
+      { name: "apple-mobile-web-app-title", content: BRAND_NAME },
       { name: "description", content: "Level 2 Super 5 season plan for Samson — Bay of Plenty to Nationals." },
     ],
     links: [

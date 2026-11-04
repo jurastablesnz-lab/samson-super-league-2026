@@ -163,7 +163,7 @@ export const SHOWS: Show[] = [
     entriesClose: "2026-11-18",
     entriesCloseNote: "Usual 5pm on Evo Events — confirm on the schedule.",
     notes: [
-      "Coach training peak is 5–6 Dec. If she is there, the show is the gymnastic.",
+      "Coach training peak is 5–6 Dec. If your coach is there, the show is the gymnastic.",
       "Taihape is two weeks later. Do not school 2B every day in between.",
     ],
   },
@@ -385,11 +385,11 @@ export const COACH: CoachVisit[] = [
     agenda: [
       {
         title: "Warm-up",
-        detail: "Let her see him as he is. 10 minutes. Film the whole ride.",
+        detail: "Let your coach see him as he is. 10 minutes. Film the whole ride.",
       },
       {
         title: "2B from memory",
-        detail: "Ride it once, then the corners and the stretch circle again. Ask what she would change before Super 5 1.",
+        detail: "Ride it once, then the corners and the stretch circle again. Ask what your coach would change before Super 5 1.",
       },
       {
         title: "2C school",
@@ -403,7 +403,7 @@ export const COACH: CoachVisit[] = [
     film: "Whole 2B, the stretch circle, both simple changes, one collected canter.",
     homework: [
       "Ride 2C twice before BOP.",
-      "One 2B from memory midweek, not the day after she comes.",
+      "One 2B from memory midweek, not the day after your coach comes.",
       "Medium three times a week until ten days out from Tauranga.",
     ],
     doNot: [
@@ -416,11 +416,11 @@ export const COACH: CoachVisit[] = [
     id: "nov",
     dates: ["2026-11-04"],
     title: "4 Nov — Second visit — debrief",
-    subtitle: "BOP is done. Watch the film with her. Change one thing, not five.",
+    subtitle: "BOP is done. Watch the film with your coach. Change one thing, not five.",
     agenda: [
       {
         title: "The test film",
-        detail: "What the judges marked versus what she saw. Stretch circle, medium trot, the halt.",
+        detail: "What the judges marked versus what your coach saw. Stretch circle, medium trot, the halt.",
       },
       {
         title: "The warm-up",
@@ -455,7 +455,7 @@ export const COACH: CoachVisit[] = [
       },
       {
         title: "Sunday — the test or the show",
-        detail: "If Waikato is that day, she watches the Super 5. If not, ride 2B from memory once and finish.",
+        detail: "If Waikato is that day, your coach watches the Super 5. If not, ride 2B from memory once and finish.",
       },
     ],
     film: "Saturday’s simple changes and Sunday’s 2B. That is the Christmas homework.",
@@ -683,7 +683,7 @@ const HOW = {
   coach: [
     "Arrive with time to walk.",
     "Film the whole ride.",
-    "Write her homework before you drive home. Do not invent a fourth programme in the morning.",
+    "Write the coach's homework down before you drive home. Do not invent a fourth programme in the morning.",
   ],
   show: [
     "Walk the arena the evening before if you can.",

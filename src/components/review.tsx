@@ -175,7 +175,7 @@ export function FilmBoard() {
         <h2 className="font-display mt-1 text-xl font-medium">Competition videos</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Film the test, not the warm-up. Clips stay on this phone. Play one back before the next visit, or share it
-          straight to her.
+          straight to your coach.
         </p>
         <MetaFields
           showId={showId}
@@ -186,7 +186,7 @@ export function FilmBoard() {
           setDate={setDate}
           note={note}
           setNote={setNote}
-          noteLabel="What should she look at?"
+          noteLabel="What should your coach look at?"
           notePlaceholder="Left canter depart, and whether the stretch circle actually stretched."
         />
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -341,7 +341,7 @@ function VideoCard({
             <p className="text-sm text-muted">{error ?? "Opening the clip…"}</p>
           )}
           <label className="mt-3 block text-sm">
-            Note for her
+            Note for your coach
             <textarea
               defaultValue={item.note}
               rows={2}

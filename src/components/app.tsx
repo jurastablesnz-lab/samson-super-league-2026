@@ -645,7 +645,7 @@ function CoachVisits() {
     <div className="flex flex-col gap-4">
       <Card>
         <Kicker>Three visits</Kicker>
-        <h2 className="font-display mt-1 text-xl font-medium">Use her, then ride the plan</h2>
+        <h2 className="font-display mt-1 text-xl font-medium">Use your coach, then ride the plan</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           14 Oct is a polish, 4 Nov is a debrief, 5–6 Dec is the training peak. Film every time. Competition videos
           and photographed judge sheets are on Videos and Sheets. Do not invent a fourth programme at home the next

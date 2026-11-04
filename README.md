@@ -1,4 +1,4 @@
-# Samson Super League 2026
+# Samson's Dressage Training Plan 2026
 
 Level 2 Super 5 season planner for Jura Samson.
 

@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Samson Super League 2026";
+const APP_NAME = "Samson's Dressage Training Plan 2026";
 
 export const Route = createRootRoute({
   head: () => ({

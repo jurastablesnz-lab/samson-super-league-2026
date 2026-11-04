@@ -128,7 +128,7 @@ export function App() {
           <div>
             <Kicker>{PAIR.series}</Kicker>
             <h1 className="font-display mt-1 text-[1.65rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-fg sm:text-[2rem]">
-              Samson Super League 2026
+              Samson’s Dressage Training Plan 2026
             </h1>
             <p className="mt-1 text-sm text-muted">
               Compete {PAIR.level} · school {PAIR.school}

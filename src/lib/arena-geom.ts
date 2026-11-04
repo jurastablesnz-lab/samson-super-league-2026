@@ -32,9 +32,44 @@ const LEFTS = new Set(["H", "S", "E", "V", "K"]);
 const RIGHTS = new Set(["M", "R", "B", "P", "F"]);
 
 /** Letters that sit on the fence. Centre-line markers are not on the rail. */
-const RAIL = new Set(["A", "K", "V", "E", "S", "H", "C", "M", "R", "B", "P", "F", "CH", "CM", "FA", "AK"]);
+const RAIL = new Set([
+  "A",
+  "K",
+  "V",
+  "E",
+  "S",
+  "H",
+  "C",
+  "M",
+  "R",
+  "B",
+  "P",
+  "F",
+  "CH",
+  "CM",
+  "FA",
+  "AK",
+]);
 
-export const LETTER_IDS = ["C", "H", "M", "G", "S", "R", "I", "E", "B", "X", "V", "P", "L", "K", "F", "D", "A"];
+export const LETTER_IDS = [
+  "C",
+  "H",
+  "M",
+  "G",
+  "S",
+  "R",
+  "I",
+  "E",
+  "B",
+  "X",
+  "V",
+  "P",
+  "L",
+  "K",
+  "F",
+  "D",
+  "A",
+];
 
 export const M_PX = { x: 120 / 20, y: 216 / 60 };
 

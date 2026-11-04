@@ -70,10 +70,8 @@ export const usePlan = create<State>()(
       weekIndex: 0,
       setTab: (tab) => set({ tab }),
       setWeekIndex: (weekIndex) => set({ weekIndex }),
-      toggleDone: (id) =>
-        set((s) => ({ done: { ...s.done, [id]: !s.done[id] } })),
-      togglePack: (id) =>
-        set((s) => ({ pack: { ...s.pack, [id]: !s.pack[id] } })),
+      toggleDone: (id) => set((s) => ({ done: { ...s.done, [id]: !s.done[id] } })),
+      togglePack: (id) => set((s) => ({ pack: { ...s.pack, [id]: !s.pack[id] } })),
       addScore: (score) => {
         const row: Score = {
           level: "L2",
@@ -93,7 +91,8 @@ export const usePlan = create<State>()(
           notes: [{ id: `${Date.now()}`, date, text }, ...s.notes],
         })),
       removeNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
-      addReview: (item) => set((s) => ({ review: [item, ...s.review.filter((x) => x.id !== item.id)] })),
+      addReview: (item) =>
+        set((s) => ({ review: [item, ...s.review.filter((x) => x.id !== item.id)] })),
       updateReview: (id, patch) =>
         set((s) => ({
           review: s.review.map((item) => (item.id === id ? { ...item, ...patch } : item)),

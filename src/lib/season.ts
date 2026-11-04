@@ -294,7 +294,8 @@ export const PHASES: Phase[] = [
     name: "Foundation",
     start: "2026-09-14",
     end: "2026-10-17",
-    intent: "Get him in front of the leg again. 2C as the homework test. Medium three times a week.",
+    intent:
+      "Get him in front of the leg again. 2C as the homework test. Medium three times a week.",
     schoolAbove: "4B transitions, simple changes, stretch circle",
   },
   {
@@ -302,7 +303,8 @@ export const PHASES: Phase[] = [
     name: "Consolidate",
     start: "2026-10-18",
     end: "2026-12-21",
-    intent: "Super 5s through to Taihape. Keep Medium, add collected canter and simple changes as the gymnastic.",
+    intent:
+      "Super 5s through to Taihape. Keep Medium, add collected canter and simple changes as the gymnastic.",
     schoolAbove: "4B + simple changes + collected canter",
   },
   {
@@ -310,7 +312,8 @@ export const PHASES: Phase[] = [
     name: "Strength",
     start: "2026-12-22",
     end: "2027-02-05",
-    intent: "Holiday rest, then Taranaki and/or CD, then Wellington. Medium stays. Do not start 4B as a competing test.",
+    intent:
+      "Holiday rest, then Taranaki and/or CD, then Wellington. Medium stays. Do not start 4B as a competing test.",
     schoolAbove: "maintain Medium, no competing 4B",
   },
   {
@@ -389,7 +392,8 @@ export const COACH: CoachVisit[] = [
       },
       {
         title: "2B from memory",
-        detail: "Ride it once, then the corners and the stretch circle again. Ask what your coach would change before Super 5 1.",
+        detail:
+          "Ride it once, then the corners and the stretch circle again. Ask what your coach would change before Super 5 1.",
       },
       {
         title: "2C school",
@@ -406,11 +410,7 @@ export const COACH: CoachVisit[] = [
       "One 2B from memory midweek, not the day after your coach comes.",
       "Medium three times a week until ten days out from Tauranga.",
     ],
-    doNot: [
-      "A fourth programme the next morning.",
-      "A new bit.",
-      "Schooling 4B as a test.",
-    ],
+    doNot: ["A fourth programme the next morning.", "A new bit.", "Schooling 4B as a test."],
   },
   {
     id: "nov",
@@ -420,7 +420,8 @@ export const COACH: CoachVisit[] = [
     agenda: [
       {
         title: "The test film",
-        detail: "What the judges marked versus what your coach saw. Stretch circle, medium trot, the halt.",
+        detail:
+          "What the judges marked versus what your coach saw. Stretch circle, medium trot, the halt.",
       },
       {
         title: "The warm-up",
@@ -428,7 +429,8 @@ export const COACH: CoachVisit[] = [
       },
       {
         title: "One Medium correction",
-        detail: "Whatever leaked in the 2B — usually the canter or the stretch — school it above the level.",
+        detail:
+          "Whatever leaked in the 2B — usually the canter or the stretch — school it above the level.",
       },
     ],
     film: "The BOP 2B, plus one homework 2C from the week after.",
@@ -451,11 +453,13 @@ export const COACH: CoachVisit[] = [
     agenda: [
       {
         title: "Saturday — gymnastic",
-        detail: "Simple changes, collected canter, stretch. This is the last big Medium block before the holiday.",
+        detail:
+          "Simple changes, collected canter, stretch. This is the last big Medium block before the holiday.",
       },
       {
         title: "Sunday — the test or the show",
-        detail: "If Waikato is that day, your coach watches the Super 5. If not, ride 2B from memory once and finish.",
+        detail:
+          "If Waikato is that day, your coach watches the Super 5. If not, ride 2B from memory once and finish.",
       },
     ],
     film: "Saturday’s simple changes and Sunday’s 2B. That is the Christmas homework.",
@@ -499,7 +503,13 @@ export const PACK = [
   {
     id: "truck",
     title: "Truck",
-    items: ["Hay and haynets", "Water and buckets", "First aid", "Shovel, fork, manure bag", "Lead, spare halter"],
+    items: [
+      "Hay and haynets",
+      "Water and buckets",
+      "First aid",
+      "Shovel, fork, manure bag",
+      "Lead, spare halter",
+    ],
   },
   {
     id: "paper",
@@ -531,7 +541,8 @@ export const TESTS: TestSheet[] = [
     name: "Novice 2A",
     role: "The other novice test",
     time: "ESNZ 2024 Novice 2A · ~5:00",
-    purpose: "Accuracy and a clean stretch. Ride it at home when 2B is stale, not as a Super 5 substitute.",
+    purpose:
+      "Accuracy and a clean stretch. Ride it at home when 2B is stale, not as a Super 5 substitute.",
     keys: [
       {
         move: "Halt at C / A",
@@ -541,7 +552,8 @@ export const TESTS: TestSheet[] = [
       {
         move: "20m circles",
         judge: "Geometry, bend, regularity",
-        school: "Letter to letter. If the circle is egg-shaped the mark is gone before the stretch.",
+        school:
+          "Letter to letter. If the circle is egg-shaped the mark is gone before the stretch.",
       },
       {
         move: "Stretchy circle",
@@ -560,7 +572,8 @@ export const TESTS: TestSheet[] = [
     name: "Novice 2B",
     role: "The one that counts",
     time: "ESNZ 2024 Novice 2B · ~5:00",
-    purpose: "North Island league test. Ridden from memory. Highest coefficient is the stretchy circle.",
+    purpose:
+      "North Island league test. Ridden from memory. Highest coefficient is the stretchy circle.",
     keys: [
       {
         move: "Stretchy circle 20m",
@@ -589,7 +602,8 @@ export const TESTS: TestSheet[] = [
     name: "Novice 2C",
     role: "The homework test",
     time: "ESNZ 2024 Novice 2C · ~5:00",
-    purpose: "The school test. Ride it from the sheet at home until the letters are boring. Super 5 2B is ridden from memory.",
+    purpose:
+      "The school test. Ride it from the sheet at home until the letters are boring. Super 5 2B is ridden from memory.",
     keys: [
       {
         move: "Letters and centre line",
@@ -618,7 +632,8 @@ export const TESTS: TestSheet[] = [
     name: "Level 2 musical freestyle",
     role: "The optional extra",
     time: "Zilco L2 MFS · finish 4:00–4:30",
-    purpose: "Music from A. Last Super 5 outing it was an elimination — only take it to a show when the file and the floorplan are both quiet.",
+    purpose:
+      "Music from A. Last Super 5 outing it was an elimination — only take it to a show when the file and the floorplan are both quiet.",
     keys: [
       {
         move: "Time window",
@@ -633,7 +648,8 @@ export const TESTS: TestSheet[] = [
       {
         move: "Artistic marks",
         judge: "Music, interpretation, choreography",
-        school: "He has to look like the music, not just survive it. Stretch where the phrase breathes.",
+        school:
+          "He has to look like the music, not just survive it. Stretch where the phrase breathes.",
       },
       {
         move: "Technical floorplan",
@@ -739,13 +755,22 @@ function defaultFor(dayDate: Date, phase: Phase): Session {
   }
   if (dow === 2 || dow === 4) {
     if (parkMedium || phase.id === "championship") {
-      return session(day, "school", "Stretch & walk", "Medium is parked this close to a show.", 40, HOW.stretch);
+      return session(
+        day,
+        "school",
+        "Stretch & walk",
+        "Medium is parked this close to a show.",
+        40,
+        HOW.stretch,
+      );
     }
     return session(
       day,
       "school",
       "Medium school",
-      phase.id === "foundation" ? "In front of the leg, then 4B transitions." : "Simple changes and collected canter.",
+      phase.id === "foundation"
+        ? "In front of the leg, then 4B transitions."
+        : "Simple changes and collected canter.",
       45,
       HOW.medium,
     );
@@ -810,21 +835,30 @@ function overlay(dayDate: Date): Session {
   const phase = phaseFor(dayDate);
 
   if (show) {
+    return session(day, "show", show.short, show.goal, 0, HOW.show, show.tests.join(" · "));
+  }
+  if (
+    showTomorrow &&
+    (showTomorrow.id === "bop" || showTomorrow.id === "akl" || showTomorrow.id === "nats")
+  ) {
     return session(
       day,
-      "show",
-      show.short,
-      show.goal,
+      "travel",
+      `Travel to ${showTomorrow.short}`,
+      showTomorrow.travel,
       0,
-      HOW.show,
-      show.tests.join(" · "),
+      HOW.travel,
     );
   }
-  if (showTomorrow && (showTomorrow.id === "bop" || showTomorrow.id === "akl" || showTomorrow.id === "nats")) {
-    return session(day, "travel", `Travel to ${showTomorrow.short}`, showTomorrow.travel, 0, HOW.travel);
-  }
   if (showYesterday) {
-    return session(day, "rest", "Rest after the show", "Paddock. Feel his back. No arena.", 0, HOW.rest);
+    return session(
+      day,
+      "rest",
+      "Rest after the show",
+      "Paddock. Feel his back. No arena.",
+      0,
+      HOW.rest,
+    );
   }
   if (coach && !show) {
     return session(
@@ -870,7 +904,13 @@ export function entriesState(show: Show) {
   const when = format(parseISO(show.entriesClose), "d MMM");
   const note = show.entriesCloseNote ?? "Confirm on Evo Events";
   if (days < 0) {
-    return { kind: "closed" as EntriesKind, days, when, headline: "Closed", detail: `Closed ${when}` };
+    return {
+      kind: "closed" as EntriesKind,
+      days,
+      when,
+      headline: "Closed",
+      detail: `Closed ${when}`,
+    };
   }
   if (days === 0) {
     return { kind: "today" as EntriesKind, days, when, headline: "Today", detail: note };

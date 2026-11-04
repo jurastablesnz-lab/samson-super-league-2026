@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Camera, Check, Share2, Trash2, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Camera, Check, ImagePlus, Share2, Trash2, Video, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,11 @@ import { compressSheetPhoto, deleteMediaBlob, getMediaBlob, putMediaBlob } from 
 import { summariseSheet } from "@/lib/summarise-sheet";
 import { SHOWS, TEST_OPTIONS, TODAY } from "@/lib/season";
 import { usePlan, type ReviewItem, type SheetRead } from "@/lib/store";
+import { MAX_SHEET_PHOTOS, sheetPhotoIds } from "@/lib/review-types";
+
+const JUDGE_LABELS = ["", "C", "E", "B", "H", "M", "Judge 1", "Judge 2", "Judge 3"];
+
+type DraftPhoto = { key: string; blob: Blob; dataUrl: string; url: string; label: string };
 
 export type ReviewView = "visits" | "videos" | "sheets";
 
@@ -106,7 +111,12 @@ function MetaFields({
         </label>
         <label className="text-sm">
           Date
-          <input type="date" className={fieldClass()} value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            type="date"
+            className={fieldClass()}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </label>
       </div>
       <label className="text-sm">
@@ -171,11 +181,13 @@ export function FilmBoard() {
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">For the coach</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          For the coach
+        </p>
         <h2 className="font-display mt-1 text-xl font-medium">Competition videos</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Film the test, not the warm-up. Clips stay on this phone. Play one back before the next visit, or share it
-          straight to your coach.
+          Film the test, not the warm-up. Clips stay on this phone. Play one back before the next
+          visit, or share it straight to your coach.
         </p>
         <MetaFields
           showId={showId}
@@ -207,7 +219,9 @@ export function FilmBoard() {
       </section>
 
       {videos.length === 0 ? (
-        <p className="px-1 text-sm text-muted">No competition videos yet. The first Super 5 is the one worth keeping.</p>
+        <p className="px-1 text-sm text-muted">
+          No competition videos yet. The first Super 5 is the one worth keeping.
+        </p>
       ) : (
         <ul className="flex flex-col gap-3">
           {videos.map((item) => (
@@ -235,29 +249,41 @@ function FileButton({
   children,
   icon,
   variant = "default",
+  multiple,
+  onFiles,
 }: {
   accept: string;
   capture?: boolean;
   disabled?: boolean;
-  onFile: (file: File | undefined) => void;
+  multiple?: boolean;
+  onFile?: (file: File | undefined) => void;
+  onFiles?: (files: File[]) => void;
   children: ReactNode;
   icon?: ReactNode;
   variant?: "default" | "outline";
 }) {
   return (
-    <label className={cn(buttonVariants({ variant }), "w-full", disabled && "pointer-events-none opacity-40")}>
+    <label
+      className={cn(
+        buttonVariants({ variant }),
+        "w-full",
+        disabled && "pointer-events-none opacity-40",
+      )}
+    >
       {icon}
       {children}
       <input
         type="file"
         accept={accept}
         capture={capture ? "environment" : undefined}
+        multiple={multiple}
         disabled={disabled}
         className="sr-only"
         onChange={(e) => {
-          const file = e.target.files?.[0];
+          const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          onFile(file);
+          if (onFiles) onFiles(files);
+          else onFile?.(files[0]);
         }}
       />
     </label>
@@ -330,7 +356,9 @@ function VideoCard({
         <p className="text-sm font-semibold">
           {item.test} · {showName(item.showId)}
         </p>
-        <p className="mt-0.5 text-xs text-faint">{item.date ? format(parseISO(item.date), "d MMM yyyy") : "No date"}</p>
+        <p className="mt-0.5 text-xs text-faint">
+          {item.date ? format(parseISO(item.date), "d MMM yyyy") : "No date"}
+        </p>
         {item.note && <p className="mt-2 text-sm text-muted">{item.note}</p>}
       </button>
       {open && (
@@ -354,7 +382,13 @@ function VideoCard({
               <Share2 className="size-4" />
               {copied ? "Note copied" : "Share"}
             </Button>
-            <Button type="button" variant="outline" size="icon" onClick={onRemove} aria-label="Delete video">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={onRemove}
+              aria-label="Delete video"
+            >
               <Trash2 className="size-4" />
             </Button>
           </div>
@@ -380,45 +414,77 @@ export function SheetBoard() {
   const [test, setTest] = useState<string>("2B Super 5");
   const [date, setDate] = useState(format(TODAY, "yyyy-MM-dd"));
   const [note, setNote] = useState("");
-  const [draftUrl, setDraftUrl] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ blob: Blob; dataUrl: string } | null>(null);
+  const [drafts, setDrafts] = useState<DraftPhoto[]>([]);
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
+  const draftsRef = useRef<DraftPhoto[]>([]);
+  draftsRef.current = drafts;
 
   useEffect(() => {
-    return () => {
-      if (draftUrl) URL.revokeObjectURL(draftUrl);
-    };
-  }, [draftUrl]);
+    return () => draftsRef.current.forEach((d) => URL.revokeObjectURL(d.url));
+  }, []);
 
-  const takePhoto = async (file: File | undefined) => {
-    if (!file) return;
+  const addPhotos = async (files: File[]) => {
+    if (files.length === 0) return;
     setError(null);
     setSavedId(null);
     setLogged(false);
-    try {
-      const next = await compressSheetPhoto(file);
-      if (draftUrl) URL.revokeObjectURL(draftUrl);
-      setDraft(next);
-      setDraftUrl(URL.createObjectURL(next.blob));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not use that photo.");
+    const room = MAX_SHEET_PHOTOS - draftsRef.current.length;
+    if (room <= 0) {
+      setError(`Up to ${MAX_SHEET_PHOTOS} photos per test. Remove one first.`);
+      return;
     }
+    const take = files.slice(0, room);
+    setPreparing(true);
+    const added: DraftPhoto[] = [];
+    let failed: string | null = null;
+    for (const file of take) {
+      try {
+        const next = await compressSheetPhoto(file);
+        added.push({
+          key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          ...next,
+          url: URL.createObjectURL(next.blob),
+          label: "",
+        });
+      } catch (err) {
+        failed = err instanceof Error ? err.message : "Could not use that photo.";
+      }
+    }
+    setDrafts((prev) => [...prev, ...added].slice(0, MAX_SHEET_PHOTOS));
+    setPreparing(false);
+    if (failed) setError(failed);
+    else if (files.length > room)
+      setError(`Only ${MAX_SHEET_PHOTOS} photos fit. The extra ones were left out.`);
   };
 
+  const removeDraft = (key: string) => {
+    setDrafts((prev) => {
+      const gone = prev.find((d) => d.key === key);
+      if (gone) URL.revokeObjectURL(gone.url);
+      return prev.filter((d) => d.key !== key);
+    });
+  };
+
+  const labelDraft = (key: string, label: string) =>
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, label } : d)));
+
   const readSheet = async () => {
-    if (!draft) return;
+    if (drafts.length === 0) return;
     setBusy(true);
     setError(null);
     try {
-      const comma = draft.dataUrl.indexOf(",");
-      const imageBase64 = draft.dataUrl.slice(comma + 1);
+      const images = drafts.map((d) => ({
+        imageBase64: d.dataUrl.slice(d.dataUrl.indexOf(",") + 1),
+        mime: "image/jpeg",
+        label: d.label || undefined,
+      }));
       const result = await summariseSheet({
         data: {
-          imageBase64,
-          mime: "image/jpeg",
+          images,
           testHint: test,
           showName: showName(showId),
         },
@@ -428,7 +494,12 @@ export function SheetBoard() {
         return;
       }
       const id = `s-${Date.now()}`;
-      await putMediaBlob(id, draft.blob);
+      // First photo keeps the entry id so older code paths still find it.
+      const photos = drafts.map((d, i) => ({
+        id: i === 0 ? id : `${id}-${i + 1}`,
+        label: d.label || undefined,
+      }));
+      for (let i = 0; i < drafts.length; i++) await putMediaBlob(photos[i].id, drafts[i].blob);
       const read = result.sheet;
       const testName = read.test && read.test !== "unknown" ? read.test : test;
       addReview({
@@ -440,14 +511,14 @@ export function SheetBoard() {
         note: note.trim(),
         mime: "image/jpeg",
         sheet: read,
+        photos,
       });
       setSavedId(id);
-      setDraft(null);
-      if (draftUrl) URL.revokeObjectURL(draftUrl);
-      setDraftUrl(null);
+      drafts.forEach((d) => URL.revokeObjectURL(d.url));
+      setDrafts([]);
       setNote("");
     } catch {
-      setError("Could not read that sheet. Check the photo and try again.");
+      setError("Could not read those sheets. Check the photos and try again.");
     } finally {
       setBusy(false);
     }
@@ -458,11 +529,13 @@ export function SheetBoard() {
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Judge sheets</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          Judge sheets
+        </p>
         <h2 className="font-display mt-1 text-xl font-medium">Photograph the test</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          One photo of the marks and comments, flat and in the light. You get a short read of the test and three
-          schooling options. Pick one. Do not do all three.
+          Every page from every judge, up to {MAX_SHEET_PHOTOS} photos, flat and in the light. You
+          get one read of the whole test and three schooling options. Pick one. Do not do all three.
         </p>
         <MetaFields
           showId={showId}
@@ -473,28 +546,85 @@ export function SheetBoard() {
           setDate={setDate}
           note={note}
           setNote={setNote}
-          noteLabel="Anything the photo will miss?"
+          noteLabel="Anything the photos will miss?"
           notePlaceholder="Optional. He felt downhill in the canter, or the judge spoke to you."
         />
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <FileButton
             capture
             accept="image/*"
-            disabled={busy}
-            onFile={takePhoto}
+            disabled={busy || preparing || drafts.length >= MAX_SHEET_PHOTOS}
+            onFiles={addPhotos}
             icon={<Camera className="size-4" />}
           >
-            Take a photo
+            {drafts.length === 0 ? "Take a photo" : "Add another page"}
           </FileButton>
-          <FileButton accept="image/*" disabled={busy} onFile={takePhoto} variant="outline">
-            Choose a photo
+          <FileButton
+            accept="image/*"
+            multiple
+            disabled={busy || preparing || drafts.length >= MAX_SHEET_PHOTOS}
+            onFiles={addPhotos}
+            variant="outline"
+            icon={<ImagePlus className="size-4" />}
+          >
+            {drafts.length === 0 ? "Choose photos" : "Choose more"}
           </FileButton>
         </div>
-        {draftUrl && (
+        {(drafts.length > 0 || preparing) && (
           <div className="mt-3">
-            <img src={draftUrl} alt="Judge sheet, ready to read" className="w-full rounded-lg" />
-            <Button type="button" className="mt-3 w-full" disabled={busy} onClick={readSheet}>
-              {busy ? "Reading the sheet…" : "Summarise this test"}
+            <p className="text-xs text-muted">
+              {drafts.length} of {MAX_SHEET_PHOTOS} pages{preparing ? " · preparing…" : ""}. Tag the
+              judge if you know it.
+            </p>
+            <ul className="mt-2 grid grid-cols-3 gap-2">
+              {drafts.map((d, i) => (
+                <li key={d.key} className="relative">
+                  <img
+                    src={d.url}
+                    alt={`Judge sheet page ${i + 1}`}
+                    className="aspect-[3/4] w-full rounded-lg bg-bg object-cover shadow-[var(--shadow-card)]"
+                  />
+                  <span className="absolute top-1 left-1 rounded bg-fg/70 px-1.5 text-[11px] font-semibold text-bg tabular-nums">
+                    {i + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeDraft(d.key)}
+                    disabled={busy}
+                    aria-label={`Remove page ${i + 1}`}
+                    className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-fg/70 text-bg"
+                  >
+                    <X className="size-4" />
+                  </button>
+                  <select
+                    aria-label={`Judge for page ${i + 1}`}
+                    value={d.label}
+                    disabled={busy}
+                    onChange={(e) => labelDraft(d.key, e.target.value)}
+                    className="mt-1 h-9 w-full rounded-md bg-bg px-1 text-xs shadow-[var(--shadow-card)]"
+                  >
+                    {JUDGE_LABELS.map((l) => (
+                      <option key={l} value={l}>
+                        {l ? `Judge ${l.startsWith("Judge") ? l.slice(6) : `at ${l}`}` : "Judge?"}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+            <Button
+              type="button"
+              className="mt-3 w-full"
+              disabled={busy || preparing || drafts.length === 0}
+              onClick={readSheet}
+            >
+              {busy
+                ? drafts.length > 1
+                  ? `Reading ${drafts.length} pages…`
+                  : "Reading the sheet…"
+                : drafts.length > 1
+                  ? `Summarise this test (${drafts.length} pages)`
+                  : "Summarise this test"}
             </Button>
           </div>
         )}
@@ -529,7 +659,8 @@ export function SheetBoard() {
                 key={item.id}
                 item={item}
                 onRemove={async () => {
-                  await deleteMediaBlob(item.id).catch(() => undefined);
+                  for (const photo of sheetPhotoIds(item))
+                    await deleteMediaBlob(photo.id).catch(() => undefined);
                   removeReview(item.id);
                 }}
               />
@@ -555,7 +686,9 @@ function SheetSummary({
   const [copied, setCopied] = useState(false);
   if (!sheet) return null;
   return (
-    <section className={embedded ? "" : "rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5"}>
+    <section
+      className={embedded ? "" : "rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5"}
+    >
       <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
         {item.test} · {showName(item.showId)}
       </p>
@@ -570,13 +703,40 @@ function SheetSummary({
       <p className="mt-3 text-sm leading-relaxed">{sheet.summary}</p>
       {item.note && <p className="mt-2 text-sm text-muted">{item.note}</p>}
       {sheet.caveat && <p className="mt-2 text-sm text-warn">{sheet.caveat}</p>}
+      {sheet.judges && sheet.judges.length > 1 && (
+        <ul className="mt-4 flex flex-col gap-2">
+          {sheet.judges.map((j) => (
+            <li key={j.position} className="rounded-lg bg-bg px-3 py-2 text-sm">
+              <p className="font-semibold">
+                {/^judge/i.test(j.position) ? j.position : `Judge at ${j.position}`}
+                {j.name ? <span className="font-normal text-muted"> · {j.name}</span> : null}
+                {j.percent != null ? (
+                  <span className="ml-2 font-mono tabular-nums">{j.percent.toFixed(1)}%</span>
+                ) : null}
+              </p>
+              {j.remarks.length > 0 && <p className="mt-0.5 text-muted">{j.remarks.join(" · ")}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {sheet.agreement && (
+        <p className="mt-3 text-sm text-muted">Judges agreed: {sheet.agreement}</p>
+      )}
+      {sheet.disagreement && (
+        <p className="mt-2 text-sm text-muted">Judges differed: {sheet.disagreement}</p>
+      )}
       {sheet.lowMarks.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
           {sheet.lowMarks.map((mark) => (
-            <li key={`${mark.movement}-${mark.mark}`} className="rounded-lg bg-bg px-3 py-2 text-sm">
+            <li
+              key={`${mark.movement}-${mark.mark}`}
+              className="rounded-lg bg-bg px-3 py-2 text-sm"
+            >
               <p className="font-semibold">
                 {mark.movement}
-                {mark.mark ? <span className="ml-2 font-mono text-warn tabular-nums">{mark.mark}</span> : null}
+                {mark.mark ? (
+                  <span className="ml-2 font-mono text-warn tabular-nums">{mark.mark}</span>
+                ) : null}
               </p>
               {mark.comment && <p className="mt-0.5 text-muted">{mark.comment}</p>}
             </li>
@@ -586,7 +746,10 @@ function SheetSummary({
       {sheet.strengths.length > 0 && (
         <p className="mt-3 text-sm text-muted">Held up: {sheet.strengths.join(" · ")}</p>
       )}
-      {sheet.collectives && <p className="mt-2 text-sm text-muted">Collectives: {sheet.collectives}</p>}
+      {sheet.collectives && (
+        <p className="mt-2 text-sm text-muted">Collectives: {sheet.collectives}</p>
+      )}
+      <SheetPhotos item={item} />
       {sheet.workOns.length > 0 && (
         <div className="mt-4">
           <p className="text-sm font-semibold">Work on one of these</p>
@@ -605,7 +768,12 @@ function SheetSummary({
       )}
       <div className="mt-4 flex flex-col gap-2">
         {sheet.percent != null && onLog && (
-          <Button type="button" variant={logged ? "secondary" : "default"} disabled={logged} onClick={onLog}>
+          <Button
+            type="button"
+            variant={logged ? "secondary" : "default"}
+            disabled={logged}
+            onClick={onLog}
+          >
             {logged ? (
               <>
                 <Check className="size-4" /> On the log
@@ -630,12 +798,80 @@ function SheetSummary({
   );
 }
 
+function SheetPhotos({ item }: { item: ReviewItem }) {
+  const [urls, setUrls] = useState<{ id: string; url: string; label?: string }[]>([]);
+  const [big, setBig] = useState<string | null>(null);
+  const key = sheetPhotoIds(item)
+    .map((p) => p.id)
+    .join("|");
+  useEffect(() => {
+    let dead = false;
+    const made: string[] = [];
+    Promise.all(
+      sheetPhotoIds(item).map(async (p) => {
+        const blob = await getMediaBlob(p.id).catch(() => undefined);
+        if (!blob) return null;
+        const url = URL.createObjectURL(blob);
+        made.push(url);
+        return { id: p.id, url, label: p.label };
+      }),
+    ).then((list) => {
+      if (!dead)
+        setUrls(list.filter((x): x is { id: string; url: string; label: string | undefined } => x != null));
+    });
+    return () => {
+      dead = true;
+      made.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  if (urls.length === 0) return null;
+  return (
+    <div className="mt-4">
+      <p className="text-xs text-muted">
+        {urls.length === 1 ? "The sheet" : `${urls.length} pages`}
+      </p>
+      <ul className="mt-1 grid grid-cols-3 gap-2">
+        {urls.map((p, i) => (
+          <li key={p.id} className="relative">
+            <button
+              type="button"
+              className="block w-full"
+              onClick={() => setBig(big === p.url ? null : p.url)}
+            >
+              <img
+                src={p.url}
+                alt={`Judge sheet page ${i + 1}`}
+                className="aspect-[3/4] w-full rounded-lg bg-bg object-cover shadow-[var(--shadow-card)]"
+              />
+            </button>
+            {p.label && (
+              <span className="absolute bottom-1 left-1 rounded bg-fg/70 px-1.5 text-[11px] font-semibold text-bg">
+                {p.label}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {big && (
+        <button type="button" className="mt-2 block w-full" onClick={() => setBig(null)}>
+          <img src={big} alt="Judge sheet, full size" className="w-full rounded-lg" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SheetCard({ item, onRemove }: { item: ReviewItem; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <li className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start justify-between gap-2">
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen((v) => !v)}>
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left"
+          onClick={() => setOpen((v) => !v)}
+        >
           <p className="text-sm font-semibold">
             {item.test}
             {item.sheet?.percent != null ? ` · ${item.sheet.percent.toFixed(1)}%` : ""}
@@ -661,8 +897,17 @@ function SheetCard({ item, onRemove }: { item: ReviewItem; onRemove: () => void 
 function sheetBrief(item: ReviewItem, sheet: SheetRead) {
   const lines = [
     `Jura Samson · ${item.test} · ${showName(item.showId)} · ${item.date}`,
-    sheet.percent != null ? `${sheet.percent.toFixed(1)}%${sheet.place ? ` · ${sheet.place}` : ""}` : "",
+    sheet.percent != null
+      ? `${sheet.percent.toFixed(1)}%${sheet.place ? ` · ${sheet.place}` : ""}`
+      : "",
     sheet.summary,
+    ...(sheet.judges && sheet.judges.length > 1
+      ? sheet.judges.map(
+          (j) =>
+            `${/^judge/i.test(j.position) ? j.position : `Judge at ${j.position}`}${j.percent != null ? ` ${j.percent.toFixed(1)}%` : ""}${j.remarks.length ? `: ${j.remarks.join("; ")}` : ""}`,
+        )
+      : []),
+    sheet.disagreement ? `Judges differed: ${sheet.disagreement}` : "",
     item.note,
     ...sheet.workOns.map((work, i) => `Option ${i + 1}: ${work.title}. ${work.how}`),
   ];

@@ -46,34 +46,57 @@ export async function deleteMediaBlob(id: string) {
   db.close();
 }
 
-export async function compressSheetPhoto(file: File): Promise<{ blob: Blob; dataUrl: string }> {
+/**
+ * Shrinks a sheet photo to fit maxBase64 characters (default 650k, about 480 KB JPEG),
+ * so six pages still fit in one request under the server body limit.
+ */
+export async function compressSheetPhoto(
+  file: File,
+  maxBase64 = 650_000,
+): Promise<{ blob: Blob; dataUrl: string }> {
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) {
-    if (file.size > 1_400_000) {
+    const dataUrl = await blobToDataUrl(file);
+    if (dataUrl.length > maxBase64) {
       throw new Error("That photo is too big to read. Take it again, closer, as a normal photo.");
     }
-    const dataUrl = await blobToDataUrl(file);
     return { blob: file, dataUrl };
   }
-  const max = 1400;
-  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not prepare the photo");
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (next) => (next ? resolve(next) : reject(new Error("Could not prepare the photo"))),
-      "image/jpeg",
-      0.72,
-    );
-  });
-  return { blob, dataUrl: await blobToDataUrl(blob) };
+  const attempts: [number, number][] = [
+    [1600, 0.72],
+    [1600, 0.6],
+    [1400, 0.6],
+    [1250, 0.55],
+    [1100, 0.5],
+    [950, 0.45],
+  ];
+  let last: { blob: Blob; dataUrl: string } | null = null;
+  try {
+    for (const [max, quality] of attempts) {
+      const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not prepare the photo");
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (next) => (next ? resolve(next) : reject(new Error("Could not prepare the photo"))),
+          "image/jpeg",
+          quality,
+        );
+      });
+      last = { blob, dataUrl: await blobToDataUrl(blob) };
+      const base64Len = last.dataUrl.length - last.dataUrl.indexOf(",") - 1;
+      if (base64Len <= maxBase64) return last;
+    }
+  } finally {
+    bitmap.close();
+  }
+  throw new Error("That photo is too detailed to send. Take it again a little closer.");
 }
 
 function blobToDataUrl(blob: Blob) {

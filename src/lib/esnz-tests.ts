@@ -3,7 +3,8 @@
  *  Source: ESNZ Novice Tests A–C & FS 2023.
  */
 
-export type Pace = "trot" | "medium" | "walk" | "free" | "canter" | "medium-canter" | "yield" | "change";
+export type Pace =
+  "trot" | "medium" | "walk" | "free" | "canter" | "medium-canter" | "yield" | "change";
 
 export type Draw =
   | { t: "line"; pts: string[] }
@@ -27,7 +28,6 @@ export type Movement = {
   pace?: Pace;
 };
 
-
 export type SetTest = {
   id: "2a" | "2b" | "2c";
   short: string;
@@ -50,7 +50,8 @@ export const COLLECTIVES: Collective[] = [
   { name: "Paces", detail: "Freedom and regularity", coeff: 1 },
   {
     name: "Impulsion",
-    detail: "Desire to move forward, elasticity of the steps, relaxation of the back and engagement of the hindquarters",
+    detail:
+      "Desire to move forward, elasticity of the steps, relaxation of the back and engagement of the hindquarters",
     coeff: 1,
   },
   {
@@ -61,7 +62,8 @@ export const COLLECTIVES: Collective[] = [
   },
   {
     name: "Rider",
-    detail: "Position and seat; correctness and effective use of the aids (clarity, subtlety, independence, accuracy of test)",
+    detail:
+      "Position and seat; correctness and effective use of the aids (clarity, subtlety, independence, accuracy of test)",
     coeff: 2,
   },
 ];
@@ -69,7 +71,8 @@ export const COLLECTIVES: Collective[] = [
 export const NOVICE_PURPOSE =
   "To confirm that the horse demonstrates correct basics, and in addition to the requirements of Preliminary Level, has developed the thrust to achieve improved balance and throughness and maintains a more consistent contact with the bit.";
 
-export const NOVICE_INSTRUCTIONS = "To be ridden in a snaffle. All trot sitting or rising unless stated otherwise.";
+export const NOVICE_INSTRUCTIONS =
+  "To be ridden in a snaffle. All trot sitting or rising unless stated otherwise.";
 
 const ENTER: Movement = {
   n: 1,
@@ -80,7 +83,10 @@ const ENTER: Movement = {
   ],
   directive:
     "Regularity and quality of trot; willing clear transitions; straightness, attentiveness; immobility (min. 3 secs)",
-  draw: [{ t: "line", pts: ["A", "X"] }, { t: "halt", at: "X" }],
+  draw: [
+    { t: "line", pts: ["A", "X"] },
+    { t: "halt", at: "X" },
+  ],
 };
 
 export const TEST_2A: SetTest = {
@@ -92,7 +98,8 @@ export const TEST_2A: SetTest = {
   time: "5:30 from entry at A",
   drawTime: "8:00",
   arena: "60 × 20",
-  purpose: "Accuracy and a clean stretch. Ride it at home when 2B is stale, not as a Super 5 substitute.",
+  purpose:
+    "Accuracy and a clean stretch. Ride it at home when 2B is stale, not as a Super 5 substitute.",
   introduces: "10m half circle in trot, 15m circle in canter, lengthening of stride in trot",
   leave: "Leave arena in walk on a long rein at A",
   keys: [
@@ -126,7 +133,8 @@ export const TEST_2A: SetTest = {
         { at: "E X", do: "Half circle left 10m, returning to the track at H" },
         { at: "H B", do: "Working trot" },
       ],
-      directive: "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
+      directive:
+        "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
       draw: [
         { t: "line", pts: ["X", "C", "H"] },
         { t: "half", from: "E", to: "X", bulge: "A" },
@@ -139,7 +147,8 @@ export const TEST_2A: SetTest = {
         { at: "B X", do: "Half circle right 10m, returning to the track at M" },
         { at: "M C", do: "Working trot" },
       ],
-      directive: "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
+      directive:
+        "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
       draw: [
         { t: "half", from: "B", to: "X", bulge: "A" },
         { t: "line", pts: ["X", "G", "M", "C"] },
@@ -149,13 +158,19 @@ export const TEST_2A: SetTest = {
       n: 4,
       coeff: 2,
       steps: [
-        { at: "C", do: "Circle left 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact" },
+        {
+          at: "C",
+          do: "Circle left 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact",
+        },
         { at: "Before C", do: "Shorten the reins" },
         { at: "C H", do: "Working trot" },
       ],
       directive:
         "Forward and downward stretch over the back into a light contact maintaining balance and quality of trot; bend; shape and size of circle; willing, clear transitions",
-      draw: [{ t: "stretch", at: "C" }, { t: "line", pts: ["C", "H"] }],
+      draw: [
+        { t: "stretch", at: "C" },
+        { t: "line", pts: ["C", "H"] },
+      ],
     },
     {
       n: 5,
@@ -165,7 +180,10 @@ export const TEST_2A: SetTest = {
       ],
       directive:
         "Moderate lengthening of frame and stride; regularity and quality of trot; straightness; consistent tempo; willing, clear transitions; bend and balance in corner",
-      draw: [{ t: "diag", from: "H", to: "P" }, { t: "line", pts: ["P", "F", "A"] }],
+      draw: [
+        { t: "diag", from: "H", to: "P" },
+        { t: "line", pts: ["P", "F", "A"] },
+      ],
     },
     {
       n: 6,
@@ -184,7 +202,10 @@ export const TEST_2A: SetTest = {
       ],
       directive:
         "Regularity and quality of walks; reach and ground cover with overtrack of free walk allowing complete freedom to stretch the neck forward and downward into a light contact; straightness; clear, balanced transitions",
-      draw: [{ t: "diag", from: "V", to: "R" }, { t: "line", pts: ["R", "M"] }],
+      draw: [
+        { t: "diag", from: "V", to: "R" },
+        { t: "line", pts: ["R", "M"] },
+      ],
     },
     {
       n: 8,
@@ -194,7 +215,8 @@ export const TEST_2A: SetTest = {
         { at: "C", do: "Working canter left lead" },
         { at: "C E", do: "Working canter" },
       ],
-      directive: "Willing clear transitions; regularity and quality of paces; bend and balance in corners",
+      directive:
+        "Willing clear transitions; regularity and quality of paces; bend and balance in corners",
       draw: [{ t: "line", pts: ["M", "C", "H", "S", "E"] }],
     },
     {
@@ -204,7 +226,10 @@ export const TEST_2A: SetTest = {
         { at: "E F", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of circle; bend; balance",
-      draw: [{ t: "circle", at: "E", m: 15 }, { t: "line", pts: ["E", "V", "K", "A", "F"] }],
+      draw: [
+        { t: "circle", at: "E", m: 15 },
+        { t: "line", pts: ["E", "V", "K", "A", "F"] },
+      ],
     },
     {
       n: 10,
@@ -212,7 +237,8 @@ export const TEST_2A: SetTest = {
         { at: "F X H", do: "Change rein" },
         { at: "X", do: "Working trot" },
       ],
-      directive: "Willing, clear transition; regularity and quality of gaits; straightness; bend and balance in corner",
+      directive:
+        "Willing, clear transition; regularity and quality of gaits; straightness; bend and balance in corner",
       draw: [{ t: "diag", from: "F", to: "H" }],
     },
     {
@@ -222,7 +248,8 @@ export const TEST_2A: SetTest = {
         { at: "C", do: "Working canter right lead" },
         { at: "C B", do: "Working canter" },
       ],
-      directive: "Willing, clear transition; regularity and quality of canter; bend and balance in corner",
+      directive:
+        "Willing, clear transition; regularity and quality of canter; bend and balance in corner",
       draw: [{ t: "line", pts: ["H", "C", "M", "R", "B"] }],
     },
     {
@@ -232,7 +259,10 @@ export const TEST_2A: SetTest = {
         { at: "B A", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of circle; bend; balance",
-      draw: [{ t: "circle", at: "B", m: 15 }, { t: "line", pts: ["B", "P", "F", "A"] }],
+      draw: [
+        { t: "circle", at: "B", m: 15 },
+        { t: "line", pts: ["B", "P", "F", "A"] },
+      ],
     },
     {
       n: 13,
@@ -240,7 +270,8 @@ export const TEST_2A: SetTest = {
         { at: "A", do: "Working trot" },
         { at: "A K", do: "Working trot" },
       ],
-      directive: "Willing, clear transition; regularity and quality of trot; straightness; bend and balance in corner",
+      directive:
+        "Willing, clear transition; regularity and quality of trot; straightness; bend and balance in corner",
       draw: [{ t: "line", pts: ["A", "K"] }],
     },
     {
@@ -251,7 +282,10 @@ export const TEST_2A: SetTest = {
       ],
       directive:
         "Moderate lengthening of frame and stride; regularity and quality of trot; straightness; consistent tempo; willing, clear transitions; bend and balance in corners",
-      draw: [{ t: "diag", from: "K", to: "R" }, { t: "line", pts: ["R", "B", "P", "F"] }],
+      draw: [
+        { t: "diag", from: "K", to: "R" },
+        { t: "line", pts: ["R", "B", "P", "F"] },
+      ],
     },
     {
       n: 15,
@@ -280,7 +314,8 @@ export const TEST_2B: SetTest = {
   time: "5:30 from entry at A",
   drawTime: "8:00",
   arena: "60 × 20",
-  purpose: "North Island Super 5 test. Ridden from memory. Highest coefficients sit on the leg yields, walks, lengthenings and the stretchy circle.",
+  purpose:
+    "North Island Super 5 test. Ridden from memory. Highest coefficients sit on the leg yields, walks, lengthenings and the stretchy circle.",
   introduces: "Leg yielding, lengthening of stride in canter",
   leave: "Leave arena in walk on a long rein at A",
   keys: [
@@ -292,7 +327,8 @@ export const TEST_2B: SetTest = {
     {
       move: "Leg yields L → M and L → H",
       judge: "Alignment, balance and flow",
-      school: "Straight on the centre line first. Then the yield — he does not lead with the shoulder.",
+      school:
+        "Straight on the centre line first. Then the yield — he does not lead with the shoulder.",
     },
     {
       move: "Lengthen in trot and canter",
@@ -306,7 +342,13 @@ export const TEST_2B: SetTest = {
     },
   ],
   movements: [
-    { ...ENTER, draw: [{ t: "line", pts: ["A", "X", "C"] }, { t: "halt", at: "X" }] },
+    {
+      ...ENTER,
+      draw: [
+        { t: "line", pts: ["A", "X", "C"] },
+        { t: "halt", at: "X" },
+      ],
+    },
     {
       n: 2,
       steps: [
@@ -316,7 +358,11 @@ export const TEST_2B: SetTest = {
       ],
       directive:
         "Bend and balance in the turns; moderate lengthening of frame and stride; regularity and quality of trot; willing, clear transitions; straightness; consistent tempo",
-      draw: [{ t: "line", pts: ["C", "M"] }, { t: "diag", from: "M", to: "V" }, { t: "line", pts: ["V", "K"] }],
+      draw: [
+        { t: "line", pts: ["C", "M"] },
+        { t: "diag", from: "M", to: "V" },
+        { t: "line", pts: ["V", "K"] },
+      ],
     },
     {
       n: 3,
@@ -326,7 +372,8 @@ export const TEST_2B: SetTest = {
         { at: "L M", do: "Leg yield right" },
         { at: "M H", do: "Working trot" },
       ],
-      directive: "Regularity and quality of trot; straightness on centre line; consistent tempo; alignment; balance and flow",
+      directive:
+        "Regularity and quality of trot; straightness on centre line; consistent tempo; alignment; balance and flow",
       draw: [
         { t: "line", pts: ["K", "A", "D", "L"] },
         { t: "yield", from: "L", to: "M" },
@@ -341,7 +388,10 @@ export const TEST_2B: SetTest = {
       ],
       directive:
         "Moderate lengthening of frame and stride; regularity and quality of trot; willing, clear transitions; straightness; consistent tempo",
-      draw: [{ t: "diag", from: "H", to: "P" }, { t: "line", pts: ["P", "F"] }],
+      draw: [
+        { t: "diag", from: "H", to: "P" },
+        { t: "line", pts: ["P", "F"] },
+      ],
     },
     {
       n: 5,
@@ -362,7 +412,8 @@ export const TEST_2B: SetTest = {
       n: 6,
       coeff: 2,
       steps: [{ at: "C M", do: "Medium walk" }],
-      directive: "Willing, clear transition; regularity and quality of walk; over track, bend and balance in corner",
+      directive:
+        "Willing, clear transition; regularity and quality of walk; over track, bend and balance in corner",
       draw: [{ t: "line", pts: ["C", "M"] }],
     },
     {
@@ -374,7 +425,10 @@ export const TEST_2B: SetTest = {
       ],
       directive:
         "Regularity and quality of walks; reach and ground cover, with over track of free walk allowing complete freedom to stretch the neck forward and downward into a light contact; straightness; clear, balanced transitions",
-      draw: [{ t: "diag", from: "M", to: "V" }, { t: "line", pts: ["V", "K"] }],
+      draw: [
+        { t: "diag", from: "M", to: "V" },
+        { t: "line", pts: ["V", "K"] },
+      ],
     },
     {
       n: 8,
@@ -383,7 +437,8 @@ export const TEST_2B: SetTest = {
         { at: "A", do: "Working canter left lead" },
         { at: "A P", do: "Working canter" },
       ],
-      directive: "Willing, clear transitions; regularity and quality of paces and bend and balance in corners",
+      directive:
+        "Willing, clear transitions; regularity and quality of paces and bend and balance in corners",
       draw: [{ t: "line", pts: ["K", "A", "F", "P"] }],
     },
     {
@@ -424,7 +479,8 @@ export const TEST_2B: SetTest = {
         { at: "F", do: "Working canter right lead" },
         { at: "F V", do: "Working canter" },
       ],
-      directive: "Willing, clear transitions; regularity and quality of canter; bend and balance in corners",
+      directive:
+        "Willing, clear transitions; regularity and quality of canter; bend and balance in corners",
       draw: [{ t: "line", pts: ["F", "A", "K", "V"] }],
     },
     {
@@ -447,26 +503,34 @@ export const TEST_2B: SetTest = {
         { at: "Between H & C", do: "Develop working canter" },
         { at: "C M", do: "Working canter" },
       ],
-      directive: "Willing, clear transition; regularity and quality of trot and canter; bend in corners",
+      directive:
+        "Willing, clear transition; regularity and quality of trot and canter; bend in corners",
       draw: [{ t: "line", pts: ["H", "C", "M"] }],
     },
     {
       n: 17,
       steps: [{ at: "M", do: "Working trot" }],
-      directive: "Willing, clear, engaged transition; regularity and quality of paces; straightness",
+      directive:
+        "Willing, clear, engaged transition; regularity and quality of paces; straightness",
       draw: [{ t: "line", pts: ["M", "R", "B"] }],
     },
     {
       n: 18,
       coeff: 2,
       steps: [
-        { at: "B", do: "Circle right 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact" },
+        {
+          at: "B",
+          do: "Circle right 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact",
+        },
         { at: "Before B", do: "Shorten the reins" },
         { at: "B A", do: "Working trot" },
       ],
       directive:
         "Forward and downward stretch over the back into a light contact maintaining balance and quality of trot; bend; shape and size of circle; willing, clear transitions",
-      draw: [{ t: "stretch", at: "B" }, { t: "line", pts: ["B", "P", "F", "A"] }],
+      draw: [
+        { t: "stretch", at: "B" },
+        { t: "line", pts: ["B", "P", "F", "A"] },
+      ],
     },
     {
       n: 19,
@@ -476,7 +540,10 @@ export const TEST_2B: SetTest = {
       ],
       directive:
         "Bend and balance in turn, regularity and quality of trot, willing, clear transition; straightness, attentiveness; immobility (min. 3 secs)",
-      draw: [{ t: "line", pts: ["A", "X"] }, { t: "halt", at: "X" }],
+      draw: [
+        { t: "line", pts: ["A", "X"] },
+        { t: "halt", at: "X" },
+      ],
     },
   ],
 };
@@ -490,7 +557,8 @@ export const TEST_2C: SetTest = {
   time: "6:00 from entry at A",
   drawTime: "8:00",
   arena: "60 × 20",
-  purpose: "The school test. Ride it from the sheet at home until the letters are boring. Super 5 2B is ridden from memory.",
+  purpose:
+    "The school test. Ride it from the sheet at home until the letters are boring. Super 5 2B is ridden from memory.",
   introduces: "10m circle at trot, change of lead through trot, counter canter",
   leave: "Leave arena in walk on a long rein at A",
   keys: [
@@ -516,7 +584,13 @@ export const TEST_2C: SetTest = {
     },
   ],
   movements: [
-    { ...ENTER, draw: [{ t: "line", pts: ["A", "X", "C"] }, { t: "halt", at: "X" }] },
+    {
+      ...ENTER,
+      draw: [
+        { t: "line", pts: ["A", "X", "C"] },
+        { t: "halt", at: "X" },
+      ],
+    },
     {
       n: 2,
       steps: [
@@ -526,7 +600,11 @@ export const TEST_2C: SetTest = {
       ],
       directive:
         "Bend and balance in turns; moderate lengthening of frame and stride; regularity and quality of trot; willing, clear transitions; straightness; consistent tempo",
-      draw: [{ t: "line", pts: ["C", "H"] }, { t: "diag", from: "H", to: "F" }, { t: "line", pts: ["F", "P", "B"] }],
+      draw: [
+        { t: "line", pts: ["C", "H"] },
+        { t: "diag", from: "H", to: "F" },
+        { t: "line", pts: ["F", "P", "B"] },
+      ],
     },
     {
       n: 3,
@@ -543,25 +621,36 @@ export const TEST_2C: SetTest = {
         { at: "C", do: "Track right" },
         { at: "C B", do: "Working trot" },
       ],
-      directive: "Regularity and quality of trot; shape and size of circle; bend; balance; straightness on centre line",
-      draw: [{ t: "circle", at: "I", m: 10 }, { t: "line", pts: ["I", "G", "C", "M", "R", "B"] }],
+      directive:
+        "Regularity and quality of trot; shape and size of circle; bend; balance; straightness on centre line",
+      draw: [
+        { t: "circle", at: "I", m: 10 },
+        { t: "line", pts: ["I", "G", "C", "M", "R", "B"] },
+      ],
     },
     {
       n: 5,
       coeff: 2,
       steps: [
-        { at: "B", do: "Circle right 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact" },
+        {
+          at: "B",
+          do: "Circle right 20m rising trot, allowing the horse to stretch forward and downward while maintaining contact",
+        },
         { at: "Before B", do: "Shorten the reins" },
         { at: "B A", do: "Working trot" },
       ],
       directive:
         "Forward and downward stretch over the back into a light contact, maintaining balance and quality of trot; bend; shape and size of circle; willing, clear transitions",
-      draw: [{ t: "stretch", at: "B" }, { t: "line", pts: ["B", "P", "F", "A"] }],
+      draw: [
+        { t: "stretch", at: "B" },
+        { t: "line", pts: ["B", "P", "F", "A"] },
+      ],
     },
     {
       n: 6,
       steps: [{ at: "A", do: "Canter right lead" }],
-      directive: "Willing, clear transition; regularity and quality of canter; bend and balance in corner",
+      directive:
+        "Willing, clear transition; regularity and quality of canter; bend and balance in corner",
       draw: [{ t: "line", pts: ["A", "K"] }],
     },
     {
@@ -572,7 +661,10 @@ export const TEST_2C: SetTest = {
         { at: "H C", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of loop; positioning; balance",
-      draw: [{ t: "loop", from: "K", to: "H" }, { t: "line", pts: ["H", "C"] }],
+      draw: [
+        { t: "loop", from: "K", to: "H" },
+        { t: "line", pts: ["H", "C"] },
+      ],
     },
     {
       n: 8,
@@ -581,7 +673,10 @@ export const TEST_2C: SetTest = {
         { at: "C M", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of circle; bend; balance",
-      draw: [{ t: "circle", at: "C", m: 15 }, { t: "line", pts: ["C", "M"] }],
+      draw: [
+        { t: "circle", at: "C", m: 15 },
+        { t: "line", pts: ["C", "M"] },
+      ],
     },
     {
       n: 9,
@@ -609,7 +704,8 @@ export const TEST_2C: SetTest = {
         { at: "C", do: "Medium walk" },
         { at: "C H", do: "Medium walk" },
       ],
-      directive: "Willing, clear transition; regularity and quality of walk; over track; bend; balance; straightness",
+      directive:
+        "Willing, clear transition; regularity and quality of walk; over track; bend; balance; straightness",
       draw: [{ t: "line", pts: ["M", "C", "H"] }],
     },
     {
@@ -621,7 +717,10 @@ export const TEST_2C: SetTest = {
       ],
       directive:
         "Regularity and quality of walks; reach, over track and ground cover of free walk allowing complete freedom to stretch the neck forward and downward into a light contact; straightness; clear, balanced transitions",
-      draw: [{ t: "diag", from: "H", to: "K" }, { t: "line", pts: ["K", "A"] }],
+      draw: [
+        { t: "diag", from: "H", to: "K" },
+        { t: "line", pts: ["K", "A"] },
+      ],
     },
     {
       n: 13,
@@ -629,7 +728,8 @@ export const TEST_2C: SetTest = {
         { at: "A", do: "Working trot" },
         { at: "A P", do: "Working trot" },
       ],
-      directive: "Willing, clear, engaged transition; regularity and quality of trot; straightness; bend and balance in corner",
+      directive:
+        "Willing, clear, engaged transition; regularity and quality of trot; straightness; bend and balance in corner",
       draw: [{ t: "line", pts: ["A", "F", "P"] }],
     },
     {
@@ -647,7 +747,10 @@ export const TEST_2C: SetTest = {
         { at: "C", do: "Track right" },
       ],
       directive: "Regularity and quality of trot; shape and size of circle; bend; balance",
-      draw: [{ t: "circle", at: "I", m: 10 }, { t: "line", pts: ["I", "G", "C", "M"] }],
+      draw: [
+        { t: "circle", at: "I", m: 10 },
+        { t: "line", pts: ["I", "G", "C", "M"] },
+      ],
     },
     {
       n: 16,
@@ -662,7 +765,8 @@ export const TEST_2C: SetTest = {
     {
       n: 17,
       steps: [{ at: "A", do: "Working canter left lead" }],
-      directive: "Willing, calm transition; regularity and quality of gait; bend and balance in corner",
+      directive:
+        "Willing, calm transition; regularity and quality of gait; bend and balance in corner",
       draw: [{ t: "line", pts: ["K", "A", "F"] }],
     },
     {
@@ -673,7 +777,10 @@ export const TEST_2C: SetTest = {
         { at: "M C", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of loop; positioning; balance",
-      draw: [{ t: "loop", from: "F", to: "M" }, { t: "line", pts: ["M", "C"] }],
+      draw: [
+        { t: "loop", from: "F", to: "M" },
+        { t: "line", pts: ["M", "C"] },
+      ],
     },
     {
       n: 19,
@@ -682,7 +789,10 @@ export const TEST_2C: SetTest = {
         { at: "C H", do: "Working canter" },
       ],
       directive: "Regularity and quality of canter; shape and size of circle; bend; balance",
-      draw: [{ t: "circle", at: "C", m: 15 }, { t: "line", pts: ["C", "H"] }],
+      draw: [
+        { t: "circle", at: "C", m: 15 },
+        { t: "line", pts: ["C", "H"] },
+      ],
     },
     {
       n: 20,
@@ -702,7 +812,10 @@ export const TEST_2C: SetTest = {
         { at: "H M", do: "Working canter" },
       ],
       directive: "Willing clear transitions; regularity and quality of paces; straightness",
-      draw: [{ t: "diag", from: "F", to: "H" }, { t: "line", pts: ["H", "C", "M"] }],
+      draw: [
+        { t: "diag", from: "F", to: "H" },
+        { t: "line", pts: ["H", "C", "M"] },
+      ],
     },
     {
       n: 22,

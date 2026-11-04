@@ -39,7 +39,8 @@ export const OFFICIAL_SCORES: OfficialScore[] = [
     date: "2026-05-10",
     test: "Medium TOC",
     percent: 58.33,
-    notes: "Level 3 & above test of choice. J1 Jacqui Thompson 58.333. Schooling above the level — not a Super 5 score.",
+    notes:
+      "Level 3 & above test of choice. J1 Jacqui Thompson 58.333. Schooling above the level — not a Super 5 score.",
     place: "5th",
     official: true,
     level: "L4",

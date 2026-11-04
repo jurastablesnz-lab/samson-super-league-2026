@@ -84,7 +84,7 @@ export function FreestyleBar() {
   const max = duration > 0 ? duration : 1;
 
   return (
-    <div className="mb-5 rounded-xl bg-accent px-3 py-3 text-accent-fg sm:px-4">
+    <div className="vd-player mb-5 rounded-xl bg-accent px-3 py-3 text-accent-fg sm:px-4">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -133,7 +133,7 @@ export function FreestyleCard({ className }: { className?: string }) {
   const overWindow = duration > 0 && duration > 4 * 60 + 30;
 
   return (
-    <section className={cn("rounded-xl bg-accent p-4 text-accent-fg shadow-[var(--shadow-card)] sm:p-5", className)}>
+    <section className={cn("vd-player rounded-xl bg-accent p-4 text-accent-fg shadow-[var(--shadow-card)] sm:p-5", className)}>
       <p className="text-[11px] font-semibold tracking-[0.16em] uppercase">{FREESTYLE.series}</p>
       <h2 className="font-display mt-1 text-xl leading-snug font-medium">{FREESTYLE.title}</h2>
       <p className="mt-1 text-sm text-accent-fg/80">{FREESTYLE.horse} · finish between {FREESTYLE.timeAllowed}</p>

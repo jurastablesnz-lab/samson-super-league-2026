@@ -113,12 +113,21 @@ export function App() {
   }, []);
 
   return (
-    <div className="min-h-dvh bg-bg text-fg">
+    <div className="vd-glow min-h-dvh text-fg">
       <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 pb-36 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+        <div className="mb-3 flex items-center gap-2.5">
+          <img src="/brand/vdnz-icon.svg" alt="Virtual Dressage NZ" className="size-9 rounded-[10px] ring-1 ring-accent/30" />
+          <div className="leading-tight">
+            <p className="font-display text-[13px] font-extrabold tracking-[-0.01em] text-fg">
+              Virtual Dressage <span className="text-accent">NZ</span>
+            </p>
+            <p className="text-[9.5px] font-semibold tracking-[0.22em] text-muted">PLAN · TRAIN · COMPETE · REFLECT</p>
+          </div>
+        </div>
         <header className="mb-4 flex items-end justify-between gap-3">
           <div>
             <Kicker>{PAIR.series}</Kicker>
-            <h1 className="font-display mt-1 text-[1.65rem] leading-[1.05] font-medium tracking-[-0.03em] text-fg sm:text-[2rem]">
+            <h1 className="font-display mt-1 text-[1.65rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-fg sm:text-[2rem]">
               Samson Super League 2026
             </h1>
             <p className="mt-1 text-sm text-muted">

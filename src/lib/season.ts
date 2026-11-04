@@ -259,7 +259,7 @@ export const SHOWS: Show[] = [
     entriesClose: "2027-02-17",
     entriesCloseNote: "Confirm close date on ESNZ and Evo Events — Nationals fills early.",
     notes: [
-      "Championship phase is light Medium and 2B from memory twice a week.",
+      "Compete phase is light Medium and 2B from memory twice a week.",
       "Protect the back. He is 14.",
     ],
   },
@@ -309,7 +309,7 @@ export const PHASES: Phase[] = [
   },
   {
     id: "strength",
-    name: "Strength",
+    name: "Prepare",
     start: "2026-12-22",
     end: "2027-02-05",
     intent:
@@ -318,7 +318,7 @@ export const PHASES: Phase[] = [
   },
   {
     id: "championship",
-    name: "Championship",
+    name: "Compete",
     start: "2027-02-06",
     end: "2027-03-14",
     intent: "Wellington, then Nationals. School Medium lightly. Test 2B from memory twice a week.",

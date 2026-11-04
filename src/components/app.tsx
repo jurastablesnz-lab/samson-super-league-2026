@@ -613,7 +613,7 @@ function Tests() {
         <Kicker>School above the level</Kicker>
         <h2 className="font-display mt-1 text-xl font-medium">Level 4 gymnastic</h2>
         <p className="mt-2 text-sm text-muted">
-          Three sessions a week in Foundation, Consolidate and Strength. Park it ten days before a Super 5.
+          Three sessions a week in Foundation, Consolidate and Prepare. Park it ten days before a Super 5.
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           {LEVEL4.map((m) => (

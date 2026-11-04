@@ -1,0 +1,58 @@
+import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { BrandShell, Field, inputCls, Kicker, Panel, PrimaryButton, Title } from "@/components/beta-ui";
+
+export const Route = createFileRoute("/login")({ component: LoginPage });
+
+function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await authClient.signIn.email({ email: email.trim(), password });
+    setBusy(false);
+    if (res.error) return setError("Email or password didn’t match.");
+    window.location.href = "/";
+  }
+
+  return (
+    <BrandShell>
+      <Kicker>XSalute</Kicker>
+      <Title>Sign in</Title>
+      <Panel className="mt-5">
+        <form onSubmit={submit} className="space-y-3">
+          <Field label="Email">
+            <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Field label="Password">
+            <input className={inputCls} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Field>
+          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
+          <PrimaryButton type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</PrimaryButton>
+        </form>
+      </Panel>
+      <Panel className="mt-4 space-y-2">
+        <p className="text-xs text-muted">Team &amp; admin sign-in</p>
+        {GROK_PROVIDERS.map((p) => (
+          <button
+            key={p.providerId}
+            type="button"
+            onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
+            className="w-full cursor-pointer rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-accent"
+          >
+            Continue with {p.label}
+          </button>
+        ))}
+      </Panel>
+      <p className="mt-4 text-center text-sm text-muted">
+        New rider? <Link to="/join" className="font-semibold text-accent underline-offset-2 hover:underline">Apply for the beta</Link>
+      </p>
+    </BrandShell>
+  );
+}

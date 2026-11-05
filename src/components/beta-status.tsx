@@ -6,7 +6,7 @@ import { BrandShell, Kicker, Panel, StatusBadge, Title } from "./beta-ui";
 const COPY: Record<string, { title: string; body: string }> = {
   pending: {
     title: "Thanks — we’ll be in touch",
-    body: "Your application is in. Susan and the Virtual Dressage NZ team review every rider personally, and we’ll email you once there’s a decision.",
+    body: "Thanks for your application! We’ll be in touch. While we’d love to guarantee everyone a spot in our trial, we review every rider to make sure we get the right mix of riders testing the app. We’ll let you know as soon as possible if you’ve been accepted!",
   },
   waitlist: {
     title: "You’re on the waitlist",

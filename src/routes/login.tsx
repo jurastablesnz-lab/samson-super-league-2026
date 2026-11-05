@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
+import { getAuthFeatures } from "@/lib/beta";
 import { BrandShell, Field, inputCls, Kicker, Panel, PrimaryButton, Title } from "@/components/beta-ui";
 
 export const Route = createFileRoute("/login")({ component: LoginPage });
@@ -10,6 +11,12 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetEnabled, setResetEnabled] = useState(false);
+  useEffect(() => {
+    getAuthFeatures()
+      .then((f) => setResetEnabled(f.passwordReset))
+      .catch(() => setResetEnabled(false));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +42,20 @@ function LoginPage() {
           </Field>
           {error && <p className="text-sm text-danger" role="alert">{error}</p>}
           <PrimaryButton type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</PrimaryButton>
+          <p className="text-center text-xs text-muted">
+            {resetEnabled ? (
+              <Link to="/forgot-password" className="font-semibold text-accent underline-offset-2 hover:underline">
+                Forgot password?
+              </Link>
+            ) : (
+              <>
+                Forgot your password?{" "}
+                <a className="font-semibold text-accent underline-offset-2 hover:underline" href="mailto:virtualdressagenz@gmail.com?subject=XSalute%20password%20reset">
+                  Contact us
+                </a>
+              </>
+            )}
+          </p>
         </form>
       </Panel>
       <Panel className="mt-4 space-y-2">

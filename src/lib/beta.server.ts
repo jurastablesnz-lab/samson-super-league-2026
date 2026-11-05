@@ -2,16 +2,19 @@
  * XSalute beta access rules (server-only).
  *
  * Admins: emails in BETA_ADMIN_EMAILS (default Susan's two addresses). An admin
- * email only counts when the account signed in through a provider that proves
- * the address (Google / X via the Grok broker, or the grok.me gate) — NOT a
- * self-typed email/password sign-up, so nobody can claim Susan's address by
- * registering it first. BETA_ADMIN_TRUST_PASSWORD=true relaxes this for local
- * testing only.
+ * email only counts when the account has a linked GOOGLE sign-in (the broker's
+ * `grok-google` provider) — NOT a self-typed email/password sign-up, X, or any
+ * other provider, so nobody can claim Susan's address by registering it first.
+ * BETA_ADMIN_TRUST_PASSWORD=true relaxes this for local testing only — never
+ * set it on a deployed app.
  */
 import { getSql } from "./db";
 import { env } from "./env.server";
 import { authConfigured, DEV_USER_ID } from "./auth/verify.server";
 import { gateIdentityEnabled } from "./auth/gate-identity.server";
+
+/** Only Google sign-in proves an admin address. */
+export const ADMIN_PROVIDERS = ["grok-google", "google"];
 
 export const DEFAULT_ADMIN_EMAILS = ["susan@manawa.tech", "virtualdressagenz@gmail.com"];
 
@@ -47,7 +50,7 @@ export async function loadUser(userId: string): Promise<UserInfo> {
     } else {
       const accounts = await sql<{ providerId: string }>`
         select "providerId" from account where "userId" = ${userId}`;
-      isAdmin = accounts.some((a) => a.providerId !== "credential");
+      isAdmin = accounts.some((a) => ADMIN_PROVIDERS.includes(a.providerId));
     }
   }
   return { id: userId, email, name: rows[0]?.name ?? null, isAdmin };

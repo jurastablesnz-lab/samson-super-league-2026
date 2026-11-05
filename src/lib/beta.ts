@@ -20,7 +20,13 @@ export const HEARD_FROM = [
 
 export const MAX_HORSES = 6;
 
-export type HorseEntry = { name: string; level: string; notes: string };
+/** One horse on an application. `esnzNumber` is optional (ESNZ horse registration). */
+export type HorseEntry = { name: string; level: string; notes: string; esnzNumber?: string };
+
+/** Loose ESNZ registration check: letters, digits, spaces and dashes, up to 20. */
+export function cleanEsnz(v: unknown): string {
+  return typeof v === "string" ? v.trim().replace(/\s+/g, " ").slice(0, 20) : "";
+}
 
 export type ApplicationInput = {
   fullName: string;
@@ -93,7 +99,7 @@ export function parseHorseList(raw: unknown, legacy: string | null | undefined):
   if (Array.isArray(v)) {
     const list = v
       .map((h) => (h ?? {}) as Record<string, unknown>)
-      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300) }))
+      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300), esnzNumber: cleanEsnz(h.esnzNumber) }))
       .filter((h) => h.name);
     if (list.length) return list;
   }
@@ -103,7 +109,11 @@ export function parseHorseList(raw: unknown, legacy: string | null | undefined):
 
 export function summariseHorses(list: HorseEntry[]): string {
   return list
-    .map((h) => [h.name, h.level && `— ${h.level}`, h.notes && `(${h.notes})`].filter(Boolean).join(" "))
+    .map((h) =>
+      [h.name, h.level && `— ${h.level}`, h.esnzNumber && `[ESNZ ${h.esnzNumber}]`, h.notes && `(${h.notes})`]
+        .filter(Boolean)
+        .join(" "),
+    )
     .join("; ")
     .slice(0, 2000);
 }
@@ -119,8 +129,8 @@ function validate(input: unknown): ApplicationInput {
     horseList: (Array.isArray(i.horseList) ? i.horseList : [])
       .slice(0, MAX_HORSES)
       .map((h) => (h ?? {}) as Record<string, unknown>)
-      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300) }))
-      .filter((h) => h.name || h.level || h.notes),
+      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300), esnzNumber: cleanEsnz(h.esnzNumber) }))
+      .filter((h) => h.name || h.level || h.notes || h.esnzNumber),
     esnzMember: i.esnzMember === true,
     coach: clip(i.coach, 120),
     goals: clip(i.goals, 1500),
@@ -135,12 +145,21 @@ function validate(input: unknown): ApplicationInput {
   if (Array.isArray(i.horseList) && i.horseList.length > MAX_HORSES) throw new Error(`Up to ${MAX_HORSES} horses`);
   for (const h of out.horseList) {
     if (h.level && !(COMPETITION_LEVELS as readonly string[]).includes(h.level)) throw new Error("Pick a level for each horse");
+    if (h.esnzNumber && !/^[A-Za-z0-9][A-Za-z0-9 -]*$/.test(h.esnzNumber)) {
+      throw new Error(`ESNZ number for ${h.name} can only use letters, numbers, spaces and dashes`);
+    }
   }
   out.horses = summariseHorses(out.horseList);
   if (!(RIDER_GRADES as readonly string[]).includes(out.riderGrade)) throw new Error("Pick a rider grade");
   if (!out.consent) throw new Error("Please accept the privacy note and beta terms");
   return out;
 }
+
+/** Public feature flags the sign-in pages need (no secrets). */
+export const getAuthFeatures = createServerFn({ method: "GET" }).handler(async () => {
+  const { emailEnabled } = await import("./email.server");
+  return { passwordReset: emailEnabled() };
+});
 
 export const getBetaAccess = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -178,6 +197,7 @@ export const submitApplication = createServerFn({ method: "POST" })
     const user = await loadUser(context.userId);
     if (!user.email) throw new Error("Your account has no email address");
     const sql = await getSql();
+    const existing = await sql<{ user_id: string }>`select user_id from beta_applications where user_id = ${user.id}`;
     await sql`
       insert into beta_applications (user_id, email, full_name, phone, region, rider_grade,
         competition_level, horses, horse_list, esnz_member, coach, goals, heard_from, consent, consent_at)
@@ -190,6 +210,26 @@ export const submitApplication = createServerFn({ method: "POST" })
         horses = excluded.horses, horse_list = excluded.horse_list, esnz_member = excluded.esnz_member, coach = excluded.coach,
         goals = excluded.goals, heard_from = excluded.heard_from, consent = excluded.consent,
         consent_at = now(), updated_at = now()`;
+    if (existing.length === 0) {
+      // Optional admin alert (Resend). Skipped silently when email is not configured.
+      try {
+        const { notifyNewApplication, emailEnabled } = await import("./email.server");
+        if (emailEnabled()) {
+          const { adminEmails } = await import("./beta.server");
+          const { env } = await import("./env.server");
+          const raw = env("BETA_NOTIFY_EMAILS");
+          const to = raw === "off" ? [] : raw ? raw.split(/[,\s]+/).filter(Boolean) : adminEmails();
+          const base = env("BETTER_AUTH_URL");
+          await notifyNewApplication(
+            to,
+            { ...data, email: user.email, horses: data.horses ?? "" },
+            base ? `${base.replace(/\/+$/, "")}/admin` : null,
+          );
+        }
+      } catch (err) {
+        console.error("[beta] new-application notification failed:", err);
+      }
+    }
     return { ok: true };
   });
 

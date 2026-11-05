@@ -32,7 +32,7 @@ const EMPTY: ApplicationInput = {
   region: "",
   riderGrade: "",
   competitionLevel: "",
-  horseList: [{ name: "", level: "", notes: "" }],
+  horseList: [{ name: "", level: "", notes: "", esnzNumber: "" }],
   esnzMember: false,
   coach: "",
   goals: "",
@@ -81,7 +81,7 @@ function ApplicationForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const filled = form.horseList.filter((h) => h.name.trim() || h.level || h.notes.trim());
+    const filled = form.horseList.filter((h) => h.name.trim() || h.level || h.notes.trim() || h.esnzNumber?.trim());
     if (!filled.some((h) => h.name.trim())) return setError("Please add at least one horse with a name.");
     if (filled.some((h) => !h.name.trim())) return setError("Every horse needs a name (or remove the empty one).");
     if (!form.consent) return setError("Please accept the privacy note and beta terms.");
@@ -238,6 +238,17 @@ function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h
               {COMPETITION_LEVELS.map((r) => <option key={r}>{r}</option>)}
             </select>
           </Field>
+          <Field label="ESNZ registration number" optional hint="The horse’s ESNZ number — helps us match your show results.">
+            <input
+              className={inputCls}
+              inputMode="text"
+              autoComplete="off"
+              maxLength={20}
+              value={h.esnzNumber ?? ""}
+              onChange={(e) => update(i, { esnzNumber: e.target.value })}
+              placeholder="e.g. 12345"
+            />
+          </Field>
           <Field label="Notes" optional>
             <textarea className={inputCls} rows={2} value={h.notes} onChange={(e) => update(i, { notes: e.target.value })} placeholder="Age, breed, goals…" />
           </Field>
@@ -246,7 +257,7 @@ function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h
       {horses.length < MAX_HORSES ? (
         <button
           type="button"
-          onClick={() => onChange([...horses, { name: "", level: "", notes: "" }])}
+          onClick={() => onChange([...horses, { name: "", level: "", notes: "", esnzNumber: "" }])}
           className="w-full cursor-pointer rounded-lg border border-dashed border-accent/60 px-3 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10"
         >
           + Add another horse

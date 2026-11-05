@@ -9,7 +9,7 @@ import {
   type BetaStatus,
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
-import { BrandShell, inputCls, Kicker, Panel, StatusBadge, Title } from "@/components/beta-ui";
+import { BrandShell, HorseListView, inputCls, Kicker, Panel, StatusBadge, Title } from "@/components/beta-ui";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({ component: AdminPage });
@@ -130,13 +130,13 @@ function ApplicationCard({ app, capReached, onChanged }: { app: Application; cap
     }
     onChanged();
   };
-  const rows: [string, string][] = [
+  const rows: [string, React.ReactNode][] = [
     ["Email", app.email],
     ["Phone", app.phone || "—"],
     ["Region", app.region],
     ["Grade", app.riderGrade],
     ["Competing at", app.competitionLevel],
-    ["Horse(s)", app.horses],
+    [app.horseList.length > 1 ? `Horses (${app.horseList.length})` : "Horse", <HorseListView horses={app.horseList} />],
     ["ESNZ member", app.esnzMember ? "Yes" : "No"],
     ["Coach", app.coach || "—"],
     ["Goals", app.goals],

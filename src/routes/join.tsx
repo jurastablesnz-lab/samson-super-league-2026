@@ -7,7 +7,9 @@ import {
   REGIONS,
   RIDER_GRADES,
   submitApplication,
+  MAX_HORSES,
   type ApplicationInput,
+  type HorseEntry,
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
 import {
@@ -30,7 +32,7 @@ const EMPTY: ApplicationInput = {
   region: "",
   riderGrade: "",
   competitionLevel: "",
-  horses: "",
+  horseList: [{ name: "", level: "", notes: "" }],
   esnzMember: false,
   coach: "",
   goals: "",
@@ -79,6 +81,9 @@ function ApplicationForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const filled = form.horseList.filter((h) => h.name.trim() || h.level || h.notes.trim());
+    if (!filled.some((h) => h.name.trim())) return setError("Please add at least one horse with a name.");
+    if (filled.some((h) => !h.name.trim())) return setError("Every horse needs a name (or remove the empty one).");
     if (!form.consent) return setError("Please accept the privacy note and beta terms.");
     setBusy(true);
     try {
@@ -171,10 +176,8 @@ function ApplicationForm({
       </Panel>
 
       <Panel className="space-y-3">
-        <Kicker>{signedIn ? "Your horse & season" : "3 · Your horse & season"}</Kicker>
-        <Field label="Horse name(s) and level" hint="e.g. “Samson — Level 2, schooling Level 3”">
-          <textarea className={inputCls} rows={2} required value={form.horses} onChange={(e) => set("horses", e.target.value)} />
-        </Field>
+        <Kicker>{signedIn ? "Your horses & season" : "3 · Your horses & season"}</Kicker>
+        <HorsesEditor horses={form.horseList} onChange={(h) => set("horseList", h)} />
         <Field label="Coach" optional>
           <input className={inputCls} value={form.coach} onChange={(e) => set("coach", e.target.value)} placeholder="Your coach’s name" />
         </Field>
@@ -204,5 +207,53 @@ function ApplicationForm({
         {busy ? "Sending…" : "Send my application"}
       </PrimaryButton>
     </form>
+  );
+}
+
+function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h: HorseEntry[]) => void }) {
+  const update = (i: number, patch: Partial<HorseEntry>) => onChange(horses.map((h, j) => (j === i ? { ...h, ...patch } : h)));
+  return (
+    <div className="space-y-3">
+      {horses.map((h, i) => (
+        <fieldset key={i} className="space-y-2.5 rounded-lg border border-line bg-sunken/40 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-fg">Horse {i + 1}</p>
+            {horses.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onChange(horses.filter((_, j) => j !== i))}
+                className="cursor-pointer rounded-md px-2 py-1 text-xs font-semibold text-muted underline-offset-2 hover:text-danger hover:underline"
+                aria-label={`Remove horse ${i + 1}${h.name ? ` (${h.name})` : ""}`}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <Field label="Horse name">
+            <input className={inputCls} required={i === 0} value={h.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="e.g. Samson" />
+          </Field>
+          <Field label="Current competition level">
+            <select className={inputCls} value={h.level} onChange={(e) => update(i, { level: e.target.value })}>
+              <option value="">Choose…</option>
+              {COMPETITION_LEVELS.map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </Field>
+          <Field label="Notes" optional>
+            <textarea className={inputCls} rows={2} value={h.notes} onChange={(e) => update(i, { notes: e.target.value })} placeholder="Age, breed, goals…" />
+          </Field>
+        </fieldset>
+      ))}
+      {horses.length < MAX_HORSES ? (
+        <button
+          type="button"
+          onClick={() => onChange([...horses, { name: "", level: "", notes: "" }])}
+          className="w-full cursor-pointer rounded-lg border border-dashed border-accent/60 px-3 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10"
+        >
+          + Add another horse
+        </button>
+      ) : (
+        <p className="text-xs text-muted">That’s the maximum of {MAX_HORSES} horses.</p>
+      )}
+    </div>
   );
 }

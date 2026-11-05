@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { signOut } from "@/lib/auth/client";
 import type { BetaAccess } from "@/lib/beta";
-import { BrandShell, Kicker, Panel, StatusBadge, Title } from "./beta-ui";
+import { BrandShell, HorseListView, Kicker, Panel, StatusBadge, Title } from "./beta-ui";
 
 const COPY: Record<string, { title: string; body: string }> = {
   pending: {
@@ -47,7 +47,7 @@ export function StatusView({ access, justApplied = false }: { access: BetaAccess
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-line pt-3 text-xs">
                 <dt className="text-faint">Name</dt><dd className="text-ink-soft">{access.application.fullName}</dd>
                 <dt className="text-faint">Email</dt><dd className="text-ink-soft">{access.application.email}</dd>
-                <dt className="text-faint">Horse(s)</dt><dd className="text-ink-soft">{access.application.horses}</dd>
+                <dt className="text-faint">Horse(s)</dt><dd className="text-ink-soft"><HorseListView horses={access.application.horseList} /></dd>
               </dl>
             )}
           </Panel>

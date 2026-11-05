@@ -18,13 +18,20 @@ export const HEARD_FROM = [
   "My coach", "At a show", "Other",
 ] as const;
 
+export const MAX_HORSES = 6;
+
+export type HorseEntry = { name: string; level: string; notes: string };
+
 export type ApplicationInput = {
   fullName: string;
   phone?: string;
   region: string;
   riderGrade: string;
   competitionLevel: string;
-  horses: string;
+  /** Structured horses (1–6). */
+  horseList: HorseEntry[];
+  /** Legacy free-text summary (kept in sync for older rows / exports). */
+  horses?: string;
   esnzMember: boolean;
   coach?: string;
   goals: string;
@@ -58,7 +65,7 @@ const LEGACY_KEY = "samson-super5-plan";
 
 type Row = {
   user_id: string; email: string; full_name: string; phone: string | null; region: string;
-  rider_grade: string; competition_level: string; horses: string; esnz_member: boolean;
+  rider_grade: string; competition_level: string; horses: string; horse_list?: unknown; esnz_member: boolean;
   coach: string | null; goals: string; heard_from: string; consent: boolean; status: BetaStatus;
   admin_notes: string; created_at: string | Date; decided_at: string | Date | null;
 };
@@ -69,13 +76,37 @@ function toApp(r: Row): Application {
   return {
     userId: r.user_id, email: r.email, fullName: r.full_name, phone: r.phone ?? "",
     region: r.region, riderGrade: r.rider_grade, competitionLevel: r.competition_level,
-    horses: r.horses, esnzMember: r.esnz_member, coach: r.coach ?? "", goals: r.goals,
+    horses: r.horses, horseList: parseHorseList(r.horse_list, r.horses), esnzMember: r.esnz_member, coach: r.coach ?? "", goals: r.goals,
     heardFrom: r.heard_from, consent: r.consent, status: r.status, adminNotes: r.admin_notes,
     createdAt: iso(r.created_at) ?? "", decidedAt: iso(r.decided_at),
   };
 }
 
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/** Structured list if present; otherwise the legacy single text field shown as one horse. */
+export function parseHorseList(raw: unknown, legacy: string | null | undefined): HorseEntry[] {
+  let v = raw;
+  if (typeof v === "string") {
+    try { v = JSON.parse(v); } catch { v = null; }
+  }
+  if (Array.isArray(v)) {
+    const list = v
+      .map((h) => (h ?? {}) as Record<string, unknown>)
+      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300) }))
+      .filter((h) => h.name);
+    if (list.length) return list;
+  }
+  const text = (legacy ?? "").trim();
+  return text ? [{ name: text, level: "", notes: "" }] : [];
+}
+
+export function summariseHorses(list: HorseEntry[]): string {
+  return list
+    .map((h) => [h.name, h.level && `— ${h.level}`, h.notes && `(${h.notes})`].filter(Boolean).join(" "))
+    .join("; ")
+    .slice(0, 2000);
+}
 
 function validate(input: unknown): ApplicationInput {
   const i = (input ?? {}) as Record<string, unknown>;
@@ -85,16 +116,27 @@ function validate(input: unknown): ApplicationInput {
     region: clip(i.region, 60),
     riderGrade: clip(i.riderGrade, 20),
     competitionLevel: clip(i.competitionLevel, 60),
-    horses: clip(i.horses, 600),
+    horseList: (Array.isArray(i.horseList) ? i.horseList : [])
+      .slice(0, MAX_HORSES)
+      .map((h) => (h ?? {}) as Record<string, unknown>)
+      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300) }))
+      .filter((h) => h.name || h.level || h.notes),
     esnzMember: i.esnzMember === true,
     coach: clip(i.coach, 120),
     goals: clip(i.goals, 1500),
     heardFrom: clip(i.heardFrom, 200),
     consent: i.consent === true,
   };
-  const missing = (["fullName", "region", "riderGrade", "competitionLevel", "horses", "goals", "heardFrom"] as const)
+  const missing = (["fullName", "region", "riderGrade", "competitionLevel", "goals", "heardFrom"] as const)
     .filter((k) => !out[k]);
   if (missing.length) throw new Error(`Please complete: ${missing.join(", ")}`);
+  if (!out.horseList.length) throw new Error("Please add at least one horse with a name");
+  if (out.horseList.some((h) => !h.name)) throw new Error("Every horse needs a name (or remove the empty one)");
+  if (Array.isArray(i.horseList) && i.horseList.length > MAX_HORSES) throw new Error(`Up to ${MAX_HORSES} horses`);
+  for (const h of out.horseList) {
+    if (h.level && !(COMPETITION_LEVELS as readonly string[]).includes(h.level)) throw new Error("Pick a level for each horse");
+  }
+  out.horses = summariseHorses(out.horseList);
   if (!(RIDER_GRADES as readonly string[]).includes(out.riderGrade)) throw new Error("Pick a rider grade");
   if (!out.consent) throw new Error("Please accept the privacy note and beta terms");
   return out;
@@ -138,14 +180,14 @@ export const submitApplication = createServerFn({ method: "POST" })
     const sql = await getSql();
     await sql`
       insert into beta_applications (user_id, email, full_name, phone, region, rider_grade,
-        competition_level, horses, esnz_member, coach, goals, heard_from, consent, consent_at)
+        competition_level, horses, horse_list, esnz_member, coach, goals, heard_from, consent, consent_at)
       values (${user.id}, ${user.email}, ${data.fullName}, ${data.phone || null}, ${data.region},
-        ${data.riderGrade}, ${data.competitionLevel}, ${data.horses}, ${data.esnzMember},
+        ${data.riderGrade}, ${data.competitionLevel}, ${data.horses ?? ""}, ${JSON.stringify(data.horseList)}::jsonb, ${data.esnzMember},
         ${data.coach || null}, ${data.goals}, ${data.heardFrom}, ${data.consent}, now())
       on conflict (user_id) do update set
         full_name = excluded.full_name, phone = excluded.phone, region = excluded.region,
         rider_grade = excluded.rider_grade, competition_level = excluded.competition_level,
-        horses = excluded.horses, esnz_member = excluded.esnz_member, coach = excluded.coach,
+        horses = excluded.horses, horse_list = excluded.horse_list, esnz_member = excluded.esnz_member, coach = excluded.coach,
         goals = excluded.goals, heard_from = excluded.heard_from, consent = excluded.consent,
         consent_at = now(), updated_at = now()`;
     return { ok: true };

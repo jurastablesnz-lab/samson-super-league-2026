@@ -123,3 +123,19 @@ export function PrivacyNote() {
     </p>
   );
 }
+
+/** Read-only list of an application's horses (legacy single text shows as one horse). */
+export function HorseListView({ horses }: { horses: { name: string; level: string; notes: string }[] }) {
+  if (!horses.length) return <span>—</span>;
+  return (
+    <ul className="space-y-1">
+      {horses.map((h, i) => (
+        <li key={i} className="break-words">
+          <span className="font-semibold text-fg">{h.name}</span>
+          {h.level && <span className="text-muted"> · {h.level}</span>}
+          {h.notes && <span className="block text-faint">{h.notes}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}

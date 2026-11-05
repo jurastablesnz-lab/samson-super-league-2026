@@ -126,23 +126,13 @@ export const usePlan = create<State>()(
 );
 
 /**
- * Point the plan store at one user's localStorage key and load it. Admins keep
- * the original single-rider key; each beta rider gets `xsalute-plan:<userId>`.
- * A rider's first load on a device that already has the original plan copies it
- * across, so an existing device keeps its history after signing in.
+ * Point the plan store at the owner's localStorage key and load it. Only the
+ * owner's original Samson plan uses this store now; beta riders' data lives in
+ * Postgres (see `src/lib/rider.ts`). localStorage is never cleared here.
  */
 export async function scopePlanStorage(key: string): Promise<void> {
   if (typeof window === "undefined") return;
-  try {
-    if (key !== LEGACY_PLAN_KEY && !localStorage.getItem(key)) {
-      const legacy = localStorage.getItem(LEGACY_PLAN_KEY);
-      if (legacy) localStorage.setItem(key, legacy);
-    }
-  } catch {
-    /* storage unavailable */
-  }
-  // Switch the key BEFORE any state write, so nothing lands in another rider's
-  // key. (Sign-out reloads the page, so in-memory state never crosses users.)
+  // Switch the key BEFORE any state write, so nothing lands in another key.
   usePlan.persist.setOptions({ name: key });
   await usePlan.persist.rehydrate();
 }

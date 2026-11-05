@@ -30,7 +30,7 @@ export const RESULTS_NOTE =
 
 export const TODAY = nzDay(new Date());
 
-function nzDay(date: Date) {
+export function nzDay(date: Date) {
   const parts = new Intl.DateTimeFormat("en-NZ", {
     timeZone: "Pacific/Auckland",
     year: "numeric",
@@ -712,11 +712,11 @@ const HOW = {
   ],
 };
 
-function iso(d: Date) {
+export function iso(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-function session(
+export function session(
   day: string,
   kind: Kind,
   title: string,
@@ -728,24 +728,122 @@ function session(
   return { id: `${day}-${kind}-${title}`, day, title, focus, kind, minutes, how, note };
 }
 
-function showOn(day: string) {
-  return SHOWS.find((s) => s.start <= day && day <= s.end);
+/** The minimum a show needs for the week engine. */
+export type PlanShow = Pick<Show, "id" | "short" | "start" | "end" | "goal" | "tests" | "travel"> & {
+  optional?: boolean;
+};
+
+/** The minimum a coach visit needs for the week engine. */
+export type PlanCoach = Pick<CoachVisit, "dates" | "title" | "subtitle">;
+
+/**
+ * Everything the week engine needs to lay out a season. Samson's plan and every
+ * generated rider plan (see `plan-builder.ts`) run through the same engine, so
+ * show / travel / rest-after-show / coach overlays behave identically; only the
+ * phases, shows and default sessions differ.
+ */
+export type WeekContext = {
+  /** First day of the first week (the week is aligned to Sunday). */
+  start: string;
+  /** Last day the plan must cover. */
+  end: string;
+  phases: Phase[];
+  shows: PlanShow[];
+  coach: PlanCoach[];
+  /** Add a travel day before these shows (long hauls). */
+  travelBefore: (show: PlanShow) => boolean;
+  how: { show: string[]; travel: string[]; rest: string[]; coach: string[] };
+  restAfterShow: { title: string; focus: string };
+  defaultFor: (dayDate: Date, phase: Phase, ctx: WeekContext) => Session;
+  headlineFor: (phase: Phase, sessions: Session[]) => string;
+  cautionFor: (sessions: Session[], weekStart: string, ctx: WeekContext) => string | undefined;
+};
+
+export function showOnIn(shows: PlanShow[], day: string) {
+  return shows.find((s) => s.start <= day && day <= s.end);
 }
 
-function coachOn(day: string) {
-  return COACH.find((c) => c.dates.includes(day));
-}
-
-function daysToNextShow(day: string) {
-  const upcoming = SHOWS.filter((s) => s.start >= day);
+export function daysToNextShowIn(shows: PlanShow[], day: string) {
+  const upcoming = shows.filter((s) => s.start >= day).sort((a, b) => a.start.localeCompare(b.start));
   if (upcoming.length === 0) return 999;
   return differenceInCalendarDays(parseISO(upcoming[0].start), parseISO(day));
 }
 
-function defaultFor(dayDate: Date, phase: Phase): Session {
+export function phaseIn(phases: Phase[], date: Date | string): Phase {
+  const key = typeof date === "string" ? date : iso(startOfDay(date));
+  return phases.find((p) => p.start <= key && key <= p.end) ?? phases[0];
+}
+
+function overlayIn(ctx: WeekContext, dayDate: Date): Session {
+  const day = iso(dayDate);
+  const show = showOnIn(ctx.shows, day);
+  const coach = ctx.coach.find((c) => c.dates.includes(day));
+  const showTomorrow = showOnIn(ctx.shows, iso(addDays(dayDate, 1)));
+  const showYesterday = showOnIn(ctx.shows, iso(addDays(dayDate, -1)));
+  const phase = phaseIn(ctx.phases, dayDate);
+
+  if (show) {
+    return session(day, "show", show.short, show.goal, 0, ctx.how.show, show.tests.join(" · "));
+  }
+  if (showTomorrow && ctx.travelBefore(showTomorrow)) {
+    return session(
+      day,
+      "travel",
+      `Travel to ${showTomorrow.short}`,
+      showTomorrow.travel,
+      0,
+      ctx.how.travel,
+    );
+  }
+  if (showYesterday) {
+    return session(day, "rest", ctx.restAfterShow.title, ctx.restAfterShow.focus, 0, ctx.how.rest);
+  }
+  if (coach && !show) {
+    return session(
+      day,
+      "coach",
+      coach.title.split("—")[1]?.trim() ?? coach.title,
+      coach.subtitle,
+      60,
+      ctx.how.coach,
+    );
+  }
+  return ctx.defaultFor(dayDate, phase, ctx);
+}
+
+/** Lay out Sunday-to-Saturday weeks from `ctx.start` through `ctx.end`. */
+export function buildWeeksFrom(ctx: WeekContext): Week[] {
+  const start = startOfWeek(parseISO(ctx.start), { weekStartsOn: 0 });
+  const end = parseISO(ctx.end);
+  const weeks: Week[] = [];
+  for (let cursor = start; cursor <= end; cursor = addDays(cursor, 7)) {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(cursor, i));
+    const sessions = days.map((d) => overlayIn(ctx, d));
+    const phase = phaseIn(ctx.phases, days[0]);
+    const label = `${format(days[0], "d MMM")} – ${format(days[6], "d MMM")}`;
+    weeks.push({
+      id: iso(days[0]),
+      label,
+      headline: ctx.headlineFor(phase, sessions),
+      caution: ctx.cautionFor(sessions, iso(days[0]), ctx),
+      sessions,
+    });
+  }
+  return weeks;
+}
+
+export function weekIn(weeks: Week[], date: Date): Week {
+  const id = iso(startOfWeek(date, { weekStartsOn: 0 }));
+  return weeks.find((w) => w.id === id) ?? weeks[weeks.length - 1] ?? weeks[0];
+}
+
+// ---- Samson's plan (owner only) -------------------------------------------
+
+function samsonDefaultFor(dayDate: Date, phase: Phase): Session {
   const day = iso(dayDate);
   const dow = dayDate.getDay();
-  const parkMedium = daysToNextShow(day) <= 10 && !SHOWS.some((s) => s.optional && s.start === day);
+  const parkMedium =
+    daysToNextShowIn(SHOWS, day) <= 10 && !SHOWS.some((s) => s.optional && s.start === day);
 
   if (dow === 0) {
     return session(day, "rest", "Rest / paddock", "Let him be a horse.", 0, HOW.rest);
@@ -781,7 +879,7 @@ function defaultFor(dayDate: Date, phase: Phase): Session {
   return session(day, "test", "2B from memory", "The league test. One time through.", 35, HOW.twoB);
 }
 
-function headlineFor(weekStart: Date, phase: Phase, sessions: Session[]): string {
+function samsonHeadlineFor(phase: Phase, sessions: Session[]): string {
   const show = sessions.find((s) => s.kind === "show");
   const coach = sessions.find((s) => s.kind === "coach");
   const travel = sessions.find((s) => s.kind === "travel");
@@ -794,93 +892,35 @@ function headlineFor(weekStart: Date, phase: Phase, sessions: Session[]): string
   return "Four Super 5s in this phase — keep him generous";
 }
 
-function cautionFor(sessions: Session[], weekStart: string): string | undefined {
-  const nearest = daysToNextShow(weekStart);
+function samsonCautionFor(sessions: Session[], weekStart: string): string | undefined {
+  const nearest = daysToNextShowIn(SHOWS, weekStart);
   if (sessions.some((s) => s.kind === "show")) return "One job: the test you came for. Then rest.";
   if (nearest <= 10 && nearest >= 0) return "Medium is parked. Stretch, 2C, one 2B from memory.";
   return undefined;
 }
 
-export const WEEKS: Week[] = buildWeeks();
+export const SAMSON_CONTEXT: WeekContext = {
+  start: "2026-09-14",
+  end: "2027-03-21",
+  phases: PHASES,
+  shows: SHOWS,
+  coach: COACH,
+  travelBefore: (show) => show.id === "bop" || show.id === "akl" || show.id === "nats",
+  how: { show: HOW.show, travel: HOW.travel, rest: HOW.rest, coach: HOW.coach },
+  restAfterShow: { title: "Rest after the show", focus: "Paddock. Feel his back. No arena." },
+  defaultFor: (d, phase) => samsonDefaultFor(d, phase),
+  headlineFor: samsonHeadlineFor,
+  cautionFor: (sessions, weekStart) => samsonCautionFor(sessions, weekStart),
+};
 
-function buildWeeks(): Week[] {
-  const start = startOfWeek(parseISO("2026-09-14"), { weekStartsOn: 0 });
-  const end = parseISO("2027-03-21");
-  const weeks: Week[] = [];
-  for (let cursor = start; cursor <= end; cursor = addDays(cursor, 7)) {
-    const days = Array.from({ length: 7 }, (_, i) => addDays(cursor, i));
-    const sessions = days.map((d) => overlay(d));
-    const phase = phaseFor(days[0]);
-    const label = `${format(days[0], "d MMM")} – ${format(days[6], "d MMM")}`;
-    const caution = cautionFor(sessions, iso(days[0]));
-    weeks.push({
-      id: iso(days[0]),
-      label,
-      headline: headlineFor(days[0], phase, sessions),
-      caution,
-      sessions,
-    });
-  }
-  return weeks;
-}
-
-function overlay(dayDate: Date): Session {
-  const day = iso(dayDate);
-  const show = showOn(day);
-  const coach = coachOn(day);
-  const tomorrow = iso(addDays(dayDate, 1));
-  const yesterday = iso(addDays(dayDate, -1));
-  const showTomorrow = showOn(tomorrow);
-  const showYesterday = showOn(yesterday);
-  const phase = phaseFor(dayDate);
-
-  if (show) {
-    return session(day, "show", show.short, show.goal, 0, HOW.show, show.tests.join(" · "));
-  }
-  if (
-    showTomorrow &&
-    (showTomorrow.id === "bop" || showTomorrow.id === "akl" || showTomorrow.id === "nats")
-  ) {
-    return session(
-      day,
-      "travel",
-      `Travel to ${showTomorrow.short}`,
-      showTomorrow.travel,
-      0,
-      HOW.travel,
-    );
-  }
-  if (showYesterday) {
-    return session(
-      day,
-      "rest",
-      "Rest after the show",
-      "Paddock. Feel his back. No arena.",
-      0,
-      HOW.rest,
-    );
-  }
-  if (coach && !show) {
-    return session(
-      day,
-      "coach",
-      coach.title.split("—")[1]?.trim() ?? coach.title,
-      coach.subtitle,
-      60,
-      HOW.coach,
-    );
-  }
-  return defaultFor(dayDate, phase);
-}
+export const WEEKS: Week[] = buildWeeksFrom(SAMSON_CONTEXT);
 
 export function phaseFor(date: Date | string): Phase {
-  const key = typeof date === "string" ? date : iso(startOfDay(date));
-  return PHASES.find((p) => p.start <= key && key <= p.end) ?? PHASES[0];
+  return phaseIn(PHASES, date);
 }
 
 export function weekFor(date: Date): Week {
-  const id = iso(startOfWeek(date, { weekStartsOn: 0 }));
-  return WEEKS.find((w) => w.id === id) ?? WEEKS[WEEKS.length - 1] ?? WEEKS[0];
+  return weekIn(WEEKS, date);
 }
 
 export function nextShow(): Show | undefined {

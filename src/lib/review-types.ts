@@ -17,6 +17,9 @@ export type SheetInput = {
   images?: SheetImage[];
   testHint: string;
   showName: string;
+  /** Optional horse + level hints (generated rider plans). Defaults to Samson. */
+  horseName?: string;
+  level?: string;
 };
 
 export type JudgeRead = {

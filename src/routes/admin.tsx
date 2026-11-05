@@ -9,6 +9,7 @@ import {
   type BetaStatus,
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
+import { EvoImportPanel } from "@/components/evo-import";
 import { BrandShell, HorseListView, inputCls, Kicker, Panel, StatusBadge, Title } from "@/components/beta-ui";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ function AdminPage() {
       <BrandShell>
         <Title>Admins only</Title>
         <p className="mt-3 text-sm text-muted">
-          Sign in with Susan’s Google account to manage beta applications.{" "}
+          Sign in with Susan’s Google account (Continue with Google) to manage beta applications.{" "}
           <Link to="/login" className="text-accent underline">Sign in</Link>
         </p>
       </BrandShell>
@@ -71,6 +72,8 @@ function AdminDashboard() {
           <CapEditor cap={data.cap} onSaved={load} />
         </div>
       </Panel>
+
+      <EvoImportPanel />
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => (

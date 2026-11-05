@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { App } from "@/components/app";
+import { OwnerSync } from "@/components/owner-sync";
+import { RiderHome } from "@/components/rider-app";
 import { StatusView } from "@/components/beta-status";
 import { BrandShell, Kicker, Panel, Title } from "@/components/beta-ui";
 import { signOut } from "@/lib/auth/client";
@@ -28,7 +30,36 @@ function Home() {
   return <StatusView access={a} />;
 }
 
+function AccountBar({ access }: { access: BetaAccess }) {
+  if (!access.email) return null;
+  return (
+    <div className="flex items-center justify-end gap-3 bg-sunken px-4 py-1.5 text-[11px] text-muted">
+      <span className="truncate">{access.email}</span>
+      {access.isAdmin && (
+        <Link to="/admin" className="font-semibold text-accent">Admin</Link>
+      )}
+      <button type="button" className="cursor-pointer underline-offset-2 hover:underline" onClick={() => void signOut("/")}>
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 function TrainingApp({ access }: { access: BetaAccess }) {
+  // Samson's hand-written plan is the owner's only. Every other rider gets
+  // their own generated plan from Postgres (or the setup wizard).
+  if (!access.isAdmin) {
+    return (
+      <>
+        <AccountBar access={access} />
+        <RiderHome storageKey={access.storageKey} />
+      </>
+    );
+  }
+  return <OwnerApp access={access} />;
+}
+
+function OwnerApp({ access }: { access: BetaAccess }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     void scopePlanStorage(access.storageKey).then(() => setReady(true));
@@ -47,12 +78,7 @@ function TrainingApp({ access }: { access: BetaAccess }) {
           </button>
         </div>
       )}
-      {!access.isAdmin && (
-        <p className="bg-violet/15 px-4 py-2 text-center text-[11.5px] leading-snug text-ink-soft">
-          Welcome to the beta! The season plan shown is our example rider’s — your own scores, notes and reviews are
-          saved privately on this device. Rider-specific plans are coming soon.
-        </p>
-      )}
+      {access.email && <OwnerSync />}
       <App />
     </>
   );

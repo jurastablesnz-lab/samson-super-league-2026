@@ -21,6 +21,8 @@ import {
   getHorseLog,
   getWorkspace,
   importLocalForHorse,
+  keepEvoResults,
+  rejectEvoResults,
   saveNote,
   saveProgress,
   saveResult,
@@ -33,11 +35,21 @@ import {
   type HorseLog,
   type HorseRecord,
   type LegacySnapshot,
+  type PendingEvoResult,
   type PlanRecord,
   type Workspace,
 } from "@/lib/rider-types";
 import { MAX_SHEET_PHOTOS } from "@/lib/review-types";
-import { daysUntil, kindLabel, phaseIn, TODAY, iso, weekIn, type Kind, type Session } from "@/lib/season";
+import {
+  daysUntil,
+  kindLabel,
+  phaseIn,
+  TODAY,
+  iso,
+  weekIn,
+  type Kind,
+  type Session,
+} from "@/lib/season";
 import { summariseSheet } from "@/lib/summarise-sheet";
 import { cn } from "@/lib/utils";
 import { BrandShell, inputCls, Kicker, Panel, PrimaryButton, Title } from "./beta-ui";
@@ -95,8 +107,9 @@ export function RiderHome({ storageKey }: { storageKey: string }) {
           <Panel className="mb-4 space-y-1">
             <Kicker>Welcome{ws.displayName ? `, ${ws.displayName.split(" ")[0]}` : ""}</Kicker>
             <p className="text-sm text-ink-soft">
-              Let’s build a season plan for your own horse{ws.applicationHorses.length > 1 ? "s" : ""}. It takes about
-              two minutes. Everything you log is saved to your account, not just this device.
+              Let’s build a season plan for your own horse
+              {ws.applicationHorses.length > 1 ? "s" : ""}. It takes about two minutes. Everything
+              you log is saved to your account, not just this device.
             </p>
           </Panel>
         )}
@@ -111,11 +124,24 @@ export function RiderHome({ storageKey }: { storageKey: string }) {
       </BrandShell>
     );
   }
-  return <RiderApp ws={ws} horses={planned} storageKey={storageKey} onEditSetup={() => setEditing(true)} />;
+  return (
+    <RiderApp
+      ws={ws}
+      horses={planned}
+      storageKey={storageKey}
+      onEditSetup={() => setEditing(true)}
+    />
+  );
 }
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <section className={cn("rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5", className)}>{children}</section>;
+  return (
+    <section
+      className={cn("rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5", className)}
+    >
+      {children}
+    </section>
+  );
 }
 
 function RiderApp({
@@ -156,13 +182,21 @@ function RiderApp({
     <div className="vd-glow min-h-dvh text-fg">
       <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 pb-36 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
         <div className="mb-3 flex items-center gap-2.5">
-          <img src="/brand/vdnz-icon.svg" alt="XSalute by Virtual Dressage NZ" className="size-9 rounded-[10px] ring-1 ring-accent/30" />
+          <img
+            src="/brand/vdnz-icon.svg"
+            alt="XSalute by Virtual Dressage NZ"
+            className="size-9 rounded-[10px] ring-1 ring-accent/30"
+          />
           <div className="leading-tight">
             <p className="font-display text-[15px] font-extrabold tracking-[-0.02em] text-fg">
               <span className="text-accent">X</span>Salute{" "}
-              <span className="text-[10px] font-semibold tracking-normal text-muted">by Virtual Dressage NZ</span>
+              <span className="text-[10px] font-semibold tracking-normal text-muted">
+                by Virtual Dressage NZ
+              </span>
             </p>
-            <p className="text-[9.5px] font-semibold tracking-[0.22em] text-muted">PLAN · TRAIN · COMPETE · REFLECT</p>
+            <p className="text-[9.5px] font-semibold tracking-[0.22em] text-muted">
+              PLAN · TRAIN · COMPETE · REFLECT
+            </p>
           </div>
         </div>
         {horses.length > 1 && (
@@ -176,7 +210,9 @@ function RiderApp({
                 onClick={() => setHorseId(h.id)}
                 className={cn(
                   "shrink-0 cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold",
-                  h.id === horse.id ? "border-accent bg-accent/15 text-accent" : "border-line text-muted",
+                  h.id === horse.id
+                    ? "border-accent bg-accent/15 text-accent"
+                    : "border-line text-muted",
                 )}
               >
                 {h.name}
@@ -194,21 +230,66 @@ function RiderApp({
               Main test {plan.mainTest}
               {plan.homeworkTest !== plan.mainTest ? ` · homework ${plan.homeworkTest}` : ""}
             </p>
-            {horse.esnzNumber && <p className="mt-0.5 text-xs text-faint">ESNZ {horse.esnzNumber}</p>}
+            {horse.esnzNumber && (
+              <p className="mt-0.5 text-xs text-faint">ESNZ {horse.esnzNumber}</p>
+            )}
           </div>
           <span className="mb-1 inline-flex rounded-full bg-accent px-3 py-1 text-[11px] font-semibold tracking-wide text-accent-fg uppercase">
             {phase.name}
           </span>
         </header>
         <LocalImportBanner storageKey={storageKey} horse={horse} onImported={setLog} />
-        {logError && <p className="mb-3 rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger">{logError}</p>}
-        {tab === "today" && <TodayTab key={`today-${horse.id}`} plan={plan} record={record} log={log} horse={horse} onTab={setTab} />}
-        {tab === "season" && <SeasonTab key={`season-${horse.id}`} plan={plan} record={record} log={log} horse={horse} />}
+        {logError && (
+          <p className="mb-3 rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger">{logError}</p>
+        )}
+        {tab === "today" && (
+          <TodayTab
+            key={`today-${horse.id}`}
+            plan={plan}
+            record={record}
+            log={log}
+            horse={horse}
+            onTab={setTab}
+          />
+        )}
+        {tab === "season" && (
+          <SeasonTab
+            key={`season-${horse.id}`}
+            plan={plan}
+            record={record}
+            log={log}
+            horse={horse}
+          />
+        )}
         {tab === "tests" && <TestsTab key={`tests-${horse.id}`} plan={plan} record={record} />}
-        {tab === "log" && <LogTab key={`log-${horse.id}`} plan={plan} horse={horse} log={log} setLog={setLog} />}
-        {tab === "setup" && <SetupTab key={`setup-${horse.id}`} ws={ws} plan={plan} record={record} horse={horse} onEdit={onEditSetup} />}
+        {tab === "log" && (
+          <LogTab
+            key={`log-${horse.id}`}
+            plan={plan}
+            horse={horse}
+            log={log}
+            setLog={(next) => {
+              setLog(next);
+              setLogError(null);
+            }}
+            onError={setLogError}
+          />
+        )}
+        {tab === "setup" && (
+          <SetupTab
+            key={`setup-${horse.id}`}
+            ws={ws}
+            plan={plan}
+            record={record}
+            horse={horse}
+            onEdit={onEditSetup}
+          />
+        )}
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur-md" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur-md"
+        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+      >
         <ul className="mx-auto grid max-w-3xl grid-cols-5 px-2 pt-1">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -218,7 +299,10 @@ function RiderApp({
                 <button
                   type="button"
                   onClick={() => setTab(t.id)}
-                  className={cn("flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium", on ? "text-accent" : "text-muted")}
+                  className={cn(
+                    "flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium",
+                    on ? "text-accent" : "text-muted",
+                  )}
                 >
                   <Icon className="size-5" strokeWidth={on ? 2.2 : 1.8} />
                   {t.label}
@@ -259,7 +343,12 @@ function useDone(horseId: string, log: HorseLog | null) {
 function SessionRow({ s, done, onToggle }: { s: Session; done: boolean; onToggle: () => void }) {
   return (
     <li className="flex items-start gap-3 rounded-lg bg-bg p-3">
-      <button type="button" onClick={onToggle} className="mt-0.5 size-6 shrink-0" aria-label={done ? "Mark not done" : "Mark done"}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mt-0.5 size-6 shrink-0"
+        aria-label={done ? "Mark not done" : "Mark done"}
+      >
         {done ? <Check className="size-5 text-accent" /> : <Circle className="size-5 text-faint" />}
       </button>
       <div className="min-w-0 flex-1">
@@ -267,7 +356,14 @@ function SessionRow({ s, done, onToggle }: { s: Session; done: boolean; onToggle
           <p className={cn("text-sm font-semibold", done && "text-muted line-through")}>
             {format(parseISO(s.day), "EEE d")} · {s.title}
           </p>
-          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", kindClass(s.kind))}>{kindLabel(s.kind)}</span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              kindClass(s.kind),
+            )}
+          >
+            {kindLabel(s.kind)}
+          </span>
         </div>
         <p className="mt-0.5 text-sm text-muted">{s.focus}</p>
       </div>
@@ -293,27 +389,49 @@ function TodayTab({
   const week = weekIn(plan.weeks, TODAY);
   const today = week.sessions.find((s) => s.day === todayIso);
   const next = plan.shows.find((s) => s.end >= todayIso);
-  const best = (log?.results ?? []).filter((r) => r.percent != null && r.status === "ok").sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0))[0];
+  const best = (log?.results ?? [])
+    .filter((r) => r.percent != null && r.status === "ok")
+    .sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0))[0];
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" onClick={() => onTab("season")} className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]">
+        <button
+          type="button"
+          onClick={() => onTab("season")}
+          className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]"
+        >
           <Kicker>Next show</Kicker>
           <p className="font-display mt-1 text-xl leading-tight font-medium">{next?.name ?? "—"}</p>
           <p className="mt-2 font-mono text-xs text-accent tabular-nums">
-            {next ? (daysUntil(next.start) <= 0 ? "Now" : `${daysUntil(next.start)} days`) : "Add a target competition in Setup"}
+            {next
+              ? daysUntil(next.start) <= 0
+                ? "Now"
+                : `${daysUntil(next.start)} days`
+              : "Add a target competition in Setup"}
           </p>
         </button>
-        <button type="button" onClick={() => onTab("log")} className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]">
+        <button
+          type="button"
+          onClick={() => onTab("log")}
+          className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]"
+        >
           <Kicker>Best score</Kicker>
-          <p className="font-display mt-1 text-xl font-medium text-good">{best ? `${best.percent!.toFixed(1)}%` : "—"}</p>
-          <p className="mt-2 text-xs text-faint">{best ? `${best.test} · ${best.showName || fmtDay(best.date)}` : "Log a test"}</p>
+          <p className="font-display mt-1 text-xl font-medium text-good">
+            {best ? `${best.percent!.toFixed(1)}%` : "—"}
+          </p>
+          <p className="mt-2 text-xs text-faint">
+            {best ? `${best.test} · ${best.showName || fmtDay(best.date)}` : "Log a test"}
+          </p>
         </button>
       </div>
       <Card>
         <Kicker>This week · {week.label}</Kicker>
         <h2 className="font-display mt-1 text-xl leading-snug font-medium">{week.headline}</h2>
-        {!inRange && <p className="mt-2 text-sm text-muted">Your plan starts {fmtDay(plan.weeks[0]?.id ?? "")}.</p>}
+        {!inRange && (
+          <p className="mt-2 text-sm text-muted">
+            Your plan starts {fmtDay(plan.weeks[0]?.id ?? "")}.
+          </p>
+        )}
         {week.caution && <p className="mt-2 text-sm text-warn">{week.caution}</p>}
         <ul className="mt-4 flex flex-col gap-2">
           {week.sessions.map((s) => (
@@ -326,7 +444,9 @@ function TodayTab({
           <Kicker>Today</Kicker>
           <h2 className="font-display mt-1 text-xl font-medium">{today.title}</h2>
           <p className="mt-1 text-sm text-muted">{today.focus}</p>
-          {today.minutes > 0 && <p className="mt-2 font-mono text-xs text-faint">{today.minutes} min</p>}
+          {today.minutes > 0 && (
+            <p className="mt-2 font-mono text-xs text-faint">{today.minutes} min</p>
+          )}
           <ol className="mt-3 list-decimal space-y-1.5 pl-4 text-sm leading-relaxed">
             {today.how.map((h) => (
               <li key={h}>{h}</li>
@@ -350,10 +470,24 @@ function TodayTab({
   );
 }
 
-function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanRecord; log: HorseLog | null; horse: HorseRecord }) {
+function SeasonTab({
+  plan,
+  log,
+  horse,
+}: {
+  plan: GeneratedPlan;
+  record: PlanRecord;
+  log: HorseLog | null;
+  horse: HorseRecord;
+}) {
   const { done, toggle } = useDone(horse.id, log);
   const current = weekIn(plan.weeks, TODAY);
-  const [idx, setIdx] = useState(() => Math.max(0, plan.weeks.findIndex((w) => w.id === current.id)));
+  const [idx, setIdx] = useState(() =>
+    Math.max(
+      0,
+      plan.weeks.findIndex((w) => w.id === current.id),
+    ),
+  );
   const week = plan.weeks[Math.min(idx, plan.weeks.length - 1)];
   const phase = phaseIn(plan.phases, TODAY);
   return (
@@ -361,7 +495,9 @@ function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanReco
       <Card>
         <Kicker>Target competitions</Kicker>
         {plan.shows.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No target competitions yet. Add some in Setup and the phases will line up with them.</p>
+          <p className="mt-2 text-sm text-muted">
+            No target competitions yet. Add some in Setup and the phases will line up with them.
+          </p>
         ) : (
           <ol className="mt-3 flex flex-col gap-2">
             {plan.shows.map((s, i) => (
@@ -373,9 +509,15 @@ function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanReco
                     {describeWhen(s)}
                     {s.venue ? ` · ${s.venue}` : ""}
                   </p>
-                  {s.entriesClose && <p className="text-xs text-faint">Entries usually close {fmtDay(s.entriesClose)} — confirm on EVO Events</p>}
+                  {s.entriesClose && (
+                    <p className="text-xs text-faint">
+                      Entries usually close {fmtDay(s.entriesClose)} — confirm on EVO Events
+                    </p>
+                  )}
                 </div>
-                <span className="text-xs text-faint">{daysUntil(s.start) < 0 ? "Done" : `${daysUntil(s.start)}d`}</span>
+                <span className="text-xs text-faint">
+                  {daysUntil(s.start) < 0 ? "Done" : `${daysUntil(s.start)}d`}
+                </span>
               </li>
             ))}
           </ol>
@@ -387,15 +529,27 @@ function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanReco
           {plan.phases.map((p) => {
             const on = p.id === phase.id;
             return (
-              <li key={p.id} className={cn("rounded-lg p-3", on ? "bg-accent text-accent-fg" : "bg-bg")}>
+              <li
+                key={p.id}
+                className={cn("rounded-lg p-3", on ? "bg-accent text-accent-fg" : "bg-bg")}
+              >
                 <p className="text-sm font-semibold">
                   {p.name}
-                  <span className={cn("ml-2 text-xs font-normal", on ? "text-accent-fg/80" : "text-muted")}>
+                  <span
+                    className={cn(
+                      "ml-2 text-xs font-normal",
+                      on ? "text-accent-fg/80" : "text-muted",
+                    )}
+                  >
                     {format(parseISO(p.start), "d MMM")} – {format(parseISO(p.end), "d MMM")}
                   </span>
                 </p>
-                <p className={cn("mt-1 text-sm", on ? "text-accent-fg/90" : "text-muted")}>{p.intent}</p>
-                <p className={cn("mt-2 text-xs", on ? "text-accent-fg/80" : "text-faint")}>School: {p.schoolAbove}</p>
+                <p className={cn("mt-1 text-sm", on ? "text-accent-fg/90" : "text-muted")}>
+                  {p.intent}
+                </p>
+                <p className={cn("mt-2 text-xs", on ? "text-accent-fg/80" : "text-faint")}>
+                  School: {p.schoolAbove}
+                </p>
               </li>
             );
           })}
@@ -409,16 +563,30 @@ function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanReco
               <h2 className="font-display mt-1 text-xl font-medium">{week.label}</h2>
             </div>
             <div className="flex gap-1">
-              <button type="button" aria-label="Previous week" disabled={idx <= 0} onClick={() => setIdx(idx - 1)} className="grid size-11 cursor-pointer place-items-center rounded-lg border border-line disabled:opacity-40">
+              <button
+                type="button"
+                aria-label="Previous week"
+                disabled={idx <= 0}
+                onClick={() => setIdx(idx - 1)}
+                className="grid size-11 cursor-pointer place-items-center rounded-lg border border-line disabled:opacity-40"
+              >
                 <ChevronLeft className="size-5" />
               </button>
-              <button type="button" aria-label="Next week" disabled={idx >= plan.weeks.length - 1} onClick={() => setIdx(idx + 1)} className="grid size-11 cursor-pointer place-items-center rounded-lg border border-line disabled:opacity-40">
+              <button
+                type="button"
+                aria-label="Next week"
+                disabled={idx >= plan.weeks.length - 1}
+                onClick={() => setIdx(idx + 1)}
+                className="grid size-11 cursor-pointer place-items-center rounded-lg border border-line disabled:opacity-40"
+              >
                 <ChevronRight className="size-5" />
               </button>
             </div>
           </div>
           <p className="mt-2 text-sm text-muted">{week.headline}</p>
-          {week.id === current.id && <p className="mt-1 text-xs font-semibold text-accent">This week</p>}
+          {week.id === current.id && (
+            <p className="mt-1 text-xs font-semibold text-accent">This week</p>
+          )}
           {week.caution && <p className="mt-2 text-sm text-warn">{week.caution}</p>}
           <ul className="mt-4 flex flex-col gap-2">
             {week.sessions.map((s) => (
@@ -441,14 +609,23 @@ function TestsTab({ plan, record }: { plan: GeneratedPlan; record: PlanRecord })
             <li key={t} className="flex items-center justify-between rounded-lg bg-bg p-3 text-sm">
               <span className="font-semibold">{t}</span>
               <span className="text-xs text-muted">
-                {t === plan.mainTest ? "Main test — from memory" : t === plan.homeworkTest ? "Homework — from the sheet" : ""}
+                {t === plan.mainTest
+                  ? "Main test — from memory"
+                  : t === plan.homeworkTest
+                    ? "Homework — from the sheet"
+                    : ""}
               </span>
             </li>
           ))}
         </ul>
         <p className="mt-3 text-xs text-muted">
           Official test sheets are on the{" "}
-          <a className="text-accent underline" href="https://www.nzequestrian.org.nz/dressage/" target="_blank" rel="noreferrer">
+          <a
+            className="text-accent underline"
+            href="https://www.nzequestrian.org.nz/dressage/"
+            target="_blank"
+            rel="noreferrer"
+          >
             ESNZ dressage page
           </a>
           .
@@ -484,16 +661,36 @@ function FreestyleCard({ record }: { record: PlanRecord }) {
       </div>
       <p className="mt-2 text-sm font-semibold">{ref.fileName}</p>
       <p className="text-xs text-muted">
-        {ref.durationSec ? fmtDuration(ref.durationSec) : "Length unknown"} · {(ref.size / 1024 / 1024).toFixed(1)} MB
+        {ref.durationSec ? fmtDuration(ref.durationSec) : "Length unknown"} ·{" "}
+        {(ref.size / 1024 / 1024).toFixed(1)} MB
       </p>
       {url && <audio className="mt-3 w-full" controls src={url} />}
-      {missing && <p className="mt-2 text-sm text-muted">The file is saved on the device you uploaded it from. Re-upload it in Setup to play it here.</p>}
+      {missing && (
+        <p className="mt-2 text-sm text-muted">
+          The file is saved on the device you uploaded it from. Re-upload it in Setup to play it
+          here.
+        </p>
+      )}
     </Card>
   );
 }
 
-function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: HorseRecord; log: HorseLog | null; setLog: (l: HorseLog) => void }) {
-  const [showName, setShowName] = useState(plan.shows.find((s) => s.start <= iso(TODAY))?.name ?? plan.shows[0]?.name ?? "");
+function LogTab({
+  plan,
+  horse,
+  log,
+  setLog,
+  onError,
+}: {
+  plan: GeneratedPlan;
+  horse: HorseRecord;
+  log: HorseLog | null;
+  setLog: (l: HorseLog) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [showName, setShowName] = useState(
+    plan.shows.find((s) => s.start <= iso(TODAY))?.name ?? plan.shows[0]?.name ?? "",
+  );
   const [test, setTest] = useState(plan.mainTest);
   const [date, setDate] = useState(iso(TODAY));
   const [percent, setPercent] = useState("");
@@ -517,9 +714,20 @@ function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: Hors
     }
   }
 
-  if (!log) return <Card><p className="text-sm text-muted">Loading…</p></Card>;
+  if (!log)
+    return (
+      <Card>
+        <p className="text-sm text-muted">Loading…</p>
+      </Card>
+    );
   return (
     <div className="flex flex-col gap-4">
+      <EvoReviewPanel
+        pending={log.pendingEvoResults}
+        horseId={horse.id}
+        onReviewed={setLog}
+        onError={onError}
+      />
       <Card>
         <Kicker>Log a score</Kicker>
         <form
@@ -527,40 +735,83 @@ function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: Hors
           onSubmit={(e) => {
             e.preventDefault();
             const pct = Number(percent.replace(",", "."));
-            if (!Number.isFinite(pct) || pct <= 0 || pct > 100) return setErr("Enter a percentage between 0 and 100.");
+            if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+              return setErr("Enter a percentage between 0 and 100.");
             void run(() =>
               saveResult({
                 data: {
                   horseId: horse.id,
-                  result: { id: `r-${Date.now()}`, showName, date, test, percent: pct, place, notes, level: plan.level, status: "ok" },
+                  result: {
+                    id: `r-${Date.now()}`,
+                    showName,
+                    date,
+                    test,
+                    percent: pct,
+                    place,
+                    notes,
+                    level: plan.level,
+                    status: "ok",
+                  },
                 },
               }),
             ).then((ok) => ok && (setPercent(""), setPlace(""), setNotes("")));
           }}
         >
-          <input className={inputCls} list="rider-shows" placeholder="Show" value={showName} onChange={(e) => setShowName(e.target.value)} />
+          <input
+            className={inputCls}
+            list="rider-shows"
+            placeholder="Show"
+            value={showName}
+            onChange={(e) => setShowName(e.target.value)}
+          />
           <datalist id="rider-shows">
             {plan.shows.map((s) => (
               <option key={s.id} value={s.name} />
             ))}
           </datalist>
-          <input className={inputCls} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            className={inputCls}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
           <select className={inputCls} value={test} onChange={(e) => setTest(e.target.value)}>
             {plan.tests.map((t) => (
               <option key={t}>{t}</option>
             ))}
             <option value="Other">Other</option>
           </select>
-          <input className={inputCls} inputMode="decimal" placeholder="Percent e.g. 64.5" value={percent} onChange={(e) => setPercent(e.target.value)} />
-          <input className={inputCls} placeholder="Place (optional)" value={place} onChange={(e) => setPlace(e.target.value)} />
-          <input className={inputCls} placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          <PrimaryButton type="submit" disabled={busy} className="sm:col-span-2">Save score</PrimaryButton>
+          <input
+            className={inputCls}
+            inputMode="decimal"
+            placeholder="Percent e.g. 64.5"
+            value={percent}
+            onChange={(e) => setPercent(e.target.value)}
+          />
+          <input
+            className={inputCls}
+            placeholder="Place (optional)"
+            value={place}
+            onChange={(e) => setPlace(e.target.value)}
+          />
+          <input
+            className={inputCls}
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+          <PrimaryButton type="submit" disabled={busy} className="sm:col-span-2">
+            Save score
+          </PrimaryButton>
         </form>
         {err && <p className="mt-2 text-sm text-danger">{err}</p>}
         <ul className="mt-4 flex flex-col gap-2">
           {log.results.length === 0 && <li className="text-sm text-muted">No scores yet.</li>}
           {log.results.map((r) => (
-            <li key={r.id} className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3 text-sm">
+            <li
+              key={r.id}
+              className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3 text-sm"
+            >
               <div className="min-w-0">
                 <p className="font-semibold">
                   {r.test || "Test"} · {r.percent != null ? `${r.percent.toFixed(2)}%` : r.status}
@@ -568,12 +819,25 @@ function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: Hors
                 </p>
                 <p className="text-xs text-muted">
                   {[r.showName, fmtDay(r.date)].filter(Boolean).join(" · ")}
-                  {r.source === "evo_csv" && <span className="ml-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-accent">EVO import</span>}
+                  {r.source === "evo_csv" && (
+                    <span className="ml-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-accent">
+                      EVO import
+                    </span>
+                  )}
                 </p>
                 {r.notes && <p className="mt-1 text-xs text-faint">{r.notes}</p>}
               </div>
               {r.source !== "evo_csv" && (
-                <button type="button" aria-label="Delete score" className="cursor-pointer text-muted hover:text-danger" onClick={() => void run(() => deleteEntry({ data: { horseId: horse.id, kind: "result", id: r.id } }))}>
+                <button
+                  type="button"
+                  aria-label="Delete score"
+                  className="cursor-pointer text-muted hover:text-danger"
+                  onClick={() =>
+                    void run(() =>
+                      deleteEntry({ data: { horseId: horse.id, kind: "result", id: r.id } }),
+                    )
+                  }
+                >
                   <Trash2 className="size-4" />
                 </button>
               )}
@@ -589,22 +853,50 @@ function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: Hors
           onSubmit={(e) => {
             e.preventDefault();
             if (!noteText.trim()) return;
-            void run(() => saveNote({ data: { horseId: horse.id, note: { id: `n-${Date.now()}`, date: iso(TODAY), text: noteText.trim() } } })).then(
-              (ok) => ok && setNoteText(""),
-            );
+            void run(() =>
+              saveNote({
+                data: {
+                  horseId: horse.id,
+                  note: { id: `n-${Date.now()}`, date: iso(TODAY), text: noteText.trim() },
+                },
+              }),
+            ).then((ok) => ok && setNoteText(""));
           }}
         >
-          <input className={inputCls} placeholder="How did today’s ride feel?" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
-          <button type="submit" disabled={busy} className="cursor-pointer rounded-lg bg-accent px-4 text-sm font-bold text-accent-fg">Add</button>
+          <input
+            className={inputCls}
+            placeholder="How did today’s ride feel?"
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="cursor-pointer rounded-lg bg-accent px-4 text-sm font-bold text-accent-fg"
+          >
+            Add
+          </button>
         </form>
         <ul className="mt-3 flex flex-col gap-2">
           {log.notes.map((n) => (
-            <li key={n.id} className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3 text-sm">
+            <li
+              key={n.id}
+              className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3 text-sm"
+            >
               <div>
                 <p className="text-xs text-faint">{fmtDay(n.date)}</p>
                 <p className="whitespace-pre-line">{n.text}</p>
               </div>
-              <button type="button" aria-label="Delete note" className="cursor-pointer text-muted hover:text-danger" onClick={() => void run(() => deleteEntry({ data: { horseId: horse.id, kind: "note", id: n.id } }))}>
+              <button
+                type="button"
+                aria-label="Delete note"
+                className="cursor-pointer text-muted hover:text-danger"
+                onClick={() =>
+                  void run(() =>
+                    deleteEntry({ data: { horseId: horse.id, kind: "note", id: n.id } }),
+                  )
+                }
+              >
                 <Trash2 className="size-4" />
               </button>
             </li>
@@ -617,7 +909,123 @@ function LogTab({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: Hors
   );
 }
 
-function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: HorseRecord; log: HorseLog; setLog: (l: HorseLog) => void }) {
+function EvoReviewPanel({
+  pending,
+  horseId,
+  onReviewed,
+  onError,
+}: {
+  pending: PendingEvoResult[];
+  horseId: string;
+  onReviewed: (log: HorseLog) => void;
+  onError: (message: string | null) => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(pending.map((r) => r.id)));
+  const [busy, setBusy] = useState(false);
+  const ids = pending.map((r) => r.id);
+  const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+
+  async function review(action: "keep" | "reject") {
+    const chosen = [...selected];
+    if (!chosen.length) return onError("Choose at least one EVO score first.");
+    setBusy(true);
+    onError(null);
+    try {
+      const fn = action === "keep" ? keepEvoResults : rejectEvoResults;
+      onReviewed(await fn({ data: { horseId, ids: chosen } }));
+      setSelected(new Set());
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!pending.length) return null;
+  return (
+    <Card>
+      <Kicker>Found on EVO Events</Kicker>
+      <p className="mt-2 text-sm text-muted">
+        If this horse had another rider before you, untick their scores.
+      </p>
+      <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm font-semibold">
+        <input
+          type="checkbox"
+          className="size-4 accent-[var(--color-accent)]"
+          checked={allSelected}
+          disabled={busy}
+          onChange={() => setSelected(allSelected ? new Set() : new Set(ids))}
+        />
+        Select all
+      </label>
+      <ul className="mt-2 flex flex-col gap-2">
+        {pending.map((r) => (
+          <li key={r.id}>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-bg p-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)]"
+                checked={selected.has(r.id)}
+                disabled={busy}
+                onChange={() =>
+                  setSelected((current) => {
+                    const next = new Set(current);
+                    if (next.has(r.id)) next.delete(r.id);
+                    else next.add(r.id);
+                    return next;
+                  })
+                }
+              />
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="block font-semibold">
+                  {r.test || "Test"} · {r.percent != null ? `${r.percent.toFixed(2)}%` : r.status}
+                  {r.place && <span className="font-normal text-muted"> · {r.place}</span>}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  {[r.showName || "Competition", fmtDay(r.date)].filter(Boolean).join(" · ")}
+                </span>
+                {r.className && r.className !== r.test && (
+                  <span className="mt-0.5 block text-xs text-faint">Class: {r.className}</span>
+                )}
+                <span className="mt-0.5 block text-xs text-faint">
+                  Rider on EVO: {r.riderName || "Not listed"}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex gap-2">
+        <PrimaryButton type="button" disabled={busy} onClick={() => void review("keep")}>
+          Keep selected
+        </PrimaryButton>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void review("reject")}
+          className="cursor-pointer rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft disabled:opacity-60"
+        >
+          Not mine
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Kept scores appear below. Scores marked “Not mine” are hidden and won’t be suggested again.
+      </p>
+    </Card>
+  );
+}
+
+function SheetsCard({
+  plan,
+  horse,
+  log,
+  setLog,
+}: {
+  plan: GeneratedPlan;
+  horse: HorseRecord;
+  log: HorseLog;
+  setLog: (l: HorseLog) => void;
+}) {
   const [files, setFiles] = useState<{ blob: Blob; dataUrl: string }[]>([]);
   const [test, setTest] = useState(plan.mainTest);
   const [showName, setShowName] = useState(plan.shows[0]?.name ?? "");
@@ -629,7 +1037,8 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
     setErr(null);
     try {
       const next = [...files];
-      for (const f of Array.from(list).slice(0, MAX_SHEET_PHOTOS - files.length)) next.push(await compressSheetPhoto(f));
+      for (const f of Array.from(list).slice(0, MAX_SHEET_PHOTOS - files.length))
+        next.push(await compressSheetPhoto(f));
       setFiles(next);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -642,7 +1051,10 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
     try {
       const res = await summariseSheet({
         data: {
-          images: files.map((f) => ({ imageBase64: f.dataUrl.slice(f.dataUrl.indexOf(",") + 1), mime: "image/jpeg" })),
+          images: files.map((f) => ({
+            imageBase64: f.dataUrl.slice(f.dataUrl.indexOf(",") + 1),
+            mime: "image/jpeg",
+          })),
           testHint: test,
           showName,
           horseName: horse.name,
@@ -657,7 +1069,17 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
       const saved = await saveSheet({
         data: {
           horseId: horse.id,
-          sheet: { id, kind: "sheet", showName, date: iso(TODAY), test: sheet.test && sheet.test !== "unknown" ? sheet.test : test, note: "", mime: "image/jpeg", sheet, photos },
+          sheet: {
+            id,
+            kind: "sheet",
+            showName,
+            date: iso(TODAY),
+            test: sheet.test && sheet.test !== "unknown" ? sheet.test : test,
+            note: "",
+            mime: "image/jpeg",
+            sheet,
+            photos,
+          },
         },
       });
       setLog(saved);
@@ -672,9 +1094,17 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
   return (
     <Card>
       <Kicker>Judge sheets</Kicker>
-      <p className="mt-2 text-sm text-muted">Photograph the sheet (up to {MAX_SHEET_PHOTOS} pages). We read it and save the summary to your account; the photos stay on this device.</p>
+      <p className="mt-2 text-sm text-muted">
+        Photograph the sheet (up to {MAX_SHEET_PHOTOS} pages). We read it and save the summary to
+        your account; the photos stay on this device.
+      </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <input className={inputCls} placeholder="Show" value={showName} onChange={(e) => setShowName(e.target.value)} />
+        <input
+          className={inputCls}
+          placeholder="Show"
+          value={showName}
+          onChange={(e) => setShowName(e.target.value)}
+        />
         <select className={inputCls} value={test} onChange={(e) => setTest(e.target.value)}>
           {plan.tests.map((t) => (
             <option key={t}>{t}</option>
@@ -682,8 +1112,17 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
         </select>
       </div>
       <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-line px-3 py-3 text-sm font-semibold text-ink-soft">
-        <ImagePlus className="size-4" /> {files.length ? `${files.length} photo${files.length === 1 ? "" : "s"} — add more` : "Add sheet photos"}
-        <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => void add(e.target.files).then(() => (e.target.value = ""))} />
+        <ImagePlus className="size-4" />{" "}
+        {files.length
+          ? `${files.length} photo${files.length === 1 ? "" : "s"} — add more`
+          : "Add sheet photos"}
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          onChange={(e) => void add(e.target.files).then(() => (e.target.value = ""))}
+        />
       </label>
       {files.length > 0 && (
         <PrimaryButton type="button" className="mt-2" disabled={busy} onClick={() => void read()}>
@@ -698,9 +1137,21 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
               <p className="font-semibold">
                 {x.test}
                 {x.sheet?.percent != null && ` · ${x.sheet.percent}%`}
-                <span className="font-normal text-muted"> · {[x.showName, fmtDay(x.date)].filter(Boolean).join(" · ")}</span>
+                <span className="font-normal text-muted">
+                  {" "}
+                  · {[x.showName, fmtDay(x.date)].filter(Boolean).join(" · ")}
+                </span>
               </p>
-              <button type="button" aria-label="Delete sheet" className="cursor-pointer text-muted hover:text-danger" onClick={() => void deleteEntry({ data: { horseId: horse.id, kind: "sheet", id: x.id } }).then(setLog)}>
+              <button
+                type="button"
+                aria-label="Delete sheet"
+                className="cursor-pointer text-muted hover:text-danger"
+                onClick={() =>
+                  void deleteEntry({ data: { horseId: horse.id, kind: "sheet", id: x.id } }).then(
+                    setLog,
+                  )
+                }
+              >
                 <Trash2 className="size-4" />
               </button>
             </div>
@@ -721,7 +1172,19 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
   );
 }
 
-function SetupTab({ ws, plan, record, horse, onEdit }: { ws: Workspace; plan: GeneratedPlan; record: PlanRecord; horse: HorseRecord; onEdit: () => void }) {
+function SetupTab({
+  ws,
+  plan,
+  record,
+  horse,
+  onEdit,
+}: {
+  ws: Workspace;
+  plan: GeneratedPlan;
+  record: PlanRecord;
+  horse: HorseRecord;
+  onEdit: () => void;
+}) {
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -745,7 +1208,9 @@ function SetupTab({ ws, plan, record, horse, onEdit }: { ws: Workspace; plan: Ge
         <PrimaryButton type="button" className="mt-4" onClick={onEdit}>
           Change horses, tests, shows or goals
         </PrimaryButton>
-        <p className="mt-2 text-xs text-muted">Rebuilding keeps your scores, notes and judge sheets.</p>
+        <p className="mt-2 text-xs text-muted">
+          Rebuilding keeps your scores, notes and judge sheets.
+        </p>
       </Card>
     </div>
   );
@@ -756,7 +1221,15 @@ function SetupTab({ ws, plan, record, horse, onEdit }: { ws: Workspace; plan: Ge
  * localStorage (`xsalute-plan:<id>`). Offer a one-off import; localStorage is
  * left untouched either way.
  */
-function LocalImportBanner({ storageKey, horse, onImported }: { storageKey: string; horse: HorseRecord; onImported: (l: HorseLog) => void }) {
+function LocalImportBanner({
+  storageKey,
+  horse,
+  onImported,
+}: {
+  storageKey: string;
+  horse: HorseRecord;
+  onImported: (l: HorseLog) => void;
+}) {
   const dismissKey = `${storageKey}:import-dismissed`;
   const [snap, setSnap] = useState<LegacySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
@@ -775,7 +1248,10 @@ function LocalImportBanner({ storageKey, horse, onImported }: { storageKey: stri
     }
   }, [storageKey, dismissKey]);
   const counts = useMemo(() => (snap ? snapshotCounts(snap) : null), [snap]);
-  if (!snap || !counts) return msg ? <p className="mb-3 rounded-lg bg-accent/15 px-3 py-2 text-sm text-accent">{msg}</p> : null;
+  if (!snap || !counts)
+    return msg ? (
+      <p className="mb-3 rounded-lg bg-accent/15 px-3 py-2 text-sm text-accent">{msg}</p>
+    ) : null;
   const dismiss = () => {
     try {
       localStorage.setItem(dismissKey, new Date().toISOString());
@@ -788,8 +1264,9 @@ function LocalImportBanner({ storageKey, horse, onImported }: { storageKey: stri
     <Panel className="mb-4 space-y-2">
       <p className="text-sm font-semibold">Found data from the earlier beta on this device</p>
       <p className="text-xs text-muted">
-        {counts.scores} scores, {counts.notes} notes, {counts.sheets} judge sheets. Import them into {horse.name}? (If these
-        are the example rider’s, skip this.) Nothing is removed from this device.
+        {counts.scores} scores, {counts.notes} notes, {counts.sheets} judge sheets. Import them into{" "}
+        {horse.name}? (If these are the example rider’s, skip this.) Nothing is removed from this
+        device.
       </p>
       <div className="flex gap-2">
         <button
@@ -810,7 +1287,11 @@ function LocalImportBanner({ storageKey, horse, onImported }: { storageKey: stri
         >
           Import into {horse.name}
         </button>
-        <button type="button" className="cursor-pointer rounded-lg border border-line px-3 py-2 text-sm" onClick={dismiss}>
+        <button
+          type="button"
+          className="cursor-pointer rounded-lg border border-line px-3 py-2 text-sm"
+          onClick={dismiss}
+        >
           Skip
         </button>
       </div>

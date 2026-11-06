@@ -56,7 +56,8 @@ export const saveResult = createServerFn({ method: "POST" })
     return { horseId: str(input?.horseId), result: input?.result ?? {} };
   })
   .handler(async ({ context, data }) => {
-    const { requireAccess, ownedHorse, upsertResult, loadHorseLog } = await import("./rider.server");
+    const { requireAccess, ownedHorse, upsertResult, loadHorseLog } =
+      await import("./rider.server");
     const { getSql } = await import("./db");
     await requireAccess(context.userId);
     const sql = await getSql();
@@ -176,12 +177,40 @@ export const importLocalForHorse = createServerFn({ method: "POST" })
     return riderImportLocal(context.userId, data.horseId, data.snapshot);
   });
 
-/** Admin only: match parsed EVO Events CSV rows to beta horses and (unless dryRun) save them. */
+/** Rider: keep the selected EVO suggestions on their own horse. */
+export const keepEvoResults = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; ids: string[] }) => ({
+    horseId: str(input?.horseId),
+    ids: Array.isArray(input?.ids) ? input.ids.slice(0, 100).map((id) => str(id, 120)) : [],
+  }))
+  .handler(async ({ context, data }): Promise<HorseLog> => {
+    const { reviewEvoResults } = await import("./rider.server");
+    return reviewEvoResults(context.userId, data.horseId, data.ids, "kept");
+  });
+
+/** Rider: hide and never re-suggest the selected EVO scores on their own horse. */
+export const rejectEvoResults = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; ids: string[] }) => ({
+    horseId: str(input?.horseId),
+    ids: Array.isArray(input?.ids) ? input.ids.slice(0, 100).map((id) => str(id, 120)) : [],
+  }))
+  .handler(async ({ context, data }): Promise<HorseLog> => {
+    const { reviewEvoResults } = await import("./rider.server");
+    return reviewEvoResults(context.userId, data.horseId, data.ids, "rejected");
+  });
+
+/** Admin only: send matched EVO Events CSV rows to beta riders for review. */
 export const importEvoResults = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { fileName: string; rows: EvoRow[]; dryRun?: boolean }) => {
     if (!Array.isArray(input?.rows)) throw new Error("No rows");
-    return { fileName: str(input.fileName, 200), rows: input.rows.slice(0, 5000), dryRun: input.dryRun !== false };
+    return {
+      fileName: str(input.fileName, 200),
+      rows: input.rows.slice(0, 5000),
+      dryRun: input.dryRun !== false,
+    };
   })
   .handler(async ({ context, data }): Promise<EvoImportResult> => {
     const { importEvoRows } = await import("./evo-import.server");

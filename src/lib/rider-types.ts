@@ -42,6 +42,21 @@ export type ResultRecord = {
   eventUrl: string;
 };
 
+export type EvoReviewStatus = "pending" | "kept" | "rejected";
+
+/** An EVO import the rider has not reviewed yet. */
+export type PendingEvoResult = {
+  id: string;
+  date: string;
+  showName: string;
+  test: string;
+  className: string;
+  percent: number | null;
+  place: string;
+  status: string;
+  riderName: string;
+};
+
 export type NoteRecord = { id: string; date: string; text: string };
 
 export type SheetRecord = {
@@ -60,6 +75,7 @@ export type SheetRecord = {
 export type HorseLog = {
   horseId: string;
   results: ResultRecord[];
+  pendingEvoResults: PendingEvoResult[];
   notes: NoteRecord[];
   sheets: SheetRecord[];
   progress: Progress;
@@ -121,7 +137,12 @@ export type EvoImportRowResult = {
   horse: string;
   esnz: string;
   percent: number | null;
-  match: { horseId: string; horseName: string; riderName: string; by: "esnz" | "horse+rider" | "horse" } | null;
+  match: {
+    horseId: string;
+    horseName: string;
+    riderName: string;
+    by: "esnz" | "horse+rider" | "horse";
+  } | null;
   reason?: string;
   inserted?: boolean;
   duplicate?: boolean;
@@ -146,19 +167,21 @@ export function snapshotFromStorage(raw: string | null): LegacySnapshot | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as { state?: unknown } | null;
-    const s = ((parsed && typeof parsed === "object" && "state" in parsed ? parsed.state : parsed) ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, boolean>) : {});
-    const arr = <T,>(v: unknown) => (Array.isArray(v) ? (v as T[]) : []);
+    const s = ((parsed && typeof parsed === "object" && "state" in parsed
+      ? parsed.state
+      : parsed) ?? {}) as Record<string, unknown>;
+    const obj = (v: unknown) =>
+      v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, boolean>) : {};
+    const arr = <T>(v: unknown) => (Array.isArray(v) ? (v as T[]) : []);
     return {
       done: obj(s.done),
       pack: obj(s.pack),
       scores: arr<LegacySnapshot["scores"][number]>(s.scores).filter(
         (x) => x && typeof x.id === "string" && !x.official && !x.id.startsWith("evo-"),
       ),
-      notes: arr<LegacySnapshot["notes"][number]>(s.notes).filter((x) => x && typeof x.text === "string"),
+      notes: arr<LegacySnapshot["notes"][number]>(s.notes).filter(
+        (x) => x && typeof x.text === "string",
+      ),
       review: arr<ReviewItem>(s.review).filter((x) => x && typeof x.id === "string"),
     };
   } catch {
@@ -177,7 +200,9 @@ export function snapshotCounts(s: LegacySnapshot) {
 
 export function snapshotIsEmpty(s: LegacySnapshot) {
   const c = snapshotCounts(s);
-  return c.scores + c.notes + c.sheets + c.ticks + Object.values(s.pack).filter(Boolean).length === 0;
+  return (
+    c.scores + c.notes + c.sheets + c.ticks + Object.values(s.pack).filter(Boolean).length === 0
+  );
 }
 
 /** Union of two snapshots (by id). `a` wins on conflicts. Never drops anything. */

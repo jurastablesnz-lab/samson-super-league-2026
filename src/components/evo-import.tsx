@@ -17,7 +17,8 @@ export function EvoImportPanel() {
     setError(null);
     setPreview(null);
     setFileName(f.name);
-    if (f.size > 5 * 1024 * 1024) return setError("That file is over 5 MB — export one event at a time.");
+    if (f.size > 5 * 1024 * 1024)
+      return setError("That file is over 5 MB — export one event at a time.");
     const text = await f.text();
     const p = parseEvoResultsCsv(text);
     setParsed(p);
@@ -41,9 +42,11 @@ export function EvoImportPanel() {
     <Panel className="mt-5 space-y-3">
       <Kicker>Import results · EVO Events CSV</Kicker>
       <p className="text-sm text-muted">
-        Download the results CSV for an event from EVO Events and drop it here. Rows are matched to beta riders’ horses by
-        ESNZ number, then horse + rider name. Other competitors in the file are ignored. You’ll see a preview before
-        anything is saved, and re-importing the same file won’t duplicate results.
+        Download the results CSV for an event from EVO Events and drop it here. Rows are matched to
+        beta riders’ horses by ESNZ number, then horse + rider name. Other competitors in the file
+        are ignored. You’ll see a preview before anything is saved. Matched scores are sent to
+        riders for review — they choose which to keep. Re-importing the same file won’t re-suggest
+        scores that are pending, kept or rejected.
       </p>
       <label className="block cursor-pointer rounded-lg border border-dashed border-line px-3 py-3 text-center text-sm font-semibold text-ink-soft">
         {fileName ? `${fileName} — choose another` : "Choose a CSV file"}
@@ -61,7 +64,8 @@ export function EvoImportPanel() {
       {parsed && (
         <div className="text-xs text-muted">
           <p>
-            {parsed.rows.length} result rows · delimiter “{parsed.delimiter === "\t" ? "tab" : parsed.delimiter}” · columns:{" "}
+            {parsed.rows.length} result rows · delimiter “
+            {parsed.delimiter === "\t" ? "tab" : parsed.delimiter}” · columns:{" "}
             {Object.entries(parsed.mapping)
               .map(([h, f]) => `${h} → ${f}`)
               .join(", ") || "none recognised"}
@@ -77,11 +81,15 @@ export function EvoImportPanel() {
       {preview && (
         <div className="space-y-2">
           <p className="text-sm">
-            <span className="font-semibold">{preview.matched}</span> of {preview.total} rows match a beta horse
+            <span className="font-semibold">{preview.matched}</span> of {preview.total} rows match a
+            beta horse
             {!preview.dryRun && (
               <>
                 {" "}
-                · <span className="font-semibold text-accent">{preview.inserted} saved</span>
+                ·{" "}
+                <span className="font-semibold text-accent">
+                  {preview.inserted} sent for review
+                </span>
                 {preview.duplicates ? ` · ${preview.duplicates} already imported` : ""}
               </>
             )}
@@ -101,7 +109,10 @@ export function EvoImportPanel() {
                 {[...preview.rows]
                   .sort((a, b) => Number(!!b.match) - Number(!!a.match))
                   .map((r) => (
-                    <tr key={r.line} className={cn("border-t border-line", !r.match && "text-faint")}>
+                    <tr
+                      key={r.line}
+                      className={cn("border-t border-line", !r.match && "text-faint")}
+                    >
                       <td className="p-2">{r.line}</td>
                       <td className="p-2">{r.rider}</td>
                       <td className="p-2">
@@ -113,7 +124,9 @@ export function EvoImportPanel() {
                         {r.match ? (
                           <span className="text-accent">
                             {r.match.horseName} ({r.match.riderName || "rider"}) · by {r.match.by}
-                            {r.duplicate && " · already saved"}
+                            {r.duplicate
+                              ? " · already reviewed or waiting"
+                              : " · sent to rider for review"}
                           </span>
                         ) : (
                           r.reason
@@ -131,7 +144,9 @@ export function EvoImportPanel() {
               onClick={() => void run(parsed, false)}
               className="w-full cursor-pointer rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-accent-fg disabled:opacity-60"
             >
-              {busy ? "Saving…" : `Save ${preview.matched} matched result${preview.matched === 1 ? "" : "s"}`}
+              {busy
+                ? "Sending…"
+                : `Send ${preview.matched} matched result${preview.matched === 1 ? "" : "s"} to riders for review`}
             </button>
           )}
         </div>

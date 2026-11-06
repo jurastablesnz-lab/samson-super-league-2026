@@ -10,15 +10,24 @@
  *   3. Horse name alone, only when exactly one horse in the beta has it.
  * Ambiguous or unmatched rows are reported, never guessed.
  *
- * Re-importing the same file is safe: each row gets a dedupe key (event, date,
- * class/test, percent) and duplicates per horse are skipped.
+ * Matched rows arrive as pending suggestions for the horse's owner, not as
+ * confirmed results. Re-importing the same file is safe: each row gets a
+ * dedupe key (event, date, class/test, percent) and duplicates per horse are
+ * skipped, including rows the rider has already kept or rejected.
  */
 import { getSql } from "./db";
 import { evoDedupeKey, normaliseEsnz, normaliseName, type EvoRow } from "./evo-csv";
 import { requireAdminUser } from "./rider.server";
 import type { EvoImportResult, EvoImportRowResult } from "./rider-types";
 
-type Candidate = { horseId: string; userId: string; horseName: string; riderName: string; esnz: string; riderKeys: string[] };
+type Candidate = {
+  horseId: string;
+  userId: string;
+  horseName: string;
+  riderName: string;
+  esnz: string;
+  riderKeys: string[];
+};
 
 function riderKeys(name: string): string[] {
   const n = normaliseName(name);
@@ -40,13 +49,25 @@ function levelFrom(row: EvoRow): string {
   return m ? `L${m[1]}` : row.level.slice(0, 20);
 }
 
-export async function importEvoRows(adminId: string, fileName: string, rows: EvoRow[], dryRun: boolean): Promise<EvoImportResult> {
+export async function importEvoRows(
+  adminId: string,
+  fileName: string,
+  rows: EvoRow[],
+  dryRun: boolean,
+): Promise<EvoImportResult> {
   const admin = await requireAdminUser(adminId);
   if (!Array.isArray(rows)) throw new Error("No rows");
   if (rows.length > 5000) throw new Error("Up to 5000 rows per file");
   const sql = await getSql();
   const cands = (
-    await sql<{ id: string; user_id: string; name: string; esnz_number: string | null; full_name: string | null; uname: string | null }>`
+    await sql<{
+      id: string;
+      user_id: string;
+      name: string;
+      esnz_number: string | null;
+      full_name: string | null;
+      uname: string | null;
+    }>`
       select h.id, h.user_id, h.name, h.esnz_number, b.full_name, u.name as uname
       from horses h
       join "user" u on u.id = h.user_id
@@ -64,7 +85,9 @@ export async function importEvoRows(adminId: string, fileName: string, rows: Evo
   const out: EvoImportRowResult[] = [];
   let importId: number | null = null;
   if (!dryRun) {
-    const ins = await sql<{ id: number }>`insert into result_imports (uploaded_by, file_name, row_count)
+    const ins = await sql<{
+      id: number;
+    }>`insert into result_imports (uploaded_by, file_name, row_count)
       values (${admin.email ?? admin.id}, ${String(fileName ?? "").slice(0, 200)}, ${rows.length}) returning id`;
     importId = Number(ins[0].id);
   }
@@ -72,7 +95,14 @@ export async function importEvoRows(adminId: string, fileName: string, rows: Evo
   let inserted = 0;
   let duplicates = 0;
   for (const row of rows) {
-    const base: EvoImportRowResult = { line: row.line, rider: row.rider, horse: row.horse, esnz: row.esnz, percent: row.percent, match: null };
+    const base: EvoImportRowResult = {
+      line: row.line,
+      rider: row.rider,
+      horse: row.horse,
+      esnz: row.esnz,
+      percent: row.percent,
+      match: null,
+    };
     const esnz = normaliseEsnz(row.esnz ?? "");
     const hn = normaliseName(row.horse ?? "");
     let hit: { c: Candidate; by: "esnz" | "horse+rider" | "horse" } | null = null;
@@ -86,10 +116,12 @@ export async function importEvoRows(adminId: string, fileName: string, rows: Evo
       const byName = cands.filter((c) => normaliseName(c.horseName) === hn);
       const both = row.rider ? byName.filter((c) => riderMatches(c, row.rider)) : [];
       if (both.length === 1) hit = { c: both[0], by: "horse+rider" };
-      else if (both.length === 0 && byName.length === 1 && !row.rider) hit = { c: byName[0], by: "horse" };
+      else if (both.length === 0 && byName.length === 1 && !row.rider)
+        hit = { c: byName[0], by: "horse" };
       else if (both.length === 0 && byName.length === 1 && row.rider) {
         reason = `Horse found, but rider "${row.rider}" doesn't match ${byName[0].riderName || "the account"}`;
-      } else if (byName.length > 1 || both.length > 1) reason = "More than one horse with this name — add the ESNZ number";
+      } else if (byName.length > 1 || both.length > 1)
+        reason = "More than one horse with this name — add the ESNZ number";
       else if (!reason) reason = "No horse with this name in the beta";
     }
     if (!hit && !reason) reason = "No horse name or ESNZ number on this row";
@@ -100,18 +132,25 @@ export async function importEvoRows(adminId: string, fileName: string, rows: Evo
     matched += 1;
     const res: EvoImportRowResult = {
       ...base,
-      match: { horseId: hit.c.horseId, horseName: hit.c.horseName, riderName: hit.c.riderName, by: hit.by },
+      match: {
+        horseId: hit.c.horseId,
+        horseName: hit.c.horseName,
+        riderName: hit.c.riderName,
+        by: hit.by,
+      },
     };
     if (!dryRun) {
       const key = evoDedupeKey(row);
       const clientId = `csv-${importId}-${row.line}`;
-      const r = await sql<{ id: number }>`insert into results (user_id, horse_id, client_id, source, show_id, show_name,
-          ride_date, test, level, percent, place, status, judges, notes, dedupe_key, import_id, raw)
+      const r = await sql<{
+        id: number;
+      }>`insert into results (user_id, horse_id, client_id, source, show_id, show_name,
+          ride_date, test, level, percent, place, status, judges, notes, dedupe_key, import_id, raw, review_status, rider_name)
         values (${hit.c.userId}, ${hit.c.horseId}, ${clientId}, 'evo_csv', 'past', ${row.event.slice(0, 120)},
           ${row.date || null}, ${(row.test || row.className).slice(0, 80)}, ${levelFrom(row)}, ${row.percent},
           ${row.place.slice(0, 20)}, ${row.status}, ${row.judges.slice(0, 300)},
           ${row.className && row.className !== row.test ? row.className.slice(0, 200) : ""}, ${key}, ${importId},
-          ${JSON.stringify(row.raw ?? {})}::jsonb)
+          ${JSON.stringify(row.raw ?? {})}::jsonb, 'pending', ${row.rider.slice(0, 120)})
         on conflict do nothing returning id`;
       if (r.length) {
         inserted += 1;

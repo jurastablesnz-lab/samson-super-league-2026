@@ -1,4 +1,8 @@
-/** 60 × 20 schematic. A at the bottom. Length is compressed to fit a phone. */
+/**
+ * Phone schematic. A at the bottom. Length is compressed the same way for both
+ * arenas (3.6px per metre), so a 20×40 arena is simply the shorter rectangle.
+ * The 60×20 exports below stay the default; call `withArena` for the small arena.
+ */
 
 export const CX = 110;
 export const LEFT = 50;
@@ -7,6 +11,15 @@ export const TOP = 28;
 export const BOT = 244;
 export const CORNER_RX = 22;
 export const CORNER_RY = 13.5;
+
+export type ArenaSize = "60x20" | "40x20";
+
+/** "60 × 20 or 40 × 20" stays on the large arena. A sheet that is only 40m uses the small one. */
+export function arenaSizeOf(arena: string | undefined): ArenaSize {
+  if (arena && /\b60\b/.test(arena)) return "60x20";
+  if (arena && /\b40\b/.test(arena)) return "40x20";
+  return "60x20";
+}
 
 const Y: Record<string, number> = {
   C: TOP,
@@ -82,11 +95,11 @@ const EXTRA: Record<string, { x: number; y: number }> = {
 };
 
 export function track(id: string): { x: number; y: number } {
-  if (EXTRA[id]) return EXTRA[id];
-  const y = Y[id] ?? 134;
-  if (LEFTS.has(id)) return { x: LEFT, y };
-  if (RIGHTS.has(id)) return { x: RIGHT, y };
-  return { x: CX, y };
+  if (geom.extra[id]) return geom.extra[id];
+  const y = geom.y[id] ?? geom.y.X;
+  if (geom.lefts.has(id)) return { x: geom.left, y };
+  if (geom.rights.has(id)) return { x: geom.right, y };
+  return { x: geom.cx, y };
 }
 
 /** A point on the straight line from one letter to another. `along` is 0 at `from` and 1 at `to`. */
@@ -101,14 +114,14 @@ export function centreAlong(from: string, to: string) {
   const a = track(from);
   const b = track(to);
   if (Math.abs(b.x - a.x) < 1) return 0.5;
-  return (CX - a.x) / (b.x - a.x);
+  return (geom.cx - a.x) / (b.x - a.x);
 }
 
 /** Flying-change marker, pulled inside the rail so the circle stays in the arena. */
 export function markerPoint(p: { x: number; y: number }) {
   return {
-    x: Math.min(RIGHT - 6, Math.max(LEFT + 6, p.x)),
-    y: Math.min(BOT - 6, Math.max(TOP + 6, p.y)),
+    x: Math.min(geom.right - 6, Math.max(geom.left + 6, p.x)),
+    y: Math.min(geom.bot - 6, Math.max(geom.top + 6, p.y)),
   };
 }
 
@@ -117,16 +130,16 @@ export function markerAt(at: string) {
 }
 
 export function label(id: string): { x: number; y: number } {
-  const y = Y[id] ?? 134;
-  if (LEFTS.has(id)) return { x: 36, y };
-  if (RIGHTS.has(id)) return { x: 184, y };
-  if (id === "C") return { x: CX, y: 14 };
-  if (id === "A") return { x: CX, y: 256 };
-  return { x: CX, y };
+  const y = geom.y[id] ?? geom.y.X;
+  if (geom.lefts.has(id)) return { x: geom.left - 14, y };
+  if (geom.rights.has(id)) return { x: geom.right + 14, y };
+  if (id === "C") return { x: geom.cx, y: geom.top - 14 };
+  if (id === "A") return { x: geom.cx, y: geom.bot + 12 };
+  return { x: geom.cx, y };
 }
 
 export function isRail(id: string) {
-  return RAIL.has(id);
+  return geom.rail.has(id);
 }
 
 export function circleCenter(
@@ -135,11 +148,11 @@ export function circleCenter(
   side?: "left" | "right",
 ): { x: number; y: number } {
   const p = track(at);
-  if (at === "C") return { x: CX, y: TOP + m * M_PX.y };
-  if (at === "A") return { x: CX, y: BOT - m * M_PX.y };
-  if (side) return { x: CX + (side === "left" ? -1 : 1) * m * M_PX.x, y: p.y };
-  if (LEFTS.has(at)) return { x: LEFT + m * M_PX.x, y: p.y };
-  if (RIGHTS.has(at)) return { x: RIGHT - m * M_PX.x, y: p.y };
+  if (at === "C") return { x: geom.cx, y: geom.top + m * geom.mPx.y };
+  if (at === "A") return { x: geom.cx, y: geom.bot - m * geom.mPx.y };
+  if (side) return { x: geom.cx + (side === "left" ? -1 : 1) * m * geom.mPx.x, y: p.y };
+  if (geom.lefts.has(at)) return { x: geom.left + m * geom.mPx.x, y: p.y };
+  if (geom.rights.has(at)) return { x: geom.right - m * geom.mPx.x, y: p.y };
   return p;
 }
 
@@ -165,35 +178,156 @@ const RAIL_POSITIONS: Record<string, number> = {
 
 /** Clockwise distance from A along the sharp rectangle. */
 export function railParam(id: string): number {
-  return RAIL_POSITIONS[id] ?? 0;
+  return geom.railPositions[id] ?? 0;
+}
+
+type ArenaFrame = {
+  size: ArenaSize;
+  cx: number;
+  left: number;
+  right: number;
+  top: number;
+  bot: number;
+  cornerRx: number;
+  cornerRy: number;
+  mPx: { x: number; y: number };
+  y: Record<string, number>;
+  lefts: Set<string>;
+  rights: Set<string>;
+  rail: Set<string>;
+  letters: readonly string[];
+  extra: Record<string, { x: number; y: number }>;
+  railPositions: Record<string, number>;
+  perim: number;
+  hw: number;
+  w: number;
+  h: number;
+};
+
+const large: ArenaFrame = {
+  size: "60x20",
+  cx: CX,
+  left: LEFT,
+  right: RIGHT,
+  top: TOP,
+  bot: BOT,
+  cornerRx: CORNER_RX,
+  cornerRy: CORNER_RY,
+  mPx: M_PX,
+  y: Y,
+  lefts: LEFTS,
+  rights: RIGHTS,
+  rail: RAIL,
+  letters: LETTER_IDS,
+  extra: EXTRA,
+  railPositions: RAIL_POSITIONS,
+  perim: PERIM,
+  hw: HW,
+  w: W,
+  h: H,
+};
+
+/** 20×40: corner letters 6m from the short sides, E/B/X at 20m, H/M/G at 34m. */
+const smallTop = BOT - 40 * M_PX.y;
+const smallY: Record<string, number> = {
+  A: BOT,
+  K: BOT - 6 * M_PX.y,
+  F: BOT - 6 * M_PX.y,
+  D: BOT - 6 * M_PX.y,
+  E: BOT - 20 * M_PX.y,
+  B: BOT - 20 * M_PX.y,
+  X: BOT - 20 * M_PX.y,
+  H: BOT - 34 * M_PX.y,
+  M: BOT - 34 * M_PX.y,
+  G: BOT - 34 * M_PX.y,
+  C: smallTop,
+};
+const smallH = BOT - smallTop;
+const smallRail = {
+  A: 0,
+  F: HW + 6 * M_PX.y,
+  B: HW + 20 * M_PX.y,
+  M: HW + 34 * M_PX.y,
+  C: HW + smallH + HW,
+  H: HW + smallH + W + 6 * M_PX.y,
+  E: HW + smallH + W + 20 * M_PX.y,
+  K: HW + smallH + W + 34 * M_PX.y,
+};
+const small: ArenaFrame = {
+  size: "40x20",
+  cx: CX,
+  left: LEFT,
+  right: RIGHT,
+  top: smallTop,
+  bot: BOT,
+  cornerRx: CORNER_RX,
+  cornerRy: CORNER_RY,
+  mPx: M_PX,
+  y: smallY,
+  lefts: new Set(["H", "E", "K"]),
+  rights: new Set(["M", "B", "F"]),
+  rail: new Set(["A", "K", "E", "H", "C", "M", "B", "F", "CH", "CM", "FA", "AK"]),
+  letters: ["C", "H", "M", "G", "E", "B", "X", "K", "F", "D", "A"],
+  extra: {
+    CH: { x: LEFT + CORNER_RX, y: smallTop },
+    CM: { x: RIGHT - CORNER_RX, y: smallTop },
+    FA: { x: RIGHT, y: BOT - 14 },
+    AK: { x: LEFT, y: BOT - 14 },
+  },
+  railPositions: smallRail,
+  perim: 2 * (W + smallH),
+  hw: HW,
+  w: W,
+  h: smallH,
+};
+
+let geom: ArenaFrame = large;
+
+export function arenaFor(size: ArenaSize): ArenaFrame {
+  return size === "40x20" ? small : large;
+}
+
+/** Run geometry against one arena. The default, outside this call, stays 60×20. */
+export function withArena<T>(size: ArenaSize, fn: () => T): T {
+  const prev = geom;
+  geom = arenaFor(size);
+  try {
+    return fn();
+  } finally {
+    geom = prev;
+  }
+}
+
+export function arenaLetters(size: ArenaSize = "60x20"): readonly string[] {
+  return arenaFor(size).letters;
 }
 
 function wrap(t: number) {
-  const p = PERIM;
+  const p = geom.perim;
   return ((t % p) + p) % p;
 }
 
 function pointOnSharp(t: number): { x: number; y: number } {
   t = wrap(t);
-  if (t < HW) return { x: CX + t, y: BOT };
-  t -= HW;
-  if (t < H) return { x: RIGHT, y: BOT - t };
-  t -= H;
-  if (t < W) return { x: RIGHT - t, y: TOP };
-  t -= W;
-  if (t < H) return { x: LEFT, y: TOP + t };
-  t -= H;
-  return { x: LEFT + t, y: BOT };
+  if (t < geom.hw) return { x: geom.cx + t, y: geom.bot };
+  t -= geom.hw;
+  if (t < geom.h) return { x: geom.right, y: geom.bot - t };
+  t -= geom.h;
+  if (t < geom.w) return { x: geom.right - t, y: geom.top };
+  t -= geom.w;
+  if (t < geom.h) return { x: geom.left, y: geom.top + t };
+  t -= geom.h;
+  return { x: geom.left + t, y: geom.bot };
 }
 
 function roundCorner(p: { x: number; y: number }): { x: number; y: number } {
-  const rx = CORNER_RX;
-  const ry = CORNER_RY;
+  const rx = geom.cornerRx;
+  const ry = geom.cornerRy;
   const corners = [
-    { cx: RIGHT - rx, cy: BOT - ry, sx: 1, sy: 1 },
-    { cx: RIGHT - rx, cy: TOP + ry, sx: 1, sy: -1 },
-    { cx: LEFT + rx, cy: TOP + ry, sx: -1, sy: -1 },
-    { cx: LEFT + rx, cy: BOT - ry, sx: -1, sy: 1 },
+    { cx: geom.right - rx, cy: geom.bot - ry, sx: 1, sy: 1 },
+    { cx: geom.right - rx, cy: geom.top + ry, sx: 1, sy: -1 },
+    { cx: geom.left + rx, cy: geom.top + ry, sx: -1, sy: -1 },
+    { cx: geom.left + rx, cy: geom.bot - ry, sx: -1, sy: 1 },
   ];
   for (const c of corners) {
     const inX = c.sx > 0 ? p.x >= c.cx : p.x <= c.cx;
@@ -262,13 +396,75 @@ export function linePath(ids: string[]): string {
   return d;
 }
 
+/** Midpoint of an SVG elliptical arc. large-arc is 0, matching the paths this file emits. */
+function arcCrown(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  rx: number,
+  ry: number,
+  sweep: 0 | 1,
+): { x: number; y: number } {
+  const dx = (a.x - b.x) / 2;
+  const dy = (a.y - b.y) / 2;
+  let arx = rx;
+  let ary = ry;
+  const lam = (dx * dx) / (arx * arx) + (dy * dy) / (ary * ary);
+  if (lam > 1) {
+    const s = Math.sqrt(lam);
+    arx *= s;
+    ary *= s;
+  }
+  // SVG spec: sign is -1 when the large-arc flag equals the sweep flag.
+  const sign = sweep === 0 ? -1 : 1;
+  const denom = arx * arx * dy * dy + ary * ary * dx * dx;
+  const root = Math.max(
+    0,
+    (arx * arx * ary * ary - arx * arx * dy * dy - ary * ary * dx * dx) / denom,
+  );
+  const coef = sign * Math.sqrt(root);
+  const cx = (a.x + b.x) / 2 + coef * ((arx * dy) / ary);
+  const cy = (a.y + b.y) / 2 + coef * -((ary * dx) / arx);
+  const ang = (ux: number, uy: number, vx: number, vy: number) => {
+    const dot = ux * vx + uy * vy;
+    const len = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+    let theta = Math.acos(Math.min(1, Math.max(-1, dot / len)));
+    if (ux * vy - uy * vx < 0) theta = -theta;
+    return theta;
+  };
+  const theta1 = ang(1, 0, (a.x - cx) / arx, (a.y - cy) / ary);
+  let dtheta = ang((a.x - cx) / arx, (a.y - cy) / ary, (b.x - cx) / arx, (b.y - cy) / ary);
+  if (sweep === 0 && dtheta > 0) dtheta -= Math.PI * 2;
+  if (sweep === 1 && dtheta < 0) dtheta += Math.PI * 2;
+  const mid = theta1 + dtheta / 2;
+  return { x: cx + arx * Math.cos(mid), y: cy + ary * Math.sin(mid) };
+}
+
 export function halfArc(from: string, to: string, bulge: "C" | "A"): string {
   const a = track(from);
   const b = track(to);
-  const rx = Math.max(8, Math.abs(b.x - a.x) / 2);
-  const ry = Math.max(8, rx * (M_PX.y / M_PX.x));
-  // SVG sweep 1 is clockwise in screen space, which bulges toward A (down) on a horizontal chord.
-  const sweep = bulge === "A" ? 1 : 0;
+  // Diameter is the whole chord, so a vertical half circle is the same size as a horizontal one.
+  const metres = Math.hypot((b.x - a.x) / geom.mPx.x, (b.y - a.y) / geom.mPx.y);
+  const rx = Math.max(8, (metres / 2) * geom.mPx.x);
+  const ry = Math.max(8, (metres / 2) * geom.mPx.y);
+  // Historical mapping. On a left-to-right chord, sweep 1 actually bends toward C;
+  // the caller still names the end it wants, and we honour that when the other
+  // sweep would leave the arena.
+  let sweep: 0 | 1 = bulge === "A" ? 1 : 0;
+  const crown = arcCrown(a, b, rx, ry, sweep);
+  const outside =
+    crown.x < geom.left - 1 ||
+    crown.x > geom.right + 1 ||
+    crown.y < geom.top - 1 ||
+    crown.y > geom.bot + 1;
+  if (outside) {
+    const flipped = arcCrown(a, b, rx, ry, sweep === 0 ? 1 : 0);
+    const flippedOutside =
+      flipped.x < geom.left - 1 ||
+      flipped.x > geom.right + 1 ||
+      flipped.y < geom.top - 1 ||
+      flipped.y > geom.bot + 1;
+    if (!flippedOutside) sweep = sweep === 0 ? 1 : 0;
+  }
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 ${sweep} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }
 
@@ -292,8 +488,8 @@ export function loopPath(from: string, to: string, via = "X"): string {
  * `first` is the long side the opening loop touches.
  */
 export function serpentinePath(from: "C" | "A", first: "left" | "right"): string {
-  const y0 = from === "C" ? TOP : BOT;
-  const y1 = from === "C" ? BOT : TOP;
+  const y0 = from === "C" ? geom.top : geom.bot;
+  const y1 = from === "C" ? geom.bot : geom.top;
   const span = (y1 - y0) / 3;
   const firstSign = first === "left" ? -1 : 1;
   let d = "";
@@ -302,10 +498,10 @@ export function serpentinePath(from: "C" | "A", first: "left" | "right"): string
     const endY = y0 + span * (i + 1);
     const midY = (startY + endY) / 2;
     const sign = i % 2 === 0 ? firstSign : -firstSign;
-    const touchX = CX + sign * (RIGHT - CX);
-    const controlX = 2 * touchX - CX;
-    if (i === 0) d = `M ${CX.toFixed(1)} ${startY.toFixed(1)}`;
-    d += ` Q ${controlX.toFixed(1)} ${midY.toFixed(1)} ${CX.toFixed(1)} ${endY.toFixed(1)}`;
+    const touchX = geom.cx + sign * (geom.right - geom.cx);
+    const controlX = 2 * touchX - geom.cx;
+    if (i === 0) d = `M ${geom.cx.toFixed(1)} ${startY.toFixed(1)}`;
+    d += ` Q ${controlX.toFixed(1)} ${midY.toFixed(1)} ${geom.cx.toFixed(1)} ${endY.toFixed(1)}`;
   }
   return d;
 }
@@ -315,9 +511,9 @@ export function insetLoopPath(from: string, to: string, metres: number): string 
   const a = track(from);
   const b = track(to);
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const inward = { x: CX - mid.x, y: (TOP + BOT) / 2 - mid.y };
+  const inward = { x: geom.cx - mid.x, y: (geom.top + geom.bot) / 2 - mid.y };
   const len = Math.hypot(inward.x, inward.y) || 1;
-  const pxPerM = Math.abs(inward.x) >= Math.abs(inward.y) ? M_PX.x : M_PX.y;
+  const pxPerM = Math.abs(inward.x) >= Math.abs(inward.y) ? geom.mPx.x : geom.mPx.y;
   const apex = {
     x: mid.x + (inward.x / len) * metres * pxPerM,
     y: mid.y + (inward.y / len) * metres * pxPerM,
@@ -343,7 +539,7 @@ export function quarterTurnPath(
   iy /= il;
   // Clockwise in this y-down arena is a right turn.
   const exit = direction === "right" ? { x: -iy, y: ix } : { x: iy, y: -ix };
-  const r = 1.5 * M_PX.x;
+  const r = 1.5 * geom.mPx.x;
   const start = { x: p.x - ix * r, y: p.y - iy * r };
   const end = { x: p.x + exit.x * r, y: p.y + exit.y * r };
   const sweep = direction === "right" ? 1 : 0;
@@ -366,7 +562,7 @@ export function halfPirouettePath(
   const il = Math.hypot(ix, iy) || 1;
   ix /= il;
   iy /= il;
-  const r = (diameterM / 2) * M_PX.x;
+  const r = (diameterM / 2) * geom.mPx.x;
   const start = { x: p.x - ix * r, y: p.y - iy * r };
   const end = { x: p.x + ix * r, y: p.y + iy * r };
   const sweep = direction === "right" ? 1 : 0;
@@ -377,10 +573,10 @@ export function pirouettePath(at: string, direction: "left" | "right"): string {
   const p = track(at);
   const r = 10;
   const sweep = direction === "left" ? 1 : 0;
-  if (Math.abs(p.x - CX) < 1) {
+  if (Math.abs(p.x - geom.cx) < 1) {
     return `M ${(p.x - r).toFixed(1)} ${p.y.toFixed(1)} A ${r} ${r} 0 0 ${sweep} ${(p.x + r).toFixed(1)} ${p.y.toFixed(1)}`;
   }
-  const bulge = p.x < CX ? 0 : 1;
+  const bulge = p.x < geom.cx ? 0 : 1;
   return `M ${p.x.toFixed(1)} ${(p.y - r).toFixed(1)} A ${r} ${r} 0 0 ${bulge} ${p.x.toFixed(1)} ${(p.y + r).toFixed(1)}`;
 }
 
@@ -394,7 +590,7 @@ export function zigzagPath(
 ) {
   const a = track(from);
   const b = track(to);
-  const reach = sideM * M_PX.x;
+  const reach = sideM * geom.mPx.x;
   const sign0 = start === "right" ? 1 : -1;
   const pts = [`M ${a.x.toFixed(1)} ${a.y.toFixed(1)}`];
   for (let i = 1; i <= legs; i++) {
@@ -417,7 +613,7 @@ export function zigzagPath(
 export function arcPath(from: string, to: string, bulge: "C" | "A") {
   const a = track(from),
     b = track(to);
-  return `M ${a.x} ${a.y} A ${10 * M_PX.x} ${10 * M_PX.y} 0 0 ${bulge === "C" ? 1 : 0} ${b.x} ${b.y}`;
+  return `M ${a.x} ${a.y} A ${10 * geom.mPx.x} ${10 * geom.mPx.y} 0 0 ${bulge === "C" ? 1 : 0} ${b.x} ${b.y}`;
 }
 
 /**
@@ -507,7 +703,7 @@ export function lateralWork(
       uy = (b.y - a.y) / length;
     const centre = { x: a.x + ux * distance, y: a.y + uy * distance };
     // Shift the body, not its placement foot, into the arena. Preserve all 16px at 30°.
-    const inward = centre.x < CX ? 1 : -1;
+    const inward = centre.x < geom.cx ? 1 : -1;
     const inset = diagonal ? 0 : inward * halfLength * Math.abs(vx);
     const from = { x: centre.x + inset - vx * halfLength, y: centre.y - vy * halfLength };
     const nose = { x: centre.x + inset + vx * halfLength, y: centre.y + vy * halfLength };
@@ -515,8 +711,8 @@ export function lateralWork(
     const tip = { x: nose.x - uy * tipClearance, y: nose.y + ux * tipClearance };
     // Renvers points the nose at the wall. Slide the whole tick inward until the tip is inside.
     const xs = [from.x, nose.x, tip.x];
-    const overflowLeft = Math.max(0, LEFT - Math.min(...xs));
-    const overflowRight = Math.max(0, Math.max(...xs) - RIGHT);
+    const overflowLeft = Math.max(0, geom.left - Math.min(...xs));
+    const overflowRight = Math.max(0, Math.max(...xs) - geom.right);
     if (overflowLeft > 0 || overflowRight > 0) {
       const shift = (overflowLeft > 0 ? 1 : -1) * ((overflowLeft || overflowRight) + 0.6);
       from.x += shift;

@@ -80,6 +80,8 @@ export type SetTest = {
   time: string;
   drawTime: string;
   arena: string;
+  /** Which rectangle to draw. Omitted tests follow `arena` (a sheet that names 60m stays 60×20). */
+  arenaSize?: "60x20" | "40x20";
   purpose?: string;
   instructions?: string;
   introduces?: string;

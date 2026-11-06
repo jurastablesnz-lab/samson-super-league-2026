@@ -1,6 +1,7 @@
 import type { SetTest } from "../types.ts";
 import {
   ARENA,
+  ARENA_SIZE,
   INTRO_COLLECTIVES,
   INTRO_INSTRUCTIONS,
   INTRO_INTRODUCES,
@@ -21,6 +22,7 @@ export const TEST_0B: SetTest = {
   time: "Riding time not printed",
   drawTime: "5:00 (60×20) or 4:00 (40×20)",
   arena: ARENA,
+  arenaSize: ARENA_SIZE,
   purpose: INTRO_PURPOSE,
   instructions: INTRO_INSTRUCTIONS,
   introduces: INTRO_INTRODUCES,
@@ -45,7 +47,7 @@ export const TEST_0B: SetTest = {
         ["H E", "Working trot rising"],
       ],
       "Regularity, bend and balance in turn and corner",
-      line(["C", "H", "S", "E"]),
+      line(["C", "H", "E"]),
       { pace: "trot" },
     ),
     mv(
@@ -55,7 +57,7 @@ export const TEST_0B: SetTest = {
         ["E K", "Working trot rising"],
       ],
       "Regularity; shape and size of circle; bend; balance",
-      [circle("E"), line(["E", "V", "K"])],
+      [circle("E"), line(["E", "K"])],
       { pace: "trot" },
     ),
     mv(
@@ -76,7 +78,7 @@ export const TEST_0B: SetTest = {
       6,
       [["E H", "Medium walk"]],
       "Willing, calm transition; regularity, quality, overtrack",
-      line(["E", "S", "H"]),
+      line(["E", "H"]),
       { pace: "walk" },
     ),
     mv(
@@ -86,7 +88,7 @@ export const TEST_0B: SetTest = {
         ["M B", "Working trot rising"],
       ],
       "Willing, calm transition; regularity of trot, bend and balance in corner",
-      line(["H", "C", "M", "R", "B"]),
+      line(["H", "C", "M", "B"]),
       { pace: "trot" },
     ),
     mv(
@@ -96,7 +98,7 @@ export const TEST_0B: SetTest = {
         ["B A", "Working trot rising"],
       ],
       "Regularity; shape and size of circle; bend; balance",
-      [circle("B"), line(["B", "P", "F", "A"])],
+      [circle("B"), line(["B", "F", "A"])],
       { pace: "trot" },
     ),
     mv(

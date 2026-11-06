@@ -1,6 +1,7 @@
 import type { SetTest } from "../types.ts";
 import {
   ARENA,
+  ARENA_SIZE,
   INTRO_COLLECTIVES,
   INTRO_INSTRUCTIONS,
   INTRO_INTRODUCES,
@@ -19,6 +20,7 @@ const sheet = {
   introduces: INTRO_INTRODUCES,
   collectives: INTRO_COLLECTIVES,
   arena: ARENA,
+  arenaSize: ARENA_SIZE,
   leave: LEAVE,
   year: "ESNZ 2023",
 };
@@ -47,7 +49,7 @@ export const TEST_0A: SetTest = {
         ["M B F", "Working trot rising"],
       ],
       "Bend and balance; willing, calm transition",
-      line(["C", "M", "R", "B", "P", "F"]),
+      line(["C", "M", "B", "F"]),
       { pace: "trot" },
     ),
     mv(
@@ -99,7 +101,7 @@ export const TEST_0A: SetTest = {
       9,
       [["X", "Halt, Salute"]],
       "Straightness; attentiveness; immobility (min. 3 seconds)",
-      [line(["L", "X"]), halt("X")],
+      [line(["A", "X"]), halt("X")],
       { pace: "walk" },
     ),
   ],

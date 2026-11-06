@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SET_TESTS, SET_4_TESTS, marksFor } from "./esnz-tests.ts";
+import { SET_0_TESTS, SET_TESTS, SET_4_TESTS, marksFor } from "./esnz-tests.ts";
 import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
@@ -24,6 +24,9 @@ import {
   lateralWorkPoints,
   returningHalfArc,
   track,
+  arenaLetters,
+  arenaSizeOf,
+  withArena,
 } from "./arena-geom.ts";
 
 function values(path: string) {
@@ -663,10 +666,7 @@ test("Medium 4B turns on the haunches are small pivots near G", () => {
     assert.ok(Math.abs(turn.crown.x - rail.x) > 30);
     assert.ok(turn.crown.y > g.y && turn.crown.y < track("I").y);
     assert.equal(Math.sign(turn.pivot.x - CX), side === "H" ? -1 : 1);
-    assert.equal(
-      Math.hypot(turn.crown.x - turn.pivot.x, turn.crown.y - turn.pivot.y),
-      turn.radius,
-    );
+    assert.equal(Math.hypot(turn.crown.x - turn.pivot.x, turn.crown.y - turn.pivot.y), turn.radius);
     const path = halfTurnPath(side);
     assert.ok(!path.includes("Q"));
     const nums = values(path);
@@ -675,17 +675,12 @@ test("Medium 4B turns on the haunches are small pivots near G", () => {
     assert.ok(!nums.some((n, i) => i % 2 === 0 && n === rail.x));
     const arc = path.match(/A ([\d.]+) ([\d.]+) 0 0 ([01]) ([\d.-]+) ([\d.-]+)/);
     assert.ok(arc);
-    const apex = arcApex(
-      nums[2],
-      nums[3],
-      +arc[1],
-      +arc[2],
-      +arc[3],
-      +arc[4],
-      +arc[5],
-    );
+    const apex = arcApex(nums[2], nums[3], +arc[1], +arc[2], +arc[3], +arc[4], +arc[5]);
     assert.ok(Math.abs(apex.x - turn.crown.x) < 0.05, `${side} apex x`);
-    assert.ok(Math.abs(apex.y - turn.crown.y) < 0.05, `${side} apex y ${apex.y} vs ${turn.crown.y}`);
+    assert.ok(
+      Math.abs(apex.y - turn.crown.y) < 0.05,
+      `${side} apex y ${apex.y} vs ${turn.crown.y}`,
+    );
     for (const p of [turn.pivot, turn.arcStart, turn.arcEnd, turn.crown]) {
       assert.ok(p.x > LEFT && p.x < RIGHT && p.y > TOP && p.y < BOT);
     }
@@ -697,4 +692,94 @@ test("Medium 4B turns on the haunches are small pivots near G", () => {
   assert.equal(towardH.crown.y, towardM.crown.y);
   assert.equal(towardH.arcStart.x, 2 * CX - towardM.arcStart.x);
   assert.equal(towardH.arcEnd.x, 2 * CX - towardM.arcEnd.x);
+});
+
+test("20×40 letters are spaced at 6, 20, 34 and 40 metres, and 60×20 is unchanged", () => {
+  assert.equal(track("E").y, 134);
+  assert.equal(track("C").y, TOP);
+  assert.equal(track("A").y, BOT);
+  assert.equal(railParam("F"), 84);
+  assert.equal(railParam("C"), 336);
+  assert.equal(railParam("K"), 588);
+  assert.equal(M_PX.y * 60, BOT - TOP);
+  assert.equal((RIGHT - LEFT) / M_PX.x, 20);
+
+  withArena("40x20", () => {
+    const fromA = (id: string) => (BOT - track(id).y) / M_PX.y;
+    const metres = (id: string, expected: number) =>
+      assert.ok(
+        Math.abs(fromA(id) - expected) < 1e-9,
+        `${id} is ${fromA(id)}m, expected ${expected}`,
+      );
+    for (const id of ["K", "F", "D"]) metres(id, 6);
+    for (const id of ["E", "B", "X"]) metres(id, 20);
+    for (const id of ["H", "M", "G"]) metres(id, 34);
+    metres("C", 40);
+    metres("A", 0);
+    assert.ok(Math.abs(fromA("E") - fromA("K") - 14) < 1e-9);
+    assert.ok(Math.abs(fromA("H") - fromA("E") - 14) < 1e-9);
+    assert.equal((track("F").x - track("K").x) / M_PX.x, 20);
+    assert.equal(track("D").x, CX);
+    assert.equal(track("X").x, CX);
+    assert.equal(track("G").x, CX);
+    assert.equal(track("K").x, LEFT);
+    assert.equal(track("H").x, LEFT);
+    assert.equal(track("F").x, RIGHT);
+    assert.equal(track("M").x, RIGHT);
+    assert.deepEqual([...arenaLetters("40x20")].sort(), [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "K",
+      "M",
+      "X",
+    ]);
+    assert.equal(
+      arenaLetters("40x20").some((id) => "VPSRLI".includes(id)),
+      false,
+    );
+  });
+
+  assert.equal(track("E").y, 134, "withArena restores the 60m arena");
+  assert.equal(arenaSizeOf("20 × 40"), "40x20");
+  assert.equal(arenaSizeOf("40 × 20"), "40x20");
+  assert.equal(arenaSizeOf("60 × 20"), "60x20");
+  assert.equal(arenaSizeOf("60 × 20 or 40 × 20"), "60x20");
+  assert.equal(arenaSizeOf(undefined), "60x20");
+});
+
+test("introductory sheets that allow 40m and never print a 60m letter use the small arena", () => {
+  const sixtyOnly = new Set(["V", "P", "S", "R", "L", "I"]);
+  const small = new Set(["A", "K", "E", "H", "C", "M", "B", "F", "X", "D", "G"]);
+  for (const t of SET_0_TESTS) {
+    assert.equal(t.arena, "60 × 20 or 40 × 20", t.id);
+    assert.equal(t.arenaSize, "40x20", t.id);
+    assert.equal(arenaSizeOf(t.arena), "60x20", "the shared wording still names 60m");
+    const used = new Set<string>();
+    for (const movement of t.movements) {
+      for (const step of movement.steps) {
+        for (const tok of step.at.split(/[\s&]+/)) {
+          const id = tok.replace(/[^A-Z]/g, "");
+          if (id.length === 1) used.add(id);
+        }
+      }
+      for (const d of movement.draw) {
+        if ("pts" in d && d.pts) for (const id of d.pts) used.add(id);
+        if ("from" in d && d.from) used.add(d.from);
+        if ("to" in d && d.to) used.add(d.to);
+        if ("at" in d && d.at) used.add(d.at);
+      }
+    }
+    for (const id of used) assert.ok(small.has(id), `${t.id} letter ${id}`);
+    assert.equal(
+      [...used].some((id) => sixtyOnly.has(id)),
+      false,
+      t.id,
+    );
+  }
 });

@@ -31,6 +31,8 @@ export const INTRO_INSTRUCTIONS =
   "To be ridden in a snaffle. All trot to be ridden rising. Transitions from walk to trot and trot to walk may be performed through sitting trot with the objective of performing a smooth transition. Turns from centre line to long side and long side to centre line should be ridden as a half circle, touching the track at a point midway between the centre line and the corner, and vice versa. Horses should be ridden on a light but steady contact, with the exception of the free walk in which the horse is allowed complete freedom to stretch neck forward and downward. Halts may be through walk.";
 
 export const ARENA = "60 × 20 or 40 × 20";
+/** The printed sheets allow either arena and never use the 60m-only letters, so the diagram is 20×40. */
+export const ARENA_SIZE = "40x20" as const;
 export const LEAVE = "Leave arena in walk on a long rein at A";
 
 export const line = (pts: string[]): Draw => ({ t: "line", pts });

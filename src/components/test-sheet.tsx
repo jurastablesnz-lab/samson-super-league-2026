@@ -46,15 +46,16 @@ import {
 } from "@/lib/esnz-tests";
 import { MFS_FLOOR, PACE_LABEL } from "@/lib/freestyle-floor";
 import {
-  BOT,
   CORNER_RX,
   CORNER_RY,
   CX,
   LEFT,
-  LETTER_IDS,
+  arenaLetters,
+  arenaSizeOf,
+  withArena,
+  type ArenaSize,
   M_PX,
   RIGHT,
-  TOP,
   circleCenter,
   halfArc,
   halfTurnPath,
@@ -136,15 +137,17 @@ export function MovementPath({
   accent,
   pace,
   lateral,
+  size,
 }: {
   draw: Draw[];
   accent?: boolean;
   pace?: Pace;
   lateral?: Movement["lateral"];
+  size?: ArenaSize;
 }) {
   const stroke = strokeFor(pace, !!accent);
   const width = accent ? 2.4 : 1.6;
-  return (
+  return withArena(size ?? "60x20", () => (
     <g fill="none" stroke={stroke} strokeLinecap="round" strokeLinejoin="round">
       {lateral ? (
         <path
@@ -270,8 +273,9 @@ export function MovementPath({
         }
         if (d.t === "halt") {
           const p = track(d.at);
-          const y1 = p.y + 5 > BOT ? p.y - 8 : p.y - 5;
-          const y2 = p.y + 5 > BOT ? p.y : p.y + 5;
+          const floor = track("A").y;
+          const y1 = p.y + 5 > floor ? p.y - 8 : p.y - 5;
+          const y2 = p.y + 5 > floor ? p.y : p.y + 5;
           return (
             <g key={key}>
               <line x1={p.x - 7} y1={p.y} x2={p.x + 7} y2={p.y} strokeWidth={2.6} />
@@ -332,15 +336,32 @@ export function MovementPath({
         return null;
       })}
     </g>
-  );
+  ));
 }
 
 export function TestArena({
   movement,
   ghostMoves,
+  arena,
+  size,
 }: {
   movement: Movement;
   ghostMoves?: Movement[];
+  arena?: string;
+  size?: ArenaSize;
+}) {
+  const resolved = size ?? arenaSizeOf(arena);
+  return <ArenaFigure movement={movement} ghostMoves={ghostMoves} size={resolved} />;
+}
+
+function ArenaFigure({
+  movement,
+  ghostMoves,
+  size,
+}: {
+  movement: Movement;
+  ghostMoves?: Movement[];
+  size: ArenaSize;
 }) {
   const used = useMemo(() => {
     const set = new Set<string>();
@@ -354,7 +375,7 @@ export function TestArena({
     return set;
   }, [movement]);
 
-  return (
+  return withArena(size, () => (
     <svg
       viewBox="0 0 220 272"
       className="h-auto w-full"
@@ -364,9 +385,9 @@ export function TestArena({
     >
       <rect
         x={LEFT}
-        y={TOP}
+        y={track("C").y}
         width={RIGHT - LEFT}
-        height={BOT - TOP}
+        height={track("A").y - track("C").y}
         rx={CORNER_RX}
         ry={CORNER_RY}
         fill="var(--color-sunken)"
@@ -375,18 +396,18 @@ export function TestArena({
       />
       <line
         x1={CX}
-        y1={TOP}
+        y1={track("C").y}
         x2={CX}
-        y2={BOT}
+        y2={track("A").y}
         stroke="var(--color-line)"
         strokeWidth="0.8"
         strokeDasharray="3 3"
       />
       <line
         x1={LEFT}
-        y1={134}
+        y1={track("X").y}
         x2={RIGHT}
-        y2={134}
+        y2={track("X").y}
         stroke="var(--color-line)"
         strokeWidth="0.8"
         strokeDasharray="3 3"
@@ -394,14 +415,20 @@ export function TestArena({
       {ghostMoves
         ? ghostMoves.map((gm) => (
             <g key={gm.n} opacity={0.18} strokeDasharray="3 3" aria-hidden="true">
-              <MovementPath draw={gm.draw} pace={gm.pace} lateral={gm.lateral} />
+              <MovementPath draw={gm.draw} pace={gm.pace} lateral={gm.lateral} size={size} />
             </g>
           ))
         : null}
       <g data-active-movement={`${movement.n}`}>
-        <MovementPath draw={movement.draw} accent pace={movement.pace} lateral={movement.lateral} />
+        <MovementPath
+          draw={movement.draw}
+          accent
+          pace={movement.pace}
+          lateral={movement.lateral}
+          size={size}
+        />
       </g>
-      {LETTER_IDS.map((id) => {
+      {arenaLetters(size).map((id) => {
         const p = label(id);
         const on = used.has(id);
         return (
@@ -429,7 +456,7 @@ export function TestArena({
         );
       })}
     </svg>
-  );
+  ));
 }
 
 function Coeff({ n }: { n: number }) {
@@ -451,6 +478,8 @@ function Caller({
   purpose,
   judge,
   trail,
+  arena,
+  size,
 }: {
   movements: Movement[];
   idx: number;
@@ -461,6 +490,8 @@ function Caller({
   purpose?: string;
   judge?: boolean;
   trail?: "last";
+  arena?: string;
+  size?: ArenaSize;
 }) {
   const movement = movements[Math.min(idx, movements.length - 1)] ?? movements[0];
   // Set tests show only their selected movement, like the official panels.
@@ -524,7 +555,7 @@ function Caller({
       </div>
 
       <div className="mx-auto mt-3 max-w-[18rem] px-1">
-        <TestArena movement={movement} ghostMoves={ghostMoves} />
+        <TestArena movement={movement} ghostMoves={ghostMoves} arena={arena} size={size} />
       </div>
       {judge && movement.directive && (
         <p className="mt-3 text-sm leading-relaxed text-muted">
@@ -628,6 +659,8 @@ function SetSheet({ test }: { test: SetTest }) {
         meta={`${test.year} · ${test.arena} · ${test.time}`}
         purpose={test.purpose}
         judge
+        arena={test.arena}
+        size={test.arenaSize}
       />
 
       <MovementList

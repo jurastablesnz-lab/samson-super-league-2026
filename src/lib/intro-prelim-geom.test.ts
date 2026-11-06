@@ -11,25 +11,32 @@ import {
   M_PX,
   RIGHT,
   TOP,
+  arenaFor,
+  arenaSizeOf,
   circleCenter,
   insetLoopPath,
   linePath,
   loopPath,
   track,
+  withArena,
 } from "./arena-geom.ts";
 
 const TESTS: SetTest[] = [...SET_0_TESTS, ...SET_1_TESTS];
 
-function insideArena(p: { x: number; y: number }) {
-  if (p.x < LEFT - 0.6 || p.x > RIGHT + 0.6 || p.y < TOP - 0.6 || p.y > BOT + 0.6) return false;
-  const left = p.x < LEFT + CORNER_RX;
-  const right = p.x > RIGHT - CORNER_RX;
-  const high = p.y < TOP + CORNER_RY;
-  const low = p.y > BOT - CORNER_RY;
+function insideArena(
+  p: { x: number; y: number },
+  box = { left: LEFT, right: RIGHT, top: TOP, bot: BOT, cornerRx: CORNER_RX, cornerRy: CORNER_RY },
+) {
+  if (p.x < box.left - 0.6 || p.x > box.right + 0.6 || p.y < box.top - 0.6 || p.y > box.bot + 0.6)
+    return false;
+  const left = p.x < box.left + box.cornerRx;
+  const right = p.x > box.right - box.cornerRx;
+  const high = p.y < box.top + box.cornerRy;
+  const low = p.y > box.bot - box.cornerRy;
   if ((left || right) && (high || low)) {
-    const cx = left ? LEFT + CORNER_RX : RIGHT - CORNER_RX;
-    const cy = high ? TOP + CORNER_RY : BOT - CORNER_RY;
-    return ((p.x - cx) / CORNER_RX) ** 2 + ((p.y - cy) / CORNER_RY) ** 2 <= 1.015;
+    const cx = left ? box.left + box.cornerRx : box.right - box.cornerRx;
+    const cy = high ? box.top + box.cornerRy : box.bot - box.cornerRy;
+    return ((p.x - cx) / box.cornerRx) ** 2 + ((p.y - cy) / box.cornerRy) ** 2 <= 1.015;
   }
   return true;
 }
@@ -150,11 +157,16 @@ test("introductory and preliminary sheets keep their counts, coefficients and to
 });
 
 test("introductory and preliminary paths stay inside the rounded arena", () => {
-  for (const t of TESTS)
-    for (const m of t.movements)
-      for (const d of m.draw)
-        for (const p of drawSamples(d))
-          assert.ok(insideArena(p), `${t.id}/${m.n} ${d.t} left the arena at ${p.x},${p.y}`);
+  for (const t of TESTS) {
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    const box = arenaFor(size);
+    withArena(size, () => {
+      for (const m of t.movements)
+        for (const d of m.draw)
+          for (const p of drawSamples(d))
+            assert.ok(insideArena(p, box), `${t.id}/${m.n} ${d.t} left the arena at ${p.x},${p.y}`);
+    });
+  }
 });
 
 test("5m loops apex halfway to the centre line and one-loops pass through X", () => {
@@ -166,7 +178,7 @@ test("5m loops apex halfway to the centre line and one-loops pass through X", ()
     const toward = rail === RIGHT ? -1 : 1;
     assert.ok(Math.abs(mid.x - (rail + toward * 5 * M_PX.x)) < 0.05, `${from}-${to} apex`);
     assert.ok(Math.abs(mid.x - CX) > 20, `${from}-${to} does not reach X`);
-    assert.ok(quadSamples(insetLoopPath(from, to, 5)).every(insideArena));
+    assert.ok(quadSamples(insetLoopPath(from, to, 5)).every((p) => insideArena(p)));
   }
   for (const [from, to] of [
     ["H", "K"],
@@ -198,7 +210,10 @@ test("20m end and side circles touch the track and the centre", () => {
     const rx = 10 * M_PX.x;
     const ry = 10 * M_PX.y;
     assert.ok(Math.abs(c.x - CX) < 1e-6 || Math.abs(Math.abs(c.x - CX) - rx) < 1e-6);
-    assert.ok(ellipseSamples(at, 20).every(insideArena), at);
+    assert.ok(
+      ellipseSamples(at, 20).every((p) => insideArena(p)),
+      at,
+    );
     if (at === "E" || at === "B") assert.equal(c.x, CX);
     assert.ok(ry > 0 && rx > 0);
   }

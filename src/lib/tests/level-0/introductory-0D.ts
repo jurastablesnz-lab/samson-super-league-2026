@@ -1,6 +1,7 @@
 import type { SetTest } from "../types.ts";
 import {
   ARENA,
+  ARENA_SIZE,
   INTRO_COLLECTIVES,
   INTRO_INSTRUCTIONS,
   INTRO_INTRODUCES,
@@ -21,6 +22,7 @@ export const TEST_0D: SetTest = {
   time: "6:00 or 5:00 from entry at A",
   drawTime: "8:00 (60×20) or 7:00 (40×20)",
   arena: ARENA,
+  arenaSize: ARENA_SIZE,
   purpose: INTRO_PURPOSE,
   instructions: INTRO_INSTRUCTIONS,
   introduces: INTRO_INTRODUCES,
@@ -45,14 +47,14 @@ export const TEST_0D: SetTest = {
         ["E", "Circle left 20m"],
       ],
       "Regularity and quality of trot; shape and size of circle; bend; balance",
-      [line(["C", "H", "S", "E"]), circle("E")],
+      [line(["C", "H", "E"]), circle("E")],
       { pace: "trot" },
     ),
     mv(
       3,
       [["Between K & A", "Working canter left lead"]],
       "Willing, calm transition; regularity and quality of paces; shape and size of circle; bend; balance",
-      line(["K", "A", "F", "P", "B"]),
+      line(["K", "A", "F", "B"]),
       { pace: "canter" },
     ),
     mv(
@@ -66,7 +68,7 @@ export const TEST_0D: SetTest = {
       5,
       [["Approaching B", "Working trot"]],
       "Willing, calm transition; regularity and quality of paces; straightness; bend and balance in corner",
-      line(["B", "R", "M", "C"]),
+      line(["B", "M", "C"]),
       { pace: "trot" },
     ),
     mv(
@@ -90,7 +92,7 @@ export const TEST_0D: SetTest = {
       8,
       [["A", "Working trot"]],
       "Willing, calm transition; regularity and quality of paces; straightness; bend and balance in corner",
-      line(["A", "K", "V", "E"]),
+      line(["A", "K", "E"]),
       { pace: "trot" },
     ),
     mv(
@@ -104,7 +106,7 @@ export const TEST_0D: SetTest = {
       10,
       [["Between H & C", "Working canter right lead"]],
       "Willing, calm transition; regularity and quality of paces; shape and size of circle; bend; balance",
-      line(["H", "C", "M", "R", "B"]),
+      line(["H", "C", "M", "B"]),
       { pace: "canter" },
     ),
     mv(
@@ -118,7 +120,7 @@ export const TEST_0D: SetTest = {
       12,
       [["Approaching B", "Working trot"]],
       "Willing, calm transition; regularity and quality of paces",
-      line(["B", "P", "F", "A"]),
+      line(["B", "F", "A"]),
       { pace: "trot" },
     ),
     mv(

@@ -1,6 +1,7 @@
 import type { SetTest } from "../types.ts";
 import {
   ARENA,
+  ARENA_SIZE,
   INTRO_COLLECTIVES,
   INTRO_INSTRUCTIONS,
   INTRO_INTRODUCES,
@@ -21,6 +22,7 @@ export const TEST_0C: SetTest = {
   time: "Riding time not printed",
   drawTime: "6:00 (60×20) or 5:00 (40×20)",
   arena: ARENA,
+  arenaSize: ARENA_SIZE,
   purpose: INTRO_PURPOSE,
   instructions: INTRO_INSTRUCTIONS,
   introduces: INTRO_INTRODUCES,
@@ -45,7 +47,7 @@ export const TEST_0C: SetTest = {
         ["M B", "Working trot rising"],
       ],
       "Regularity; bend and balance in turn and corner",
-      line(["C", "M", "R", "B"]),
+      line(["C", "M", "B"]),
       { pace: "trot" },
     ),
     mv(
@@ -55,7 +57,7 @@ export const TEST_0C: SetTest = {
         ["B F", "Working trot rising"],
       ],
       "Regularity; shape and size of circle; bend; balance",
-      [circle("B"), line(["B", "P", "F"])],
+      [circle("B"), line(["B", "F"])],
       { pace: "trot" },
     ),
     mv(
@@ -81,7 +83,7 @@ export const TEST_0C: SetTest = {
         ["M C E", "Working trot rising"],
       ],
       "Regularity of trot; straightness; bend and balance in corners",
-      [diag("K", "M"), line(["M", "C", "H", "S", "E"])],
+      [diag("K", "M"), line(["M", "C", "H", "E"])],
       { pace: "trot" },
     ),
     mv(
@@ -91,7 +93,7 @@ export const TEST_0C: SetTest = {
         ["E A", "Working trot rising"],
       ],
       "Regularity; shape and size of circle; bend; balance",
-      [circle("E"), line(["E", "V", "K", "A"])],
+      [circle("E"), line(["E", "K", "A"])],
       { pace: "trot" },
     ),
     mv(
@@ -114,7 +116,7 @@ export const TEST_0C: SetTest = {
       10,
       [["Between F & B", "Medium walk"]],
       "Willing, calm transition; regularity, quality, overtrack",
-      line(["F", "P", "B"]),
+      line(["F", "B"]),
       { pace: "walk" },
     ),
     mv(
@@ -131,7 +133,7 @@ export const TEST_0C: SetTest = {
       12,
       [["Between C & M", "Working trot rising to A"]],
       "Willing, calm transition; regularity of trot; bend and balance in corner, straightness",
-      line(["C", "M", "R", "B", "P", "F", "A"]),
+      line(["C", "M", "B", "F", "A"]),
       { pace: "trot" },
     ),
     mv(

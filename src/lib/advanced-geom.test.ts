@@ -21,6 +21,7 @@ import {
   RIGHT,
   TOP,
   circleCenter,
+  halfArc,
   halfPirouettePath,
   halfTurnPath,
   lateralWork,
@@ -32,19 +33,26 @@ import {
   pointOn,
   quarterTurnPath,
   track,
+  withArena,
   zigzagPath,
+  arenaFor,
+  arenaSizeOf,
 } from "./arena-geom.ts";
 
-function insideArena(p: { x: number; y: number }) {
-  if (p.x < LEFT - 0.6 || p.x > RIGHT + 0.6 || p.y < TOP - 0.6 || p.y > BOT + 0.6) return false;
-  const left = p.x < LEFT + CORNER_RX;
-  const right = p.x > RIGHT - CORNER_RX;
-  const high = p.y < TOP + CORNER_RY;
-  const low = p.y > BOT - CORNER_RY;
+function insideArena(
+  p: { x: number; y: number },
+  box = { left: LEFT, right: RIGHT, top: TOP, bot: BOT, cornerRx: CORNER_RX, cornerRy: CORNER_RY },
+) {
+  if (p.x < box.left - 0.6 || p.x > box.right + 0.6 || p.y < box.top - 0.6 || p.y > box.bot + 0.6)
+    return false;
+  const left = p.x < box.left + box.cornerRx;
+  const right = p.x > box.right - box.cornerRx;
+  const high = p.y < box.top + box.cornerRy;
+  const low = p.y > box.bot - box.cornerRy;
   if ((left || right) && (high || low)) {
-    const cx = left ? LEFT + CORNER_RX : RIGHT - CORNER_RX;
-    const cy = high ? TOP + CORNER_RY : BOT - CORNER_RY;
-    return ((p.x - cx) / CORNER_RX) ** 2 + ((p.y - cy) / CORNER_RY) ** 2 <= 1.02;
+    const cx = left ? box.left + box.cornerRx : box.right - box.cornerRx;
+    const cy = high ? box.top + box.cornerRy : box.bot - box.cornerRy;
+    return ((p.x - cx) / box.cornerRx) ** 2 + ((p.y - cy) / box.cornerRy) ** 2 <= 1.02;
   }
   return true;
 }
@@ -133,6 +141,7 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
       }));
     }
     case "half":
+      return pathSamples(halfArc(d.from, d.to, d.bulge));
     case "arc": {
       const a = track(d.from);
       const b = track(d.to);
@@ -475,9 +484,16 @@ test("FEI Small Tour and Para Grand Prix sheets keep printed totals and stay in 
       assert.equal(m.n, i + 1, `${t.id}/${m.n}`);
       assert.ok(m.directive.length > 8, `${t.id}/${m.n}`);
     });
-    for (const m of t.movements)
-      for (const d of m.draw)
-        for (const p of drawSamples(d))
-          assert.ok(insideArena(p), `${t.id}/${m.n} ${d.t} at ${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    const box = arenaFor(size);
+    withArena(size, () => {
+      for (const m of t.movements)
+        for (const d of m.draw)
+          for (const p of drawSamples(d))
+            assert.ok(
+              insideArena(p, box),
+              `${t.id}/${m.n} ${d.t} at ${p.x.toFixed(1)},${p.y.toFixed(1)}`,
+            );
+    });
   }
 });

@@ -39,5 +39,8 @@ test("riders only see published names, and new registry tests start unpublished"
   const ids = catalogTests().map((item) => item.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(catalogTests().some((item) => item.id === "4b" && item.viewId === "4b"));
+  assert.equal(isPublishedTest("Introductory 0A", approved), false);
+  assert.equal(isPublishedTest("Preliminary 1A", approved), false);
+  assert.equal(isPublishedTest("1C", approved), false);
   assert.equal(isPublishedTest("preliminary-9z", approved), false);
 });

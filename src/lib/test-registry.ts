@@ -3,7 +3,14 @@
  * `test_approvals`. A test that is not in that table is a draft.
  */
 import { TESTS_BY_LEVEL } from "./plan-builder.ts";
-import { MEDIUM_FS, MFS_SHEET, SET_4_TESTS, SET_TESTS, type TestTabId } from "./esnz-tests.ts";
+import {
+  MEDIUM_FS,
+  MFS_SHEET,
+  SET_0_TESTS,
+  SET_1_TESTS,
+  SET_4_TESTS,
+  SET_TESTS,
+} from "./esnz-tests.ts";
 
 export type CatalogTest = {
   id: string;
@@ -11,7 +18,7 @@ export type CatalogTest = {
   levels: string[];
   aliases: string[];
   /** Diagram tab, when this test has a sheet view. */
-  viewId?: TestTabId;
+  viewId?: string;
 };
 
 /** ESNZ tests Susan has signed off. Everything else starts as a draft. */
@@ -27,17 +34,11 @@ function slug(name: string) {
 
 function diagramTests(): CatalogTest[] {
   const sheets = [
-    ...SET_TESTS.map((test) => ({
+    ...[...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_4_TESTS].map((test) => ({
       id: test.id,
       name: test.name,
       aliases: [test.short, test.name],
-      viewId: test.id as TestTabId,
-    })),
-    ...SET_4_TESTS.map((test) => ({
-      id: test.id,
-      name: test.name,
-      aliases: [test.short, test.name],
-      viewId: test.id as TestTabId,
+      viewId: test.id,
     })),
     {
       id: MFS_SHEET.id,

@@ -10,6 +10,8 @@ import {
   MFS_SHEET,
   MEDIUM_FS,
   MEDIUM_PURPOSE,
+  SET_0_TESTS,
+  SET_1_TESTS,
   SET_4_TESTS,
   NOVICE_INSTRUCTIONS,
   NOVICE_PURPOSE,
@@ -19,7 +21,6 @@ import {
   type Movement,
   type Pace,
   type SetTest,
-  type TestTabId,
 } from "@/lib/esnz-tests";
 import { MFS_FLOOR, PACE_LABEL } from "@/lib/freestyle-floor";
 import {
@@ -718,7 +719,7 @@ function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS }) {
   );
 }
 
-const DIAGRAM_TABS = ["2a", "2b", "2c", "mfs", "4a", "4b", "4c", "medium-fs"] as const;
+const ALL_SET_TESTS = [...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_4_TESTS];
 
 function PublicationBar({
   name,
@@ -811,7 +812,7 @@ export function TestCatalog() {
 }
 
 export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
-  const [active, setActive] = useState<TestTabId>("2b");
+  const [active, setActive] = useState("2b");
   const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -829,7 +830,7 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
     );
     if (!shown.some((item) => item.viewId === active) && shown[0]?.viewId) setActive(shown[0].viewId);
   }, [active, approvedIds, isAdmin]);
-  const test = [...SET_TESTS, ...SET_4_TESTS].find((item) => item.id === active);
+  const test = ALL_SET_TESTS.find((item) => item.id === active);
   const activeMeta = diagrams.find((item) => item.viewId === active);
   const others = catalogTests().filter((item) => !item.viewId);
 
@@ -848,7 +849,8 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface p-1 shadow-[var(--shadow-card)]">
-        {DIAGRAM_TABS.filter((id) => visible.some((item) => item.viewId === id)).map((id) => {
+        {visible.map((item) => {
+          const id = item.viewId ?? item.id;
           const tabLabel = id === "mfs" ? "MFS" : id === "medium-fs" ? "L4 MFS" : id.toUpperCase();
           const on = active === id;
           const draft = isAdmin && approvedIds !== null && !approved.has(id);

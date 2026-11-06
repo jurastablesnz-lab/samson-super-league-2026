@@ -301,7 +301,7 @@ function TodayTab({
           <Kicker>Next show</Kicker>
           <p className="font-display mt-1 text-xl leading-tight font-medium">{next?.name ?? "—"}</p>
           <p className="mt-2 font-mono text-xs text-accent tabular-nums">
-            {next ? (daysUntil(next.start) <= 0 ? "Now" : `${daysUntil(next.start)} days`) : "Add a target show in Setup"}
+            {next ? (daysUntil(next.start) <= 0 ? "Now" : `${daysUntil(next.start)} days`) : "Add a target competition in Setup"}
           </p>
         </button>
         <button type="button" onClick={() => onTab("log")} className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]">
@@ -359,9 +359,9 @@ function SeasonTab({ plan, log, horse }: { plan: GeneratedPlan; record: PlanReco
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <Kicker>Target shows</Kicker>
+        <Kicker>Target competitions</Kicker>
         {plan.shows.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No target shows yet. Add some in Setup and the phases will line up with them.</p>
+          <p className="mt-2 text-sm text-muted">No target competitions yet. Add some in Setup and the phases will line up with them.</p>
         ) : (
           <ol className="mt-3 flex flex-col gap-2">
             {plan.shows.map((s, i) => (

@@ -237,7 +237,7 @@ export function SetupWizard({
         <>
           <Title>Ready to build your plan</Title>
           <p className="text-sm text-muted">
-            Four phases — Foundation, Consolidate, Prepare, Compete — timed around your target shows. You can change
+            Four phases — Foundation, Consolidate, Prepare, Compete — timed around your target competitions. You can change
             any of this later from Setup.
           </p>
           {horses.map((x, i) => (
@@ -379,7 +379,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
   const customs = horse.shows.filter((s) => s.source !== "calendar");
   return (
     <>
-      <Title>{horse.name}: target shows</Title>
+      <Title>{horse.name}: target competitions</Title>
       <p className="text-sm text-muted">
         Tick the shows you’re aiming at. The plan times its phases around them — the last one is the main target.
         Dates follow the usual calendar; always confirm on EVO Events.

@@ -73,6 +73,11 @@ export {
   GRADE_V_FS,
   GRADE_V_PURPOSE,
 } from "./tests/para-grade-5/index.ts";
+export { SET_G1_TESTS, GRADE_1_FS } from "./tests/para-grade-1/index.ts";
+export { SET_G2_TESTS, GRADE_2_FS } from "./tests/para-grade-2/index.ts";
+export { SET_G3_TESTS, GRADE_3_FS } from "./tests/para-grade-3/index.ts";
+export { SET_G4_TESTS, GRADE_4_FS } from "./tests/para-grade-4/index.ts";
+export { SET_7_TESTS, INTERMEDIATE_I_FS, TEST_PSG, TEST_INT_I } from "./tests/level-7/index.ts";
 export type TestTabId =
   | "2a"
   | "2b"

@@ -14,8 +14,18 @@ import {
   MFS_SHEET,
   ELEMENTARY_FS,
   ELEMENTARY_PURPOSE,
+  GRADE_1_FS,
+  GRADE_2_FS,
+  GRADE_3_FS,
+  GRADE_4_FS,
   GRADE_V_FS,
   GRADE_V_PURPOSE,
+  INTERMEDIATE_I_FS,
+  SET_7_TESTS,
+  SET_G1_TESTS,
+  SET_G2_TESTS,
+  SET_G3_TESTS,
+  SET_G4_TESTS,
   SET_GV_TESTS,
   MEDIUM_FS,
   MEDIUM_PURPOSE,
@@ -63,6 +73,7 @@ import {
   returningHalfArc,
   serpentinePath,
   track,
+  zigzagPath,
 } from "@/lib/arena-geom";
 
 function ptsTo(d: Draw): string[] {
@@ -81,10 +92,13 @@ function ptsTo(d: Draw): string[] {
       return [d.at, d.side];
     case "serpentine":
       return [d.from, d.from === "C" ? "A" : "C"];
+    case "zigzag":
+      return [d.from, d.to];
     case "pirouette":
       if ("turn" in d && d.turn === "half") return [d.from, d.to];
+      if ("turn" in d && d.turn === "full") return [d.from, d.to];
       if ("turn" in d && d.turn === "quarter") return [d.at, d.from, d.aim];
-      return [d.at];
+      return "at" in d ? [d.at] : [];
     case "change":
       return "at" in d ? [d.at] : [d.from, d.to];
     case "circle":
@@ -195,12 +209,29 @@ export function MovementPath({
           );
         }
         if (d.t === "pirouette") {
+          if ("turn" in d && d.turn === "full") {
+            const p = pointOn(d.from, d.to, d.along);
+            const radius = (d.diameterM ?? 3) / 2;
+            return (
+              <ellipse
+                key={key}
+                cx={p.x}
+                cy={p.y}
+                rx={radius * M_PX.x}
+                ry={radius * M_PX.y}
+                strokeWidth={width}
+                strokeDasharray={dash}
+              />
+            );
+          }
           const dPath =
             "turn" in d && d.turn === "quarter"
               ? quarterTurnPath(d.at, d.from, d.aim, d.direction)
               : "turn" in d && d.turn === "half"
                 ? halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2)
-                : pirouettePath(d.at, d.direction);
+                : "at" in d
+                  ? pirouettePath(d.at, d.direction)
+                  : halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2);
           return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }
         if (d.t === "arc")
@@ -246,6 +277,16 @@ export function MovementPath({
               <line x1={p.x - 7} y1={p.y} x2={p.x + 7} y2={p.y} strokeWidth={2.6} />
               <line x1={p.x} y1={y1} x2={p.x} y2={y2} strokeWidth={1.4} opacity={0.7} />
             </g>
+          );
+        }
+        if (d.t === "zigzag") {
+          return (
+            <path
+              key={key}
+              d={zigzagPath(d.from, d.to, d.legs, d.sideM, d.start)}
+              strokeWidth={width}
+              strokeDasharray={dash}
+            />
           );
         }
         if (d.t === "serpentine") {
@@ -742,12 +783,20 @@ function MfsSheet() {
 function FreestyleTable({
   sheet: s,
 }: {
-  sheet:
-    | typeof MEDIUM_FS
-    | typeof ELEMENTARY_FS
-    | typeof ADVANCED_MEDIUM_FS
-    | typeof ADVANCED_FS
-    | typeof GRADE_V_FS;
+  sheet: {
+    name: string;
+    year: string;
+    arena: string;
+    time: string;
+    bridle: string;
+    technicalTotal: number;
+    artisticTotal: number;
+    compulsory: { n: number; move: string; coeff: number }[];
+    artistic: { n: number; move: string; coeff: number }[];
+    permitted: string[];
+    notPermitted: string[];
+    penalties: string;
+  };
 }) {
   const Row = ({ n, text, coeff }: { n: number; text: string; coeff: number }) => (
     <li className="flex items-start gap-3 rounded-lg bg-bg p-3">
@@ -808,7 +857,20 @@ const ALL_SET_TESTS = [
   ...SET_5_TESTS,
   ...SET_6_TESTS,
   ...SET_GV_TESTS,
+  ...SET_G1_TESTS,
+  ...SET_G2_TESTS,
+  ...SET_G3_TESTS,
+  ...SET_G4_TESTS,
+  ...SET_7_TESTS,
 ];
+
+const MORE_FREESTYLES: Record<string, Parameters<typeof FreestyleTable>[0]["sheet"]> = {
+  "g1-fs": GRADE_1_FS,
+  "g2-fs": GRADE_2_FS,
+  "g3-fs": GRADE_3_FS,
+  "g4-fs": GRADE_4_FS,
+  "int-i-fs": INTERMEDIATE_I_FS,
+};
 
 function PublicationBar({
   name,
@@ -964,7 +1026,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
               ? ADVANCED_PURPOSE
               : active === "gv-fs"
                 ? GRADE_V_PURPOSE
-                : NOVICE_PURPOSE);
+                : MORE_FREESTYLES[active]
+                  ? "Freestyle to the official test sheet."
+                  : NOVICE_PURPOSE);
 
   return (
     <div className="flex flex-col gap-4">
@@ -1033,6 +1097,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       )}
       {active === "gv-fs" && visible.some((item) => item.viewId === "gv-fs") && (
         <FreestyleTable sheet={GRADE_V_FS} />
+      )}
+      {MORE_FREESTYLES[active] && visible.some((item) => item.viewId === active) && (
+        <FreestyleTable sheet={MORE_FREESTYLES[active]} />
       )}
 
       {isAdmin && approvedIds !== null && others.length > 0 && (

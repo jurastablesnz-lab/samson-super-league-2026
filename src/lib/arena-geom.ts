@@ -384,6 +384,36 @@ export function pirouettePath(at: string, direction: "left" | "right"): string {
   return `M ${p.x.toFixed(1)} ${(p.y - r).toFixed(1)} A ${r} ${r} 0 0 ${bulge} ${p.x.toFixed(1)} ${(p.y + r).toFixed(1)}`;
 }
 
+/** Centre-line zigzag of `legs` half-passes, each `sideM` metres off the centre. */
+export function zigzagPath(
+  from: string,
+  to: string,
+  legs: number,
+  sideM: number,
+  start: "left" | "right",
+) {
+  const a = track(from);
+  const b = track(to);
+  const reach = sideM * M_PX.x;
+  const sign0 = start === "right" ? 1 : -1;
+  const pts = [`M ${a.x.toFixed(1)} ${a.y.toFixed(1)}`];
+  for (let i = 1; i <= legs; i++) {
+    const peakT = (i - 0.5) / legs;
+    const endT = i / legs;
+    const sign = sign0 * (i % 2 === 1 ? 1 : -1);
+    const peak = {
+      x: a.x + (b.x - a.x) * peakT + sign * reach,
+      y: a.y + (b.y - a.y) * peakT,
+    };
+    const end = { x: a.x + (b.x - a.x) * endT, y: a.y + (b.y - a.y) * endT };
+    pts.push(
+      `L ${peak.x.toFixed(1)} ${peak.y.toFixed(1)}`,
+      `L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`,
+    );
+  }
+  return pts.join(" ");
+}
+
 export function arcPath(from: string, to: string, bulge: "C" | "A") {
   const a = track(from),
     b = track(to);

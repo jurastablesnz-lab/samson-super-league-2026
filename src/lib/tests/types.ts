@@ -32,12 +32,13 @@ export type Draw =
   | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
   | { t: "half-turn"; at: "G"; side: "H" | "M" }
   | { t: "serpentine"; from: "C" | "A"; first: "left" | "right" }
+  | { t: "zigzag"; from: string; to: string; legs: number; sideM: number; start: "left" | "right" }
   | { t: "rein-back"; at: string }
   | { t: "pirouette"; at: string; direction: "left" | "right" }
   | {
       t: "pirouette";
       direction: "left" | "right";
-      turn: "half";
+      turn: "half" | "full";
       from: string;
       to: string;
       along: number;

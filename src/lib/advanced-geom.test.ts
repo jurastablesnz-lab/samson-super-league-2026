@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SET_5_TESTS, SET_6_TESTS, SET_GV_TESTS, marksFor } from "./esnz-tests.ts";
+import {
+  SET_5_TESTS,
+  SET_6_TESTS,
+  SET_7_TESTS,
+  SET_G1_TESTS,
+  SET_G2_TESTS,
+  SET_G3_TESTS,
+  SET_G4_TESTS,
+  SET_GV_TESTS,
+  marksFor,
+} from "./esnz-tests.ts";
 import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
@@ -11,7 +21,6 @@ import {
   RIGHT,
   TOP,
   circleCenter,
-  halfArc,
   halfPirouettePath,
   halfTurnPath,
   lateralWork,
@@ -23,6 +32,7 @@ import {
   pointOn,
   quarterTurnPath,
   track,
+  zigzagPath,
 } from "./arena-geom.ts";
 
 function insideArena(p: { x: number; y: number }) {
@@ -123,18 +133,52 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
       }));
     }
     case "half":
-    case "arc":
-      return pathSamples(halfArc(d.from, d.to, d.bulge));
+    case "arc": {
+      const a = track(d.from);
+      const b = track(d.to);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const px = -dy / len;
+      const py = dx / len;
+      const towardA = py >= 0 ? 1 : -1;
+      const sign = towardA * (d.bulge === "A" ? 1 : -1);
+      const ry = (len / 2) * (M_PX.y / M_PX.x);
+      const samples = [a, b];
+      for (let i = 1; i <= 8; i++) {
+        const t = i / 8;
+        const lift = Math.sin(Math.PI * t) * ry;
+        samples.push({
+          x: a.x + dx * t + sign * px * lift,
+          y: a.y + dy * t + sign * py * lift,
+        });
+      }
+      return samples;
+    }
     case "half-turn":
       return pathSamples(halfTurnPath(d.side));
     case "pirouette":
+      if ("turn" in d && d.turn === "full") {
+        const p = pointOn(d.from, d.to, d.along);
+        const radius = (d.diameterM ?? 3) / 2;
+        const rx = radius * M_PX.x;
+        const ry = radius * M_PX.y;
+        return Array.from({ length: 16 }, (_, i) => {
+          const a = (i / 16) * Math.PI * 2;
+          return { x: p.x + rx * Math.cos(a), y: p.y + ry * Math.sin(a) };
+        });
+      }
       return pathSamples(
         "turn" in d && d.turn === "quarter"
           ? quarterTurnPath(d.at, d.from, d.aim, d.direction)
           : "turn" in d && d.turn === "half"
             ? halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2)
-            : pirouettePath(d.at, d.direction),
+            : "at" in d
+              ? pirouettePath(d.at, d.direction)
+              : halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2),
       );
+    case "zigzag":
+      return pathSamples(zigzagPath(d.from, d.to, d.legs, d.sideM, d.start));
     case "circle": {
       const between = d.betweenQuarterlines;
       const radius = between ? 5 : d.m / 2;
@@ -401,5 +445,39 @@ test("grade V grand prix keeps counts, coefficients, totals and stays in the are
           );
         }
       }
+  }
+});
+
+test("FEI Small Tour and Para Grand Prix sheets keep printed totals and stay in the arena", () => {
+  const expected: Record<string, [number, number]> = {
+    psg: [320, 340],
+    "int-i": [320, 340],
+    g1a: [220, 240],
+    g1b: [220, 240],
+    g2a: [270, 290],
+    g2b: [280, 300],
+    g3a: [280, 300],
+    g3b: [280, 300],
+    g4a: [340, 360],
+    g4b: [350, 370],
+  };
+  const sheets = [
+    ...SET_7_TESTS,
+    ...SET_G1_TESTS,
+    ...SET_G2_TESTS,
+    ...SET_G3_TESTS,
+    ...SET_G4_TESTS,
+  ];
+  for (const t of sheets) {
+    const marks = marksFor(t);
+    assert.deepEqual([marks.tech, marks.total], expected[t.id], t.id);
+    t.movements.forEach((m, i) => {
+      assert.equal(m.n, i + 1, `${t.id}/${m.n}`);
+      assert.ok(m.directive.length > 8, `${t.id}/${m.n}`);
+    });
+    for (const m of t.movements)
+      for (const d of m.draw)
+        for (const p of drawSamples(d))
+          assert.ok(insideArena(p), `${t.id}/${m.n} ${d.t} at ${p.x.toFixed(1)},${p.y.toFixed(1)}`);
   }
 });

@@ -103,6 +103,7 @@ function drawSamples(d: Draw) {
     case "change":
     case "serpentine":
     case "pirouette":
+    case "zigzag":
       return [];
     case "halt": {
       const p = track(d.at);

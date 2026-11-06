@@ -1,0 +1,297 @@
+import type { SetTest } from "../types.ts";
+import {
+  PARA_COLLECTIVES,
+  circle,
+  diag,
+  half,
+  halt,
+  line,
+  mv,
+  serpentine,
+} from "../para-common.ts";
+
+export const TEST_G2B: SetTest = {
+  id: "g2b",
+  short: "G2 B",
+  name: "Grade II Para Grand Prix B",
+  year: "FEI 2023",
+  time: "5:00",
+  drawTime: "",
+  arena: "20 × 40",
+  purpose:
+    "FEI Para Dressage Grade II. Grand Prix B is the 2025 team medal test (the 2023 index still calls it the former Individual test).",
+  instructions: "20 × 40 arena. Minimum age of horse: 6 years. Time is for information only.",
+  introduces: "Team medal test",
+  leave: "Leave arena at A in walk on a long rein",
+  collectives: PARA_COLLECTIVES,
+  movements: [
+    mv(
+      1,
+      [
+        ["A", "Enter in working"],
+        ["", "trot."],
+        ["X", "Halt. Immobility."],
+        ["", "Salute. Proceed in"],
+        ["X C", "medium walk. Medium walk."],
+        ["C", "Track right."],
+      ],
+      "Quality of walk, halt, and transitions. Straightness. Contact and poll.",
+      [line(["A", "X", "C"]), halt("X"), line(["X", "C"]), line(["C"])],
+      { pace: "walk" },
+    ),
+    mv(
+      2,
+      [
+        ["C M", "Medium walk"],
+        ["M", "Transition to"],
+        ["M B", "working trot Working trot"],
+      ],
+      "Regularity and quality of walk, promptness of transition to trot, regularity and quality of trot.",
+      [line(["C", "M"]), line(["M"]), line(["M", "B"])],
+      { pace: "walk" },
+    ),
+    mv(
+      3,
+      [
+        ["B E B", "Circle right (20m"],
+        ["", "Ø)"],
+      ],
+      "Regularity, quality of trot, bend and balance, engagement, size and shape of circle, contact.",
+      circle("B", 20),
+    ),
+    mv(
+      4,
+      [
+        ["B", "Transition to"],
+        ["", "medium walk and"],
+        ["", "immediate volte"],
+        ["", "right (8m Ø)"],
+      ],
+      "Smooth and fluent transition, regularity and quality of walk, bend and balance, size and shape of volte, maintenance of rhythm and activity, contact.",
+      line(["B"]),
+      { pace: "walk" },
+    ),
+    mv(
+      5,
+      [
+        ["B K", "On the diagonal"],
+        ["K A", "Medium walk"],
+      ],
+      "Regularity and quality of walk, straightness on diagonal.",
+      [diag("B", "K"), line(["K", "A"])],
+      { pace: "walk" },
+    ),
+    mv(
+      6,
+      [
+        ["A", "Halt. 5 seconds"],
+        ["", "immobility."],
+        ["", "Proceed in medium walk"],
+      ],
+      "Smooth transition into halt, accurate time of immobility, squareness, contact. Prompt transition to medium walk.",
+      halt("A"),
+      { pace: "walk", coeff: 2 },
+    ),
+    mv(
+      7,
+      [
+        ["A", "Turn down on the"],
+        ["", "quarter line."],
+      ],
+      "Regularity and quality of walk. Straightness. Balance.",
+      line(["A"]),
+    ),
+    mv(
+      8,
+      [
+        ["", "Leg yield right."],
+        ["M C", "Medium walk"],
+      ],
+      "Regularity, quality of walk, flexion at poll, upright balance, forward sideways movement.",
+      [line(["B", "X"]), line(["M"]), line(["M", "C"])],
+      { pace: "walk", coeff: 2 },
+    ),
+    mv(
+      9,
+      [
+        ["C", "Transition to"],
+        ["", "working trot"],
+        ["C H E", "Working trot"],
+      ],
+      "Regularity, promptness of transition to trot, quality of trot, engagement.",
+      [line(["C"]), line(["C", "H", "E"])],
+    ),
+    mv(
+      10,
+      [
+        ["E B E", "Circle left (20m"],
+        ["", "Ø)"],
+      ],
+      "Regularity, quality of trot, bend and balance, engagement, size and shape of circle, contact.",
+      circle("E", 20),
+    ),
+    mv(
+      11,
+      [
+        ["E", "Transition to"],
+        ["", "medium walk and"],
+        ["", "immediate volte"],
+        ["", "left (8m Ø)"],
+      ],
+      "Smooth and fluent transition, regularity and quality of walk, bend and balance, size and shape of volte, maintenance of rhythm and activity, contact.",
+      line(["E"]),
+      { pace: "walk" },
+    ),
+    mv(
+      12,
+      [
+        ["E F", "On the diagonal"],
+        ["F A", "Medium walk"],
+      ],
+      "Regularity and quality of walk, straightness on diagonal.",
+      [diag("E", "F"), line(["F", "A"])],
+      { pace: "walk" },
+    ),
+    mv(
+      13,
+      [
+        ["A", "Turn down on the"],
+        ["", "quarter line"],
+      ],
+      "Regularity and quality of walk. Straightness. Balance.",
+      line(["A"]),
+    ),
+    mv(
+      14,
+      [
+        ["", "Leg yield left."],
+        ["H C", "Medium walk"],
+      ],
+      "Regularity, quality of walk, flexion at poll, upright balance, forward sideways movement.",
+      [line(["E", "X"]), line(["H"]), line(["H", "C"])],
+      { pace: "walk", coeff: 2 },
+    ),
+    mv(
+      15,
+      [
+        ["C", "Transition to"],
+        ["", "working trot"],
+        ["C M", "Working trot"],
+      ],
+      "Regularity, promptness of transition to trot, quality of trot, engagement.",
+      [line(["C"]), line(["C", "M"])],
+    ),
+    mv(
+      16,
+      [
+        ["M X K", "Change the rein,"],
+        ["", "showing 5 – 7"],
+        ["", "lengthened steps"],
+        ["", "over X"],
+      ],
+      "Regularity and quality of trot, elasticity, balance, engagement of hindquarters, lengthening of steps and frame. Straightness.",
+      line(["M", "X", "K"]),
+    ),
+    mv(
+      17,
+      [
+        ["", "Transitions into"],
+        ["", "and out of"],
+        ["", "lengthened steps over X."],
+        ["K A", "Working trot"],
+      ],
+      "Maintenance of rhythm, fluency, precise and smooth execution of transitions. Change of frame. Quality of trot.",
+      line(["K", "A"]),
+    ),
+    mv(
+      18,
+      [
+        ["A C", "Serpentine, 3"],
+        ["", "equal loops, touching the long"],
+        ["", "sides of the"],
+        ["", "arena, finishing"],
+        ["", "on the left rein."],
+        ["C H", "Working trot."],
+      ],
+      "Regularity and quality of trot, equal bend and balance, size and shape of loops, smooth and fluent changes of direction.",
+      [serpentine("C", "left"), line(["C", "H"])],
+    ),
+    mv(
+      19,
+      [
+        ["H", "Transition to medium walk."],
+        ["H E", "Medium walk"],
+      ],
+      "Precision, execution and fluency of transitions. Regularity of walk.",
+      [line(["H"]), line(["H", "E"])],
+      { pace: "walk" },
+    ),
+    mv(
+      20,
+      [
+        ["E B", "Half circle left"],
+        ["", "(20m Ø) letting"],
+        ["", "the horse stretch on a longer rein."],
+        ["B", "Medium walk."],
+      ],
+      "Regularity, maintenance of rhythm and activity, relaxation, stretching forward downward of neck, lengthening of steps and frame without giving up contact.",
+      [half("E", "B", "A"), line(["B"])],
+      { pace: "free" },
+    ),
+    mv(
+      21,
+      [
+        ["E B", "Transitions at E and B"],
+        ["B M", "Medium walk"],
+      ],
+      "Gradual stretching forward downward to the bit, lengthening and shortening of steps and frame, maintenance of four beat, retaking reins without resistance.",
+      [line(["E", "B"]), line(["B", "M"])],
+      { pace: "walk" },
+    ),
+    mv(
+      22,
+      [
+        ["M", "Transition to"],
+        ["", "working trot"],
+        ["M C H", "Working trot"],
+      ],
+      "Precise and smooth transition. Regularity and quality of trot.",
+      [line(["M"]), line(["M", "C", "H"])],
+    ),
+    mv(
+      23,
+      [
+        ["H X F", "Change the rein,"],
+        ["", "showing 5-7"],
+        ["", "lengthened steps"],
+        ["", "over X"],
+      ],
+      "Regularity and quality of trot, elasticity, balance, engagement of hindquarters, lengthening of steps and frame. Straightness.",
+      line(["H", "X", "F"]),
+    ),
+    mv(
+      24,
+      [
+        ["", "Transitions into"],
+        ["", "and out of lengthened steps"],
+        ["", "over X"],
+        ["F A", "Working trot"],
+      ],
+      "Maintenance of rhythm, fluency, precise and smooth execution of transitions. Change of frame. Quality of trot.",
+      line(["F", "A"]),
+    ),
+    mv(
+      25,
+      [
+        ["A X", "Down the centre"],
+        ["X", "line. Halt. Immobility."],
+        ["", "Salute."],
+        ["", "Leave arena at A in walk on a long"],
+        ["", "rein"],
+      ],
+      "Balance in turn, straightness on centre line, quality of trot, smooth transition into halt, immobility, contact and poll.",
+      [line(["A", "X"]), halt("X")],
+      { pace: "walk" },
+    ),
+  ],
+};

@@ -202,11 +202,11 @@ function RiderApp({
         </header>
         <LocalImportBanner storageKey={storageKey} horse={horse} onImported={setLog} />
         {logError && <p className="mb-3 rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger">{logError}</p>}
-        {tab === "today" && <TodayTab plan={plan} record={record} log={log} horse={horse} onTab={setTab} />}
-        {tab === "season" && <SeasonTab plan={plan} record={record} log={log} horse={horse} />}
-        {tab === "tests" && <TestsTab plan={plan} record={record} />}
-        {tab === "log" && <LogTab plan={plan} horse={horse} log={log} setLog={setLog} />}
-        {tab === "setup" && <SetupTab ws={ws} plan={plan} record={record} horse={horse} onEdit={onEditSetup} />}
+        {tab === "today" && <TodayTab key={`today-${horse.id}`} plan={plan} record={record} log={log} horse={horse} onTab={setTab} />}
+        {tab === "season" && <SeasonTab key={`season-${horse.id}`} plan={plan} record={record} log={log} horse={horse} />}
+        {tab === "tests" && <TestsTab key={`tests-${horse.id}`} plan={plan} record={record} />}
+        {tab === "log" && <LogTab key={`log-${horse.id}`} plan={plan} horse={horse} log={log} setLog={setLog} />}
+        {tab === "setup" && <SetupTab key={`setup-${horse.id}`} ws={ws} plan={plan} record={record} horse={horse} onEdit={onEditSetup} />}
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur-md" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
         <ul className="mx-auto grid max-w-3xl grid-cols-5 px-2 pt-1">
@@ -721,12 +721,14 @@ function SheetsCard({ plan, horse, log, setLog }: { plan: GeneratedPlan; horse: 
   );
 }
 
-function SetupTab({ plan, record, horse, onEdit }: { ws: Workspace; plan: GeneratedPlan; record: PlanRecord; horse: HorseRecord; onEdit: () => void }) {
+function SetupTab({ ws, plan, record, horse, onEdit }: { ws: Workspace; plan: GeneratedPlan; record: PlanRecord; horse: HorseRecord; onEdit: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <Kicker>{horse.name}</Kicker>
         <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="text-faint">Rider grade</dt>
+          <dd>{ws.riderGrade}</dd>
           <dt className="text-faint">Level</dt>
           <dd>{horse.level || plan.level}</dd>
           <dt className="text-faint">ESNZ</dt>

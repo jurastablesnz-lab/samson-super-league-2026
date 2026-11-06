@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generatePlan, phasesFor, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
+import { describeWhen, generatePlan, phasesFor, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
+import { differenceInDays } from "date-fns";
 import { WEEKS, PHASES } from "./season.ts";
 
 const NOW = new Date("2026-11-08T00:00:00");
@@ -37,6 +38,24 @@ test("generated plan uses the four phases, contiguous and ordered", () => {
   assert.ok(sessions.some((s) => s.kind === "show" && s.title === "Champs"));
   assert.ok(sessions.some((s) => s.kind === "travel" && s.day === "2027-03-04"));
   assert.ok(sessions.some((s) => s.kind === "rest" && s.day === "2027-03-08") || plan.weeks.at(-1)!.sessions.at(-1)!.day < "2027-03-08");
+});
+
+test("short show runways give Consolidate more than one day", () => {
+  const phases = phasesFor("2026-11-01", [{ id: "soon", name: "Soon", start: "2026-12-12", end: "2026-12-13" }], "Level 2", []);
+  const consolidate = phases.find((p) => p.id === "consolidate")!;
+  assert.ok(differenceInDays(consolidate.end, consolidate.start) >= 6);
+  assert.ok(phases.every((p) => p.start <= p.end));
+});
+
+test("cross-month dates include both month names", () => {
+  assert.equal(describeWhen({ start: "2026-11-30", end: "2026-12-02" }), "30 Nov–2 Dec 2026");
+});
+
+test("main test sheet session uses main-test instructions, not homework", () => {
+  const plan = generatePlan({ horseName: "Kahu", level: "Level 2", tests: ["2B", "2C"], shows: [{ id: "show", name: "Show", start: "2027-01-30", end: "2027-01-31" }], goals: ["learn_level"] }, NOW);
+  const sheet = plan.weeks.flatMap((w) => w.sessions).find((s) => s.title === "2B from the sheet")!;
+  assert.ok(sheet.how[0].startsWith("2B"));
+  assert.ok(!sheet.how.join(" ").includes("2C"));
 });
 
 test("coaching text is gender-neutral", () => {

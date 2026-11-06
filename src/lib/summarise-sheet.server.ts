@@ -25,7 +25,7 @@ Rules:
 - lowMarks: only movements at 6 or below, or ones with a useful comment. Max 6.
 - workOns: exactly 3 options the rider can choose between for next week's schooling. Each how is a specific arena exercise (gait, letters or circle size, what good looks like). Not slogans, not more shows, not shopping.
 - Prefer the repeated comment and the lowest coefficient movements, especially the stretch circle, transitions, and accuracy.
-- If the photo is the wrong page, blurry, or mostly unreadable, set readable to false, say so in caveat, and still offer 3 general Level 2 options only if something on the sheet supports them. Otherwise workOns can be empty.
+- If the photo is the wrong page, blurry, or mostly unreadable, set readable to false, say so in caveat, and still offer 3 general options appropriate to the horse's level only if something on the sheet supports them. Otherwise workOns can be empty.
 - Tone: direct NZ dressage coach. Gender-neutral: say "your horse", the horse's name or "they", never he/she for horse or rider. No emoji.`;
 
 export async function summariseSheetOnServer(data: {

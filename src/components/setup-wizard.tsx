@@ -244,7 +244,7 @@ export function SetupWizard({
             <Panel key={i} className="space-y-2 text-sm">
               <p className="font-display text-lg font-extrabold">{x.name}</p>
               <p className="text-muted">
-                {x.level}
+                {x.level} · rider grade {workspace.riderGrade}
                 {x.esnzNumber && ` · ESNZ ${x.esnzNumber}`}
               </p>
               <p>
@@ -372,6 +372,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [travel, setTravel] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
   const picked = (id: string) => horse.shows.some((s) => s.id === id);
   const toggle = (s: TargetShow) =>
     onChange({ shows: picked(s.id) ? horse.shows.filter((x) => x.id !== s.id) : [...horse.shows, s] });
@@ -397,6 +398,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
       </Panel>
       <Panel className="space-y-3">
         <Kicker>Your own shows</Kicker>
+        {dateError && <p className="text-sm text-danger" role="alert">{dateError}</p>}
         {customs.map((s) => (
           <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm">
             <span>
@@ -432,6 +434,9 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           type="button"
           disabled={!name.trim() || !start}
           onClick={() => {
+            if (start < today) return setDateError("Choose a start date from today onwards.");
+            if (end && end < start) return setDateError("The finish date must be on or after the start date.");
+            setDateError(null);
             onChange({
               shows: [
                 ...horse.shows,

@@ -154,7 +154,7 @@ export function phasesFor(startIso: string, shows: TargetShow[], level: string, 
     competeStart = addDays(parseISO(last.start), -10);
     prepareStart = addDays(competeStart, -21);
     consolidateStart = addDays(first, -28);
-    if (consolidateStart > prepareStart) consolidateStart = prepareStart;
+    if (consolidateStart > addDays(prepareStart, -7)) consolidateStart = addDays(prepareStart, -7);
   }
   // Clamp: start < consolidate < prepare < compete <= end, each phase >= 1 day.
   const span = differenceInCalendarDays(end, start) + 1;
@@ -372,7 +372,7 @@ export function generatePlan(config: PlanConfig, now: Date = new Date()): Genera
         return session(day, "school", "Stretch & walk", `Long and low. No ${mainTest}.`, 40, how.stretch);
       }
       if (learn && phase.id === "foundation") {
-        return session(day, "test", `${mainTest} from the sheet`, "Learn the pattern. Accuracy over expression.", 35, how.homework);
+        return session(day, "test", `${mainTest} from the sheet`, "Learn the pattern. Accuracy over expression.", 35, how.main);
       }
       return session(day, "test", `${mainTest} from memory`, "The main test. One time through.", 35, how.main);
     },
@@ -412,7 +412,7 @@ export function generatePlan(config: PlanConfig, now: Date = new Date()): Genera
 
 export function describeWhen(s: { start: string; end: string }) {
   const a = parseISO(s.start);
-  return s.end && s.end !== s.start ? `${format(a, "d")}–${format(parseISO(s.end), "d MMM yyyy")}` : format(a, "d MMM yyyy");
+  return s.end && s.end !== s.start ? format(a, "d MMM") === format(parseISO(s.end), "d MMM") ? `${format(a, "d")}–${format(parseISO(s.end), "d MMM yyyy")}` : `${format(a, "d MMM")}–${format(parseISO(s.end), "d MMM yyyy")}` : format(a, "d MMM yyyy");
 }
 
 /** Normalise untrusted wizard input into a PlanConfig (server-side validation). */

@@ -87,3 +87,21 @@ re-suggesting them. The CSV rider name is stored separately in `rider_name`.
 
 Run `npx tsc --noEmit` and `npm test` after changes. The review integration test
 uses an in-memory PGLite database and applies all numbered migrations.
+
+## Rider self-import
+
+A rider can open their horse's **Log** tab and use **Bring in my EVO results**.
+They sign in to EVO Events themselves, select and copy their horse's results
+table, and paste it into the box. XSalute does not access EVO or the rider's EVO
+account. `src/lib/evo-paste.ts` accepts the copied nine-column EVO table
+(Date, Event, Discipline, Rider, Class, Level/Type, Place, Result, Detail) or
+the existing CSV format. It reassembles cells wrapped across physical lines.
+
+The preview reports the number of dressage scores, date range and rider names.
+Eliminated, blank-result, cancelled and non-dressage informational rows are
+skipped; Para and Para Equestrian dressage results are retained. **Send to
+review** inserts up to 500 rows for that signed-in rider's chosen horse only,
+without matching any other user. The server checks beta access and ownership,
+then creates pending `evo_csv` suggestions with the same dedupe key as the admin
+import. Already pending, kept or rejected rows are skipped. No schema change is
+needed.

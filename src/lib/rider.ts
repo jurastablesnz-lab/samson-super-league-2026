@@ -177,6 +177,20 @@ export const importLocalForHorse = createServerFn({ method: "POST" })
     return riderImportLocal(context.userId, data.horseId, data.snapshot);
   });
 
+/** Rider: turn their own pasted EVO scores into pending review suggestions. */
+export const importOwnEvoResults = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; rows: EvoRow[] }) => {
+    if (!Array.isArray(input?.rows)) throw new Error("No EVO scores to import");
+    if (JSON.stringify(input.rows).length > 500_000)
+      throw new Error("That paste is too large — import fewer rows at a time");
+    return { horseId: str(input?.horseId), rows: input.rows };
+  })
+  .handler(async ({ context, data }) => {
+    const { importOwnEvoResults: save } = await import("./rider.server");
+    return save(context.userId, data.horseId, data.rows);
+  });
+
 /** Rider: keep the selected EVO suggestions on their own horse. */
 export const keepEvoResults = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

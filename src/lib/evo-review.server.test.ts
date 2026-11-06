@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readdir, readFile } from "node:fs/promises";
 import type { Sql } from "./db.ts";
 import { reviewEvoResultsForOwner } from "./evo-review.server.ts";
+import { importOwnEvoRows } from "./evo-self-import.server.ts";
 
 function asSql(pg: PGlite): Sql {
   const sql = (async <T>(strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -130,6 +131,77 @@ test("keep/reject is owner-scoped, pending-only, and rejected rows still dedupe"
         )
       ).rows[0].n,
       5,
+    );
+  } finally {
+    await pg.close();
+  }
+});
+
+test("rider self-import is pending, owner-scoped and dedupes all review states", async () => {
+  const pg = await database();
+  try {
+    const sql = asSql(pg);
+    await pg.query(
+      "insert into \"user\" (id, name, email, \"emailVerified\") values ('owner', 'Owner', 'owner@example.com', true)",
+    );
+    await pg.query("insert into horses (id, user_id, name) values ('horse', 'owner', 'Bella')");
+    await pg.query(
+      "insert into result_imports (uploaded_by, file_name, row_count) values ('rider:owner', 'Rider EVO paste', 1) returning id",
+    );
+    const audit = await pg.query<{ id: number }>(
+      "select id from result_imports where file_name = 'Rider EVO paste'",
+    );
+    const row = {
+      line: 1,
+      rider: "Nicole Bours",
+      horse: "",
+      esnz: "",
+      event: "Kiwi Arena",
+      date: "2026-10-03",
+      className: "Class 701",
+      test: "701 — Level 7",
+      level: "Level 7",
+      percent: 64.7,
+      place: "4",
+      status: "ok" as const,
+      judges: "J1:65.1/3",
+      raw: { Rider: "Nicole Bours" },
+    };
+    assert.deepEqual(await importOwnEvoRows(sql, "owner", "horse", [row], audit.rows[0].id), {
+      count: 1,
+      duplicates: 0,
+    });
+    assert.deepEqual(await importOwnEvoRows(sql, "owner", "horse", [row], audit.rows[0].id), {
+      count: 0,
+      duplicates: 1,
+    });
+    const saved = (
+      await pg.query("select user_id, horse_id, source, review_status, rider_name from results")
+    ).rows;
+    assert.deepEqual(saved, [
+      {
+        user_id: "owner",
+        horse_id: "horse",
+        source: "evo_csv",
+        review_status: "pending",
+        rider_name: "Nicole Bours",
+      },
+    ]);
+
+    await reviewEvoResultsForOwner(
+      sql,
+      "owner",
+      "horse",
+      [`csv-${audit.rows[0].id}-1`],
+      "rejected",
+    );
+    assert.deepEqual(await importOwnEvoRows(sql, "owner", "horse", [row], audit.rows[0].id), {
+      count: 0,
+      duplicates: 1,
+    });
+    assert.equal(
+      (await pg.query<{ n: number }>("select count(*)::int as n from results")).rows[0].n,
+      1,
     );
   } finally {
     await pg.close();

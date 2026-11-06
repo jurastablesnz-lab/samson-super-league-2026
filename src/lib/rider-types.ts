@@ -131,6 +131,11 @@ export type SetupHorseInput = {
   config: PlanConfig;
 };
 
+export type RiderEvoImportResult = {
+  count: number;
+  duplicates: number;
+};
+
 export type EvoImportRowResult = {
   line: number;
   rider: string;

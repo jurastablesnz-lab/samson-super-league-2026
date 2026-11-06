@@ -16,11 +16,14 @@ import {
 import { format, parseISO } from "date-fns";
 import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
+import type { EvoRow } from "@/lib/evo-csv";
+import { parseEvoResultsPaste, type EvoPasteResult } from "@/lib/evo-paste";
 import {
   deleteEntry,
   getHorseLog,
   getWorkspace,
   importLocalForHorse,
+  importOwnEvoResults,
   keepEvoResults,
   rejectEvoResults,
   saveNote,
@@ -722,6 +725,7 @@ function LogTab({
     );
   return (
     <div className="flex flex-col gap-4">
+      <EvoSelfImportPanel horseId={horse.id} onImported={setLog} />
       <EvoReviewPanel
         pending={log.pendingEvoResults}
         horseId={horse.id}
@@ -906,6 +910,131 @@ function LogTab({
 
       <SheetsCard plan={plan} horse={horse} log={log} setLog={setLog} />
     </div>
+  );
+}
+
+function EvoSelfImportPanel({
+  horseId,
+  onImported,
+}: {
+  horseId: string;
+  onImported: (log: HorseLog) => void;
+}) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<EvoPasteResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  function preview() {
+    setMessage(null);
+    setParsed(parseEvoResultsPaste(text));
+  }
+
+  function changeText(value: string) {
+    setText(value);
+    setParsed(null);
+    setMessage(null);
+  }
+
+  async function send(rows: EvoRow[]) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await importOwnEvoResults({ data: { horseId, rows } });
+      onImported(result.log);
+      setText("");
+      setParsed(null);
+      setMessage(
+        `${result.count} score${result.count === 1 ? "" : "s"} sent to Found on EVO Events below${
+          result.duplicates
+            ? `. ${result.duplicates} already imported, kept or marked not mine and skipped.`
+            : "."
+        }`,
+      );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rows = parsed?.rows ?? [];
+  const dates = rows
+    .map((row) => row.date)
+    .filter(Boolean)
+    .sort();
+  const riders = [...new Set(rows.map((row) => row.rider.trim()).filter(Boolean))];
+  return (
+    <Card>
+      <Kicker>Bring in my EVO results</Kicker>
+      <p className="mt-2 text-sm text-muted">
+        Copy your horse's results table from EVO Events and paste it here. You'll choose which
+        scores to keep.
+      </p>
+      <textarea
+        value={text}
+        onChange={(event) => changeText(event.target.value)}
+        rows={6}
+        spellCheck={false}
+        placeholder="Paste your copied results table here, including the column headings if you selected them."
+        className="mt-3 w-full resize-y rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent"
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <PrimaryButton type="button" onClick={preview} disabled={!text.trim() || busy}>
+          Preview results
+        </PrimaryButton>
+        {text && (
+          <button
+            type="button"
+            disabled={busy}
+            className="rounded-lg border border-line px-3 py-2 text-sm"
+            onClick={() => changeText("")}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {parsed && (
+        <div className="mt-3 rounded-lg bg-bg p-3 text-sm">
+          <p className="font-semibold">
+            {rows.length} dressage score{rows.length === 1 ? "" : "s"} found
+          </p>
+          {dates.length > 0 && (
+            <p className="mt-1 text-xs text-muted">
+              {fmtDay(dates[0])} – {fmtDay(dates[dates.length - 1])}
+            </p>
+          )}
+          {riders.length > 0 && (
+            <p className="mt-1 text-xs text-muted">Rider names found: {riders.join(", ")}</p>
+          )}
+          {parsed.skipped > 0 && (
+            <p className="mt-1 text-xs text-faint">
+              {parsed.skipped} row{parsed.skipped === 1 ? "" : "s"} skipped.
+            </p>
+          )}
+          {parsed.warnings.map((warning) => (
+            <p key={warning} className="mt-1 text-xs text-warn">
+              {warning}
+            </p>
+          ))}
+          {rows.length > 0 && (
+            <PrimaryButton
+              type="button"
+              className="mt-3"
+              disabled={busy}
+              onClick={() => void send(rows)}
+            >
+              {busy ? "Sending…" : "Send to review"}
+            </PrimaryButton>
+          )}
+        </div>
+      )}
+      {message && (
+        <p className="mt-2 text-sm text-muted" role="status">
+          {message}
+        </p>
+      )}
+    </Card>
   );
 }
 

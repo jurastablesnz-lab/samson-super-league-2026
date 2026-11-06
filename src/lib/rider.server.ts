@@ -9,6 +9,7 @@ import { loadUser, preApproved, authOff, type UserInfo } from "./beta.server";
 import { parseHorseList, type HorseEntry } from "./beta";
 import { generatePlan, sanitisePlanConfig, type PlanConfig } from "./plan-builder";
 import { reviewEvoResultsForOwner } from "./evo-review.server";
+import type { EvoRow } from "./evo-csv";
 import type {
   HorseLog,
   HorseRecord,
@@ -321,6 +322,23 @@ export async function loadHorseLog(userId: string, horseId: string): Promise<Hor
     sheets,
     progress: toProgress(prog[0]?.progress),
   };
+}
+
+/** Import a rider's own parsed EVO rows as pending review suggestions. */
+export async function importOwnEvoResults(userId: string, horseId: string, rows: EvoRow[]) {
+  await requireAccess(userId);
+  if (!Array.isArray(rows) || !rows.length) throw new Error("No EVO scores to import");
+  if (rows.length > 500) throw new Error("Up to 500 rows at a time");
+  const sql = await getSql();
+  await ownedHorse(sql, userId, horseId);
+  const { importOwnEvoRows } = await import("./evo-self-import.server");
+  const audit = await sql<{
+    id: number;
+  }>`insert into result_imports (uploaded_by, file_name, row_count)
+    values (CONCAT('rider:', ${userId}), 'Rider EVO paste', ${rows.length}) returning id`;
+  const summary = await importOwnEvoRows(sql, userId, horseId, rows, Number(audit[0].id));
+  const log = await loadHorseLog(userId, horseId);
+  return { ...summary, log };
 }
 
 /** Keep or reject EVO suggestions only where they belong to this rider's horse. */

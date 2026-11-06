@@ -3,8 +3,9 @@
  *
  * Admins: emails in BETA_ADMIN_EMAILS (default Susan's two addresses). An admin
  * email only counts when the account has a linked GOOGLE sign-in (the broker's
- * `grok-google` provider) — NOT a self-typed email/password sign-up, X, or any
- * other provider, so nobody can claim Susan's address by registering it first.
+ * `grok-google` or native `google` provider) — NOT a self-typed email/password
+ * sign-up, X, or any other provider, so nobody can claim Susan's address by
+ * registering it first.
  * BETA_ADMIN_TRUST_PASSWORD=true relaxes this for local testing only — never
  * set it on a deployed app.
  */

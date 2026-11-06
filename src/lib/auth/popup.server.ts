@@ -16,7 +16,7 @@
  * React route here paints the full app shell in the popup. The opener lives in
  * `client.ts` (`signIn` → `openSignInPopup`).
  */
-import { auth, SESSION_TOKEN_COOKIE } from "./server";
+import { auth, nativeGoogleEnabled, SESSION_TOKEN_COOKIE } from "./server";
 
 /** Message shape the popup posts to the opener (must match `client.ts`). */
 type PopupMessage = {
@@ -62,17 +62,27 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
   // Stay first-party for the callback so the session cookie lands in THIS popup.
   const back = `${url.origin}/auth/popup?done=1`;
   try {
-    const apiRes = await auth.api.signInWithOAuth2({
-      body: {
-        providerId,
-        callbackURL: back,
-        errorCallbackURL: `${back}&error=1`,
-      },
-      // Forward the preview host so Better Auth derives the correct baseURL /
-      // redirect_uri for the dynamic `*.grok-sandbox.com` origin.
-      headers: request.headers,
-      asResponse: true,
-    });
+    const callback = {
+      callbackURL: back,
+      errorCallbackURL: `${back}&error=1`,
+    };
+    // The client resolves grok-google to google when native auth is enabled.
+    // Keep the same popup + bearer completion flow, but use the native social
+    // endpoint because genericOAuth only knows about broker providers.
+    const apiRes =
+      (providerId === "google" || providerId === "grok-google") && nativeGoogleEnabled
+        ? await auth.api.signInSocial({
+            body: { ...callback, provider: "google" },
+            headers: request.headers,
+            asResponse: true,
+          })
+        : await auth.api.signInWithOAuth2({
+            body: { ...callback, providerId },
+            // Forward the preview host so Better Auth derives the correct baseURL /
+            // redirect_uri for the dynamic `*.grok-sandbox.com` origin.
+            headers: request.headers,
+            asResponse: true,
+          });
 
     if (!apiRes.ok) {
       const detail = await apiRes.text().catch(() => "");

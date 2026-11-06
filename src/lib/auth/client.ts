@@ -1,7 +1,7 @@
 import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
-import { GROK_PROVIDERS } from "./providers";
+import { getNativeGoogleEnabled, GROK_PROVIDERS } from "./providers";
 
 /**
  * Better Auth client for this React SPA (browser-side).
@@ -73,25 +73,23 @@ function setBearerToken(token: string | null): void {
  * popup there and a normal redirect everywhere else.
  */
 function inLivePreview(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.location.hostname.endsWith(".grok-sandbox.com")
-  );
+  return typeof window !== "undefined" && window.location.hostname.endsWith(".grok-sandbox.com");
 }
 
 /** Message the popup posts back to the opener once sign-in completes. */
 type PopupMessage = { source: "grok-auth-popup"; token: string | null; error?: string };
 
 /**
- * Start sign-in with one upstream provider (`providerId` from `GROK_PROVIDERS`),
- * federating through the Grok auth broker.
+ * Start sign-in with one upstream provider (`providerId` from `GROK_PROVIDERS`).
+ * Google uses the app-owned native provider when configured; everything else
+ * keeps federating through the Grok auth broker.
  *
  * - **Live preview** (`*.grok-sandbox.com` iframe): opens a POPUP to
  *   `/auth/popup`, served by the template Vite plugin (see `vite.config.ts` +
  *   `popup.server.ts`) — 302s to the broker/upstream login (no app chrome) and,
  *   on return, posts the session bearer token back. We store it and refresh the
  *   session; no top-level navigation of the iframe to the broker.
- * - **Deployed** (and local non-iframe): a normal full-page redirect into the broker.
+ * - **Deployed** (and local non-iframe): a normal full-page OAuth redirect.
  *
  * Either way it clears any existing local session FIRST so switching providers
  * actually switches identity.
@@ -103,9 +101,23 @@ export async function signIn(
   const callbackURL = opts.callbackURL ?? "/";
   const errorCallbackURL = opts.errorCallbackURL ?? "/";
 
+  // Only Google changes providers. A missing/partial config (or a failed
+  // feature lookup) keeps the existing broker behaviour unchanged.
+  let resolvedProviderId = providerId;
+  if (providerId === "grok-google") {
+    try {
+      if (await getNativeGoogleEnabled()) resolvedProviderId = "google";
+    } catch {
+      /* broker fallback */
+    }
+  }
+
   // Open the popup SYNCHRONOUSLY on the user gesture — before any await
   // (including signOut). Awaiting first drops user-gesture privilege in some
   // browsers when the opener is a cross-origin live-preview iframe.
+  // Keep this synchronous (no feature lookup before it): the popup server also
+  // resolves grok-google to native Google, so preserving the user gesture does
+  // not require knowing the selected mode here.
   const popup = inLivePreview() ? openSignInPopup(providerId) : null;
 
   // Clear any prior session so switching providers actually switches identity.
@@ -136,18 +148,29 @@ export async function signIn(
     if (typeof window !== "undefined") {
       const dest = new URL(callbackURL, window.location.origin);
       const here = window.location;
-      if (dest.origin !== here.origin || dest.pathname !== here.pathname || dest.search !== here.search) {
+      if (
+        dest.origin !== here.origin ||
+        dest.pathname !== here.pathname ||
+        dest.search !== here.search
+      ) {
         window.location.href = callbackURL;
       }
     }
     return;
   }
 
-  const { data, error } = await authClient.signIn.oauth2({
-    providerId,
-    callbackURL,
-    errorCallbackURL,
-  });
+  const { data, error } =
+    resolvedProviderId === "google"
+      ? await authClient.signIn.social({
+          provider: "google",
+          callbackURL,
+          errorCallbackURL,
+        })
+      : await authClient.signIn.oauth2({
+          providerId: resolvedProviderId,
+          callbackURL,
+          errorCallbackURL,
+        });
   if (error) throw new Error(error.message ?? "Sign-in failed");
   if (data?.url) window.location.href = data.url;
 }

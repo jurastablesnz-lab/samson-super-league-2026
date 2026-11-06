@@ -1,3 +1,5 @@
+import { createServerFn } from "@tanstack/react-start";
+
 /**
  * The upstream identity providers this app offers for sign-in (via the broker).
  *
@@ -29,3 +31,14 @@ export const GROK_PROVIDERS: readonly GrokProvider[] = [
   { providerId: "grok-google", idp: "google", label: "Google" },
   { providerId: "grok-x", idp: "twitter", label: "X" },
 ];
+
+/**
+ * Public feature flag only — never return the Google client id or secret.
+ * `signIn` uses this to choose native Google versus the existing broker.
+ */
+export const getNativeGoogleEnabled = createServerFn({ method: "GET" }).handler(
+  async (): Promise<boolean> => {
+    const { nativeGoogleEnabled } = await import("./server");
+    return nativeGoogleEnabled;
+  },
+);

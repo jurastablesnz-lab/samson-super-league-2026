@@ -381,7 +381,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
     <>
       <Title>{horse.name}: target competitions</Title>
       <p className="text-sm text-muted">
-        Tick the shows you’re aiming at. The plan times its phases around them — the last one is the main target.
+        Tick the competitions you’re aiming at. The plan times its phases around them — the last one is the main target.
         Dates follow the usual calendar; always confirm on EVO Events.
       </p>
       <Panel className="space-y-2">
@@ -394,10 +394,10 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
             </span>
           </Chip>
         ))}
-        {upcoming.length === 0 && <p className="text-sm text-muted">No upcoming calendar shows — add your own below.</p>}
+        {upcoming.length === 0 && <p className="text-sm text-muted">No upcoming calendar competitions — add your own below.</p>}
       </Panel>
       <Panel className="space-y-3">
-        <Kicker>Your own shows</Kicker>
+        <Kicker>Your own competitions</Kicker>
         {dateError && <p className="text-sm text-danger" role="alert">{dateError}</p>}
         {customs.map((s) => (
           <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm">

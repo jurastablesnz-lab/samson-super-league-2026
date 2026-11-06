@@ -50,9 +50,13 @@ import {
   label,
   insetLoopPath,
   loopPath,
+  halfPirouettePath,
   linePath,
   markerAt,
+  markerPoint,
   pirouettePath,
+  pointOn,
+  quarterTurnPath,
   returningHalfArc,
   serpentinePath,
   track,
@@ -75,11 +79,14 @@ function ptsTo(d: Draw): string[] {
     case "serpentine":
       return [d.from, d.from === "C" ? "A" : "C"];
     case "pirouette":
+      if ("turn" in d && d.turn === "half") return [d.from, d.to];
+      if ("turn" in d && d.turn === "quarter") return [d.at, d.from, d.aim];
       return [d.at];
+    case "change":
+      return "at" in d ? [d.at] : [d.from, d.to];
     case "circle":
     case "stretch":
     case "halt":
-    case "change":
     case "rein-back":
       return [d.at];
   }
@@ -185,14 +192,13 @@ export function MovementPath({
           );
         }
         if (d.t === "pirouette") {
-          return (
-            <path
-              key={key}
-              d={pirouettePath(d.at, d.direction)}
-              strokeWidth={width}
-              strokeDasharray={dash}
-            />
-          );
+          const dPath =
+            "turn" in d && d.turn === "quarter"
+              ? quarterTurnPath(d.at, d.from, d.aim, d.direction)
+              : "turn" in d && d.turn === "half"
+                ? halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2)
+                : pirouettePath(d.at, d.direction);
+          return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }
         if (d.t === "arc")
           return (
@@ -211,8 +217,11 @@ export function MovementPath({
           return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }
         if (d.t === "circle" || d.t === "stretch") {
-          const m = d.t === "stretch" ? 20 : d.m;
-          const c = circleCenter(d.at, m / 2, d.t === "circle" ? d.side : undefined);
+          const between = d.t === "circle" && d.betweenQuarterlines;
+          const m = d.t === "stretch" ? 20 : between ? 10 : d.m;
+          const c = between
+            ? circleCenter(d.at, 10)
+            : circleCenter(d.at, m / 2, d.t === "circle" ? d.side : undefined);
           return (
             <ellipse
               key={key}
@@ -221,7 +230,7 @@ export function MovementPath({
               rx={(m / 2) * M_PX.x}
               ry={(m / 2) * M_PX.y}
               strokeWidth={width}
-              strokeDasharray={d.t === "stretch" ? "6 4" : dash}
+              strokeDasharray={d.t === "stretch" ? "6 4" : between ? "2 2" : dash}
             />
           );
         }
@@ -247,12 +256,30 @@ export function MovementPath({
           );
         }
         if (d.t === "change") {
-          const p = markerAt(d.at);
+          const placed = "at" in d ? markerAt(d.at) : markerPoint(pointOn(d.from, d.to, d.along));
+          const travel =
+            "at" in d
+              ? { x: 0, y: -1 }
+              : (() => {
+                  const a = pointOn(d.from, d.to, 0);
+                  const b = pointOn(d.from, d.to, 1);
+                  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                  return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+                })();
+          const tip = { x: placed.x + travel.x * 6, y: placed.y + travel.y * 6 };
+          const left = { x: placed.x + travel.y * 5, y: placed.y - travel.x * 5 };
+          const right = { x: placed.x - travel.y * 5, y: placed.y + travel.x * 5 };
           return (
             <g key={key}>
-              <circle cx={p.x} cy={p.y} r="5" fill="var(--color-surface)" strokeWidth={2} />
+              <circle
+                cx={placed.x}
+                cy={placed.y}
+                r="5"
+                fill="var(--color-surface)"
+                strokeWidth={2}
+              />
               <path
-                d={`M ${p.x - 5} ${p.y} L ${p.x} ${p.y - 6} L ${p.x + 5} ${p.y}`}
+                d={`M ${left.x.toFixed(1)} ${left.y.toFixed(1)} L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)} L ${right.x.toFixed(1)} ${right.y.toFixed(1)}`}
                 strokeWidth={1.8}
               />
             </g>

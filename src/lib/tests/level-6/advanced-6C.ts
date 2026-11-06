@@ -6,13 +6,14 @@ import {
   DRAW,
   LEAVE,
   change,
+  changeOn,
+  changes,
   diag,
   half,
   halt,
   lateral,
   line,
   mv,
-  pirouette,
   reinBack,
   yieldTo,
 } from "./shared.ts";
@@ -192,7 +193,18 @@ export const TEST_6C: SetTest = {
         ["", "Proceed collected canter"],
       ],
       "Size, bend and balance of working pirouette; straightness, regularity, engagement and collection of canter",
-      [diag("S", "P"), pirouette("X", "left")],
+      [
+        diag("S", "P"),
+        {
+          t: "pirouette",
+          direction: "left",
+          turn: "half",
+          from: "S",
+          to: "P",
+          along: 0.75,
+          diameterM: 2,
+        },
+      ],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -214,7 +226,18 @@ export const TEST_6C: SetTest = {
         ["", "Proceed collected canter"],
       ],
       "Size, bend and balance of working pirouette; straightness, regularity, engagement and collection of canter",
-      [diag("V", "R"), pirouette("X", "right")],
+      [
+        diag("V", "R"),
+        {
+          t: "pirouette",
+          direction: "right",
+          turn: "half",
+          from: "V",
+          to: "R",
+          along: 0.75,
+          diameterM: 2,
+        },
+      ],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -241,7 +264,7 @@ export const TEST_6C: SetTest = {
         ["H M", "Collected canter"],
       ],
       "Clear balanced, fluent, straight flying change on diagonal",
-      [line(["H", "C", "M"]), change("H")],
+      [line(["H", "C", "M"]), changeOn("F", "H", 0.75)],
       { pace: "canter" },
     ),
     mv(
@@ -251,7 +274,7 @@ export const TEST_6C: SetTest = {
         ["K A", "Collected canter"],
       ],
       "Clear. Balanced, fluent, straight flying changes; engagement, quality of canter",
-      [diag("M", "K"), change("X"), line(["K", "A"])],
+      [diag("M", "K"), ...changes("M", "K", [0.327, 0.5, 0.673]), line(["K", "A"])],
       { pace: "canter", coeff: 2 },
     ),
     mv(

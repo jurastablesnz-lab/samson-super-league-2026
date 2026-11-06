@@ -5,7 +5,7 @@ import {
   ADVANCED_MEDIUM_PURPOSE,
   DRAW,
   LEAVE,
-  change,
+  changeOn,
   circle,
   diag,
   halt,
@@ -180,7 +180,7 @@ export const TEST_5B: SetTest = {
         ["M H", "Collected canter"],
       ],
       "Clear, balanced, fluent, straight flying change; engagement and self carriage",
-      [line(["R", "M", "C", "H"]), change("M")],
+      [line(["R", "M", "C", "H"]), changeOn("R", "M", 0.5)],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -201,7 +201,7 @@ export const TEST_5B: SetTest = {
         ["H C", "Collected canter"],
       ],
       "Clear, balanced, fluent, straight flying change; engagement and self carriage",
-      [line(["S", "H", "C"]), change("H")],
+      [line(["S", "H", "C"]), changeOn("S", "H", 0.5)],
       { pace: "canter", coeff: 2 },
     ),
     mv(

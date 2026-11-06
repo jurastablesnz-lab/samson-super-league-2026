@@ -6,7 +6,7 @@ import {
   ELEMENTARY_INSTRUCTIONS,
   ELEMENTARY_PURPOSE,
   LEAVE,
-  change,
+  changeOn,
   circle,
   diag,
   halt,
@@ -189,7 +189,7 @@ const mv21 = mv(
     ["E H C M", "Collected canter"],
   ],
   "Clear, balanced, straight transitions; quality of paces",
-  [diag("F", "E"), change("L"), line(["E", "S", "H", "C", "M"])],
+  [diag("F", "E"), changeOn("F", "E", 0.5), line(["E", "S", "H", "C", "M"])],
   { pace: "canter", coeff: 2 },
 );
 const mv22 = mv(
@@ -226,7 +226,7 @@ const mv25 = mv(
     ["E K", "Collected canter"],
   ],
   "Clear, balanced, straight transitions; quality of paces",
-  [diag("M", "E"), change("I"), line(["E", "V", "K"])],
+  [diag("M", "E"), changeOn("M", "E", 0.5), line(["E", "V", "K"])],
   { pace: "canter", coeff: 2 },
 );
 const mv26 = mv(

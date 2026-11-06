@@ -89,14 +89,31 @@ export function track(id: string): { x: number; y: number } {
   return { x: CX, y };
 }
 
+/** A point on the straight line from one letter to another. `along` is 0 at `from` and 1 at `to`. */
+export function pointOn(from: string, to: string, along: number) {
+  const a = track(from);
+  const b = track(to);
+  return { x: a.x + (b.x - a.x) * along, y: a.y + (b.y - a.y) * along };
+}
+
+/** Where a straight line crosses the centre line, as a fraction from `from` to `to`. */
+export function centreAlong(from: string, to: string) {
+  const a = track(from);
+  const b = track(to);
+  if (Math.abs(b.x - a.x) < 1) return 0.5;
+  return (CX - a.x) / (b.x - a.x);
+}
+
 /** Flying-change marker, pulled inside the rail so the circle stays in the arena. */
+export function markerPoint(p: { x: number; y: number }) {
+  return {
+    x: Math.min(RIGHT - 6, Math.max(LEFT + 6, p.x)),
+    y: Math.min(BOT - 6, Math.max(TOP + 6, p.y)),
+  };
+}
+
 export function markerAt(at: string) {
-  const p = track(at);
-  if (at === "A") return { x: p.x, y: p.y - 6 };
-  if (at === "C") return { x: p.x, y: p.y + 6 };
-  if (p.x <= LEFT) return { x: LEFT + 6, y: p.y };
-  if (p.x >= RIGHT) return { x: RIGHT - 6, y: p.y };
-  return p;
+  return markerPoint(track(at));
 }
 
 export function label(id: string): { x: number; y: number } {
@@ -310,6 +327,52 @@ export function insetLoopPath(from: string, to: string, metres: number): string 
 }
 
 /** Small working-pirouette arc, the same size as the at-G haunches turn. */
+/** Quarter-pirouette: a 90° arc at `at`, entered from `from` and aimed toward `aim`. */
+export function quarterTurnPath(
+  at: string,
+  from: string,
+  aim: string,
+  direction: "left" | "right",
+) {
+  const p = track(at);
+  const a = track(from);
+  let ix = p.x - a.x;
+  let iy = p.y - a.y;
+  const il = Math.hypot(ix, iy) || 1;
+  ix /= il;
+  iy /= il;
+  // Clockwise in this y-down arena is a right turn.
+  const exit = direction === "right" ? { x: -iy, y: ix } : { x: iy, y: -ix };
+  const r = 1.5 * M_PX.x;
+  const start = { x: p.x - ix * r, y: p.y - iy * r };
+  const end = { x: p.x + exit.x * r, y: p.y + exit.y * r };
+  const sweep = direction === "right" ? 1 : 0;
+  return `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} A ${r.toFixed(1)} ${r.toFixed(1)} 0 0 ${sweep} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+}
+
+/** Half-pirouette of `diameterM` metres on the line from `from` to `to`. */
+export function halfPirouettePath(
+  from: string,
+  to: string,
+  along: number,
+  direction: "left" | "right",
+  diameterM = 2,
+) {
+  const p = pointOn(from, to, along);
+  const a = track(from);
+  const b = track(to);
+  let ix = b.x - a.x;
+  let iy = b.y - a.y;
+  const il = Math.hypot(ix, iy) || 1;
+  ix /= il;
+  iy /= il;
+  const r = (diameterM / 2) * M_PX.x;
+  const start = { x: p.x - ix * r, y: p.y - iy * r };
+  const end = { x: p.x + ix * r, y: p.y + iy * r };
+  const sweep = direction === "right" ? 1 : 0;
+  return `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} A ${r.toFixed(1)} ${r.toFixed(1)} 0 0 ${sweep} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+}
+
 export function pirouettePath(at: string, direction: "left" | "right"): string {
   const p = track(at);
   const r = 10;
@@ -420,6 +483,16 @@ export function lateralWork(
     const nose = { x: centre.x + inset + vx * halfLength, y: centre.y + vy * halfLength };
     const tipClearance = 2.5;
     const tip = { x: nose.x - uy * tipClearance, y: nose.y + ux * tipClearance };
+    // Renvers points the nose at the wall. Slide the whole tick inward until the tip is inside.
+    const xs = [from.x, nose.x, tip.x];
+    const overflowLeft = Math.max(0, LEFT - Math.min(...xs));
+    const overflowRight = Math.max(0, Math.max(...xs) - RIGHT);
+    if (overflowLeft > 0 || overflowRight > 0) {
+      const shift = (overflowLeft > 0 ? 1 : -1) * ((overflowLeft || overflowRight) + 0.6);
+      from.x += shift;
+      nose.x += shift;
+      tip.x += shift;
+    }
     return { centre, from, nose, to: nose, tip };
   });
 }

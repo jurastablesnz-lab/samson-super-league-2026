@@ -108,8 +108,20 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
       return ellipseSamples(d.at, d.m);
     case "serpentine":
       return quadSamples(serpentinePath(d.from, d.first));
+    case "change": {
+      if (!("at" in d)) {
+        const a = track(d.from);
+        const b = track(d.to);
+        const p = {
+          x: a.x + (b.x - a.x) * d.along,
+          y: a.y + (b.y - a.y) * d.along,
+        };
+        return [p, { x: p.x - 5, y: p.y }, { x: p.x + 5, y: p.y }];
+      }
+      const p = track(d.at);
+      return [p, { x: p.x - 7, y: p.y }, { x: p.x + 7, y: p.y }, { x: p.x, y: p.y + 7 }];
+    }
     case "halt":
-    case "change":
     case "rein-back": {
       const p = track(d.at);
       const extra = d.t === "rein-back" ? 16 : 7;
@@ -214,4 +226,25 @@ test("elementary shoulder-in and travers hatches match the sheet and stay at 30 
         }
       }
   assert.deepEqual(audited, expected);
+});
+
+test("final halts follow the diagram from the side letter through the centre to G", () => {
+  const lineOf = (id: string, n: number) => {
+    const line = SET_3_TESTS.find((t) => t.id === id)!.movements[n - 1].draw.find(
+      (d) => d.t === "line",
+    );
+    return line && line.t === "line" ? line.pts : [];
+  };
+  assert.deepEqual(lineOf("3a", 22), ["S", "I", "G"]);
+  assert.deepEqual(lineOf("3b", 28), ["E", "X", "G"]);
+  for (const [id, n, from, to] of [
+    ["3c", 21, "F", "E"],
+    ["3c", 25, "M", "E"],
+  ] as const) {
+    const marker = SET_3_TESTS.find((t) => t.id === id)!.movements[n - 1].draw.find(
+      (d) => d.t === "change",
+    );
+    assert.ok(marker && !("at" in marker) && marker.from === from && marker.to === to);
+    assert.equal(marker && !("at" in marker) ? marker.along : 0, 0.5);
+  }
 });

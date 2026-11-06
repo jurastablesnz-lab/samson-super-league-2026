@@ -6,6 +6,7 @@ import {
   DRAW,
   LEAVE,
   change,
+  changes,
   circle,
   diag,
   halt,
@@ -203,7 +204,11 @@ export const TEST_6A: SetTest = {
         ["C H", "Collected canter"],
       ],
       "Well defined transitions; engagement and collection throughout; shape, size and bend of circle",
-      [circle("C", 20), line(["C", "H"])],
+      [
+        circle("C", 20),
+        { t: "circle", at: "C", m: 10, betweenQuarterlines: true },
+        line(["C", "H"]),
+      ],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -255,7 +260,7 @@ export const TEST_6A: SetTest = {
         ["M H", "Collected canter"],
       ],
       "Quality of canter; clear, balanced, fluent. Straight flying changes; engagement",
-      [diag("K", "M"), change("X"), line(["M", "C", "H"])],
+      [diag("K", "M"), ...changes("K", "M", [0.174, 0.5, 0.802]), line(["M", "C", "H"])],
       { pace: "canter", coeff: 2 },
     ),
     mv(

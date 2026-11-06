@@ -13,7 +13,14 @@ export type Pace =
 export type Draw =
   | { t: "line"; pts: string[] }
   | { t: "diag"; from: string; to: string }
-  | { t: "circle"; at: string; m: 10 | 15 | 20; side?: "left" | "right" }
+  | {
+      t: "circle";
+      at: string;
+      m: 10 | 15 | 20;
+      side?: "left" | "right";
+      /** 10m circle on the same centre as the 20m circle, spanning the quarterlines. */
+      betweenQuarterlines?: boolean;
+    }
   | { t: "half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "return-half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "loop"; from: string; to: string; insetM?: number }
@@ -21,11 +28,29 @@ export type Draw =
   | { t: "halt"; at: string }
   | { t: "stretch"; at: string }
   | { t: "change"; at: string }
+  | { t: "change"; from: string; to: string; along: number }
   | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
   | { t: "half-turn"; at: "G"; side: "H" | "M" }
   | { t: "serpentine"; from: "C" | "A"; first: "left" | "right" }
   | { t: "rein-back"; at: string }
-  | { t: "pirouette"; at: string; direction: "left" | "right" };
+  | { t: "pirouette"; at: string; direction: "left" | "right" }
+  | {
+      t: "pirouette";
+      direction: "left" | "right";
+      turn: "half";
+      from: string;
+      to: string;
+      along: number;
+      diameterM?: number;
+    }
+  | {
+      t: "pirouette";
+      direction: "left" | "right";
+      turn: "quarter";
+      at: string;
+      from: string;
+      aim: string;
+    };
 
 export type LateralKind = "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield";
 export type LateralDirection = "left" | "right";

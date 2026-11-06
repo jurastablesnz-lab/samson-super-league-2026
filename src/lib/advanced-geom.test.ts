@@ -12,12 +12,16 @@ import {
   TOP,
   circleCenter,
   halfArc,
+  halfPirouettePath,
   halfTurnPath,
   lateralWork,
   lateralWorkPoints,
   linePath,
   markerAt,
+  markerPoint,
   pirouettePath,
+  pointOn,
+  quarterTurnPath,
   track,
 } from "./arena-geom.ts";
 
@@ -124,11 +128,19 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
     case "half-turn":
       return pathSamples(halfTurnPath(d.side));
     case "pirouette":
-      return pathSamples(pirouettePath(d.at, d.direction));
+      return pathSamples(
+        "turn" in d && d.turn === "quarter"
+          ? quarterTurnPath(d.at, d.from, d.aim, d.direction)
+          : "turn" in d && d.turn === "half"
+            ? halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 2)
+            : pirouettePath(d.at, d.direction),
+      );
     case "circle": {
-      const c = circleCenter(d.at, d.m / 2, d.side);
-      const rx = (d.m / 2) * M_PX.x;
-      const ry = (d.m / 2) * M_PX.y;
+      const between = d.betweenQuarterlines;
+      const radius = between ? 5 : d.m / 2;
+      const c = between ? circleCenter(d.at, 10) : circleCenter(d.at, radius, d.side);
+      const rx = radius * M_PX.x;
+      const ry = radius * M_PX.y;
       return Array.from({ length: 36 }, (_, i) => {
         const a = (i / 36) * Math.PI * 2;
         return { x: c.x + rx * Math.cos(a), y: c.y + ry * Math.sin(a) };
@@ -137,8 +149,13 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
     case "halt":
     case "change":
     case "rein-back": {
-      const p0 = track(d.at);
-      const p = d.t === "change" ? markerAt(d.at) : p0;
+      const p0 = d.t === "halt" || d.t === "rein-back" ? track(d.at) : { x: 0, y: 0 };
+      const p =
+        d.t === "change"
+          ? "at" in d
+            ? markerAt(d.at)
+            : markerPoint(pointOn(d.from, d.to, d.along))
+          : p0;
       if (d.t === "change")
         return [
           { x: p.x - 5, y: p.y },
@@ -254,20 +271,8 @@ test("half-pass hatches are 45 degrees and shoulder-in, travers and renvers are 
         const a = track(ids[0]);
         const b = track(ids[1]);
         for (const tick of ticks) {
-          for (const [name, p] of [
-            ["centre", tick.centre],
-            ["from", tick.from],
-            ["to", tick.to],
-            ["nose", tick.nose],
-            ["tip", tick.tip],
-          ] as const) {
-            const onRail = m.lateral.kind === "renvers" && (name === "nose" || name === "tip");
-            assert.ok(
-              insideArena(p) ||
-                (onRail && p.x >= LEFT - 4 && p.x <= RIGHT + 4 && p.y >= TOP && p.y <= BOT),
-              `${id} hatch ${name} outside`,
-            );
-          }
+          for (const p of [tick.centre, tick.from, tick.to, tick.nose, tick.tip])
+            assert.ok(insideArena(p), `${id} hatch outside`);
           const dx = tick.nose.x - tick.from.x;
           const dy = tick.nose.y - tick.from.y;
           const travel = Math.atan2(b.y - a.y, b.x - a.x);
@@ -281,4 +286,68 @@ test("half-pass hatches are 45 degrees and shoulder-in, travers and renvers are 
         }
       }
   assert.deepEqual(audited, expected);
+});
+
+test("changes and pirouettes sit on the sheet's line, and the final halt runs to G", () => {
+  const movement = (id: string, n: number) =>
+    SHEETS.find((t) => t.id === id)!.movements.find((m) => m.n === n)!;
+  const placed = (id: string, n: number) =>
+    movement(id, n).draw.filter((d) => d.t === "change" && !("at" in d));
+
+  const betweenCentreAndR = pointOn("V", "R", 0.75);
+  assert.ok(betweenCentreAndR.x > track("X").x, "5A change is past the centre toward R");
+  assert.ok(betweenCentreAndR.y < track("X").y && betweenCentreAndR.y > track("R").y);
+  const firstChange = placed("5a", 15)[0];
+  assert.equal(firstChange && "along" in firstChange ? firstChange.along : 0, 0.75);
+
+  const betweenRAndM = pointOn("R", "M", 0.5);
+  assert.ok(Math.abs(betweenRAndM.x - track("R").x) < 0.1);
+  assert.ok(betweenRAndM.y > track("M").y && betweenRAndM.y < track("R").y);
+
+  const betweenXAndP = pointOn("S", "P", 0.75);
+  assert.ok(betweenXAndP.x > track("X").x && betweenXAndP.y > track("X").y);
+  const half = movement("6c", 16).draw.find((d) => d.t === "pirouette");
+  assert.ok(
+    half && "turn" in half && half.turn === "half" && half.along === 0.75 && half.diameterM === 2,
+  );
+
+  assert.deepEqual(
+    placed("6a", 22).map((d) => ("along" in d ? d.along : 0)),
+    [0.174, 0.5, 0.802],
+  );
+  assert.deepEqual(
+    placed("6b", 20).map((d) => ("along" in d ? d.along : 0)),
+    [0.269, 0.5, 0.731],
+  );
+  assert.deepEqual(
+    placed("6c", 23).map((d) => ("along" in d ? d.along : 0)),
+    [0.327, 0.5, 0.673],
+  );
+
+  const quarter = movement("6b", 19).draw.find((d) => d.t === "pirouette");
+  assert.ok(
+    quarter &&
+      "turn" in quarter &&
+      quarter.turn === "quarter" &&
+      quarter.aim === "F" &&
+      quarter.from === "K",
+  );
+  const quarterLeft = movement("6b", 21).draw.find((d) => d.t === "pirouette");
+  assert.ok(
+    quarterLeft &&
+      "turn" in quarterLeft &&
+      quarterLeft.turn === "quarter" &&
+      quarterLeft.aim === "M",
+  );
+
+  const collected = movement("6a", 16).draw.find((d) => d.t === "circle" && d.betweenQuarterlines);
+  assert.ok(collected);
+
+  for (const [id, n] of [
+    ["5c", 24],
+    ["6a", 24],
+  ] as const) {
+    const line = movement(id, n).draw.find((d) => d.t === "line");
+    assert.deepEqual(line && line.t === "line" ? line.pts : [], ["E", "X", "G"]);
+  }
 });

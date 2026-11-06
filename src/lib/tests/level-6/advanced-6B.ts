@@ -6,12 +6,12 @@ import {
   DRAW,
   LEAVE,
   change,
+  changes,
   diag,
   halt,
   lateral,
   line,
   mv,
-  pirouette,
   turn,
   yieldTo,
 } from "./shared.ts";
@@ -215,7 +215,11 @@ export const TEST_6B: SetTest = {
         ["F A K", "Collected canter"],
       ],
       "Bend and balance of working pirouette; straightness, regularity, engagement and collection of canter",
-      [line(["K", "X"]), pirouette("X", "right"), line(["X", "F", "A", "K"])],
+      [
+        line(["K", "X"]),
+        { t: "pirouette", direction: "right", turn: "quarter", at: "X", from: "K", aim: "F" },
+        line(["X", "F", "A", "K"]),
+      ],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -225,7 +229,7 @@ export const TEST_6B: SetTest = {
         ["M C H", "Collected canter"],
       ],
       "Clear, balanced, fluent, straight flying changes; engagement, quality of canter",
-      [diag("K", "M"), change("X"), line(["M", "C", "H"])],
+      [diag("K", "M"), ...changes("K", "M", [0.269, 0.5, 0.731]), line(["M", "C", "H"])],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -236,7 +240,11 @@ export const TEST_6B: SetTest = {
         ["M C H", "Collected canter"],
       ],
       "Bend and balance of working pirouette; straightness, regularity, engagement and collection of canter",
-      [line(["H", "X"]), pirouette("X", "left"), line(["X", "M", "C", "H"])],
+      [
+        line(["H", "X"]),
+        { t: "pirouette", direction: "left", turn: "quarter", at: "X", from: "H", aim: "M" },
+        line(["X", "M", "C", "H"]),
+      ],
       { pace: "canter", coeff: 2 },
     ),
     mv(

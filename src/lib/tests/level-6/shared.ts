@@ -42,6 +42,14 @@ export const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({
 export const halt = (at: string): Draw => ({ t: "halt", at });
 export const reinBack = (at: string): Draw => ({ t: "rein-back", at });
 export const change = (at: string): Draw => ({ t: "change", at });
+export const changeOn = (from: string, to: string, along: number): Draw => ({
+  t: "change",
+  from,
+  to,
+  along,
+});
+export const changes = (from: string, to: string, along: number[]): Draw[] =>
+  along.map((t) => changeOn(from, to, t));
 export const turn = (side: "H" | "M"): Draw => ({ t: "half-turn", at: "G", side });
 export const yieldTo = (from: string, to: string): Draw => ({ t: "yield", from, to });
 export const pirouette = (at: string, direction: "left" | "right"): Draw => ({

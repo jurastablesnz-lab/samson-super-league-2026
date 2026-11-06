@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SET_5_TESTS, SET_6_TESTS, marksFor } from "./esnz-tests.ts";
+import { SET_5_TESTS, SET_6_TESTS, SET_GV_TESTS, marksFor } from "./esnz-tests.ts";
 import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
@@ -349,5 +349,57 @@ test("changes and pirouettes sit on the sheet's line, and the final halt runs to
   ] as const) {
     const line = movement(id, n).draw.find((d) => d.t === "line");
     assert.deepEqual(line && line.t === "line" ? line.pts : [], ["E", "X", "G"]);
+  }
+});
+
+test("grade V grand prix keeps counts, coefficients, totals and stays in the arena", () => {
+  assert.deepEqual(
+    SET_GV_TESTS.map((t) => [t.id, t.movements.length, marksFor(t).tech, marksFor(t).total]),
+    [
+      ["gv-a", 30, 370, 390],
+      ["gv-b", 29, 360, 380],
+    ],
+  );
+  assert.deepEqual(
+    SET_GV_TESTS.map((t) => t.movements.filter((m) => m.coeff === 2).map((m) => m.n)),
+    [
+      [4, 5, 8, 13, 14, 21, 26],
+      [4, 8, 10, 14, 21, 25, 28],
+    ],
+  );
+  for (const t of SET_GV_TESTS) {
+    t.movements.forEach((m, i) => assert.equal(m.n, i + 1));
+    for (const m of t.movements)
+      for (const d of m.draw)
+        for (const p of drawSamples(d))
+          assert.ok(
+            insideArena(p),
+            `${t.short}/${m.n} ${d.t} at ${p.x.toFixed(1)},${p.y.toFixed(1)}`,
+          );
+    for (const m of t.movements)
+      if (m.lateral && !m.lateral.line) {
+        const ids = [m.lateral.from, m.lateral.to];
+        const ticks = lateralWork(lateralWorkPoints(ids), m.lateral.kind, m.lateral.direction);
+        const diagonal = m.lateral.kind === "half-pass";
+        const a = track(ids[0]);
+        const b = track(ids[1]);
+        for (const tick of ticks) {
+          for (const p of [tick.from, tick.nose, tick.tip])
+            assert.ok(insideArena(p), `${t.short}/${m.n} hatch`);
+          const dx = tick.nose.x - tick.from.x;
+          const dy = tick.nose.y - tick.from.y;
+          const travel = Math.atan2(b.y - a.y, b.x - a.x);
+          const acute = Math.abs(
+            Math.atan2(
+              Math.sin(Math.atan2(dy, dx) - travel),
+              Math.cos(Math.atan2(dy, dx) - travel),
+            ),
+          );
+          assert.ok(
+            Math.abs(acute - (diagonal ? Math.PI / 4 : Math.PI / 6)) < 1e-6,
+            `${t.short}/${m.n}`,
+          );
+        }
+      }
   }
 });

@@ -16,7 +16,7 @@ export type Draw =
   | {
       t: "circle";
       at: string;
-      m: 10 | 15 | 20;
+      m: 8 | 10 | 15 | 20;
       side?: "left" | "right";
       /** 10m circle on the same centre as the 20m circle, spanning the quarterlines. */
       betweenQuarterlines?: boolean;
@@ -71,7 +71,7 @@ export type Movement = {
 };
 
 export type SetTest = {
-  id: `${number}${"a" | "b" | "c" | "d"}`;
+  id: string;
   short: string;
   name: string;
   role?: string;

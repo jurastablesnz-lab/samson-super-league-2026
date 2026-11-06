@@ -14,6 +14,9 @@ import {
   MFS_SHEET,
   ELEMENTARY_FS,
   ELEMENTARY_PURPOSE,
+  GRADE_V_FS,
+  GRADE_V_PURPOSE,
+  SET_GV_TESTS,
   MEDIUM_FS,
   MEDIUM_PURPOSE,
   SET_0_TESTS,
@@ -739,7 +742,12 @@ function MfsSheet() {
 function FreestyleTable({
   sheet: s,
 }: {
-  sheet: typeof MEDIUM_FS | typeof ELEMENTARY_FS | typeof ADVANCED_MEDIUM_FS | typeof ADVANCED_FS;
+  sheet:
+    | typeof MEDIUM_FS
+    | typeof ELEMENTARY_FS
+    | typeof ADVANCED_MEDIUM_FS
+    | typeof ADVANCED_FS
+    | typeof GRADE_V_FS;
 }) {
   const Row = ({ n, text, coeff }: { n: number; text: string; coeff: number }) => (
     <li className="flex items-start gap-3 rounded-lg bg-bg p-3">
@@ -799,6 +807,7 @@ const ALL_SET_TESTS = [
   ...SET_4_TESTS,
   ...SET_5_TESTS,
   ...SET_6_TESTS,
+  ...SET_GV_TESTS,
 ];
 
 function PublicationBar({
@@ -953,7 +962,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
             ? ADVANCED_MEDIUM_PURPOSE
             : active === "advanced-fs"
               ? ADVANCED_PURPOSE
-              : NOVICE_PURPOSE);
+              : active === "gv-fs"
+                ? GRADE_V_PURPOSE
+                : NOVICE_PURPOSE);
 
   return (
     <div className="flex flex-col gap-4">
@@ -971,7 +982,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
                     ? "L5 MFS"
                     : id === "advanced-fs"
                       ? "L6 MFS"
-                      : id.toUpperCase();
+                      : id === "gv-fs"
+                        ? "GV FS"
+                        : id.toUpperCase();
           const on = active === id;
           const draft = isAdmin && approvedIds !== null && !approved.has(id);
           return (
@@ -1017,6 +1030,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       )}
       {active === "advanced-fs" && visible.some((item) => item.viewId === "advanced-fs") && (
         <FreestyleTable sheet={ADVANCED_FS} />
+      )}
+      {active === "gv-fs" && visible.some((item) => item.viewId === "gv-fs") && (
+        <FreestyleTable sheet={GRADE_V_FS} />
       )}
 
       {isAdmin && approvedIds !== null && others.length > 0 && (

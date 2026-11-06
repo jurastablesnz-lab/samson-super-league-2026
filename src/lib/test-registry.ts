@@ -6,6 +6,7 @@ import { TESTS_BY_LEVEL } from "./plan-builder.ts";
 import {
   ADVANCED_FS,
   ADVANCED_MEDIUM_FS,
+  GRADE_V_FS,
   ELEMENTARY_FS,
   MEDIUM_FS,
   MFS_SHEET,
@@ -15,6 +16,7 @@ import {
   SET_4_TESTS,
   SET_5_TESTS,
   SET_6_TESTS,
+  SET_GV_TESTS,
   SET_TESTS,
 } from "./esnz-tests.ts";
 
@@ -48,6 +50,7 @@ function diagramTests(): CatalogTest[] {
       ...SET_4_TESTS,
       ...SET_5_TESTS,
       ...SET_6_TESTS,
+      ...SET_GV_TESTS,
     ].map((test) => ({
       id: test.id,
       name: test.name,
@@ -82,6 +85,17 @@ function diagramTests(): CatalogTest[] {
       name: ADVANCED_FS.name,
       aliases: [ADVANCED_FS.short, ADVANCED_FS.name, "Level 6 musical freestyle", "L6 MFS"],
       viewId: "advanced-fs" as const,
+    },
+    {
+      id: GRADE_V_FS.id,
+      name: GRADE_V_FS.name,
+      aliases: [
+        GRADE_V_FS.short,
+        GRADE_V_FS.name,
+        "Grade V Freestyle",
+        "Grade V musical freestyle",
+      ],
+      viewId: "gv-fs" as const,
     },
     {
       id: MEDIUM_FS.id,

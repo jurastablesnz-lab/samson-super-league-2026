@@ -66,6 +66,13 @@ export {
   ADVANCED_FS,
   ADVANCED_PURPOSE,
 } from "./tests/level-6/index.ts";
+export {
+  TEST_GV_A,
+  TEST_GV_B,
+  SET_GV_TESTS,
+  GRADE_V_FS,
+  GRADE_V_PURPOSE,
+} from "./tests/para-grade-5/index.ts";
 export type TestTabId =
   | "2a"
   | "2b"
@@ -86,7 +93,10 @@ export type TestTabId =
   | "6a"
   | "6b"
   | "6c"
-  | "advanced-fs";
+  | "advanced-fs"
+  | "gv-a"
+  | "gv-b"
+  | "gv-fs";
 
 export function marksFor(test: SetTest) {
   const tech = test.movements.reduce((n, m) => n + 10 * (m.coeff ?? 1), 0);

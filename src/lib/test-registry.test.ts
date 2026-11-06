@@ -60,6 +60,11 @@ test("riders only see published names, and new registry tests start unpublished"
   assert.equal(testIdForName("Level 6 musical freestyle"), "advanced-fs");
   assert.equal(testIdForName("5A"), "5a");
   assert.equal(testIdForName("6A"), "6a");
+  assert.equal(isPublishedTest("Grade V Para Grand Prix A", approved), false);
+  assert.equal(isPublishedTest("Grade V Para Grand Prix B", approved), false);
+  assert.equal(isPublishedTest("Grade V Freestyle", approved), false);
+  assert.equal(testIdForName("Grade V Para Grand Prix A"), "gv-a");
+  assert.equal(testIdForName("Grade V Freestyle"), "gv-fs");
   assert.deepEqual(testsForLevelPublished("Level 5", approved), []);
   assert.deepEqual(testsForLevelPublished("Level 6", approved), []);
   assert.equal(isPublishedTest("preliminary-9z", approved), false);

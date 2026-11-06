@@ -335,8 +335,8 @@ function TestsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
     <>
       <Title>{horse.name}: tests to load</Title>
       <p className="text-sm text-muted">
-        Pick the tests you’ll ride at {horse.level || "your level"} this season. The first one you pick is the main test
-        your plan rides from memory; the second is the homework test.
+        Select the tests you want in your pocket at {horse.level || "this level"}. Also want access to tests a level above
+        or below for this horse? Add them in the “Another test” field below.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((t) => (

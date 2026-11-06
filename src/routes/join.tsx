@@ -229,7 +229,7 @@ function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h
               </button>
             )}
           </div>
-          <Field label="Horse name">
+          <Field label="Horse name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
             <input className={inputCls} required={i === 0} value={h.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="e.g. Samson" />
           </Field>
           <Field label="Current competition level">

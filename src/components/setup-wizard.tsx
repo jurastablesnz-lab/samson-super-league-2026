@@ -187,7 +187,7 @@ export function SetupWizard({
                   </button>
                 )}
               </div>
-              <Field label="Horse name">
+              <Field label="Horse name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
                 <input className={inputCls} value={x.name} onChange={(e) => update(i, { name: e.target.value })} />
               </Field>
               <Field label="Level you’re competing at this season">

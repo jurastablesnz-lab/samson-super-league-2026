@@ -40,6 +40,8 @@ export {
   MEDIUM_ENTER,
 } from "./tests/medium.ts";
 export { TEST_4A, TEST_4B, TEST_4C, SET_4_TESTS, MEDIUM_FS } from "./tests/level-4/index.ts";
+export { TEST_0A, TEST_0B, TEST_0C, TEST_0D, SET_0_TESTS } from "./tests/level-0/index.ts";
+export { TEST_1A, TEST_1B, TEST_1C, TEST_1D, SET_1_TESTS } from "./tests/level-1/index.ts";
 export type TestTabId = "2a" | "2b" | "2c" | "mfs" | "4a" | "4b" | "4c" | "medium-fs";
 
 export function marksFor(test: SetTest) {

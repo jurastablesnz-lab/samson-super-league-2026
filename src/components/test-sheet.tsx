@@ -36,6 +36,7 @@ import {
   arcPath,
   lateralWorkPath,
   label,
+  insetLoopPath,
   loopPath,
   linePath,
   returningHalfArc,
@@ -139,7 +140,13 @@ export function MovementPath({
           );
         }
         if (d.t === "loop") {
-          return <path key={key} d={loopPath(d.from, d.to)} strokeWidth={width} />;
+          return (
+            <path
+              key={key}
+              d={d.insetM ? insetLoopPath(d.from, d.to, d.insetM) : loopPath(d.from, d.to)}
+              strokeWidth={width}
+            />
+          );
         }
         if (d.t === "half-turn")
           return (

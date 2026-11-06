@@ -260,6 +260,22 @@ export function loopPath(from: string, to: string, via = "X"): string {
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }
 
+/** Shallow loop whose apex sits `metres` in from the track, toward the arena centre. */
+export function insetLoopPath(from: string, to: string, metres: number): string {
+  const a = track(from);
+  const b = track(to);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const inward = { x: CX - mid.x, y: (TOP + BOT) / 2 - mid.y };
+  const len = Math.hypot(inward.x, inward.y) || 1;
+  const pxPerM = Math.abs(inward.x) >= Math.abs(inward.y) ? M_PX.x : M_PX.y;
+  const apex = {
+    x: mid.x + (inward.x / len) * metres * pxPerM,
+    y: mid.y + (inward.y / len) * metres * pxPerM,
+  };
+  const control = { x: 2 * apex.x - mid.x, y: 2 * apex.y - mid.y };
+  return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+}
+
 export function arcPath(from: string, to: string, bulge: "C" | "A") {
   const a = track(from),
     b = track(to);

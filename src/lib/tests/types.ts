@@ -16,7 +16,7 @@ export type Draw =
   | { t: "circle"; at: string; m: 10 | 15 | 20; side?: "left" | "right" }
   | { t: "half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "return-half"; from: string; to: string; bulge: "C" | "A" }
-  | { t: "loop"; from: string; to: string }
+  | { t: "loop"; from: string; to: string; insetM?: number }
   | { t: "yield"; from: string; to: string }
   | { t: "halt"; at: string }
   | { t: "stretch"; at: string }
@@ -44,7 +44,7 @@ export type Movement = {
 };
 
 export type SetTest = {
-  id: `${number}${"a" | "b" | "c"}`;
+  id: `${number}${"a" | "b" | "c" | "d"}`;
   short: string;
   name: string;
   role?: string;

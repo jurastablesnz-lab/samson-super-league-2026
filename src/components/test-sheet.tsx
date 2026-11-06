@@ -55,7 +55,7 @@ function ptsTo(d: Draw): string[] {
     case "return-half":
       return [d.from, "X", d.to];
     case "half-turn":
-      return [d.to];
+      return [d.at, d.side];
     case "circle":
     case "stretch":
     case "halt":
@@ -143,7 +143,7 @@ export function MovementPath({
         }
         if (d.t === "half-turn")
           return (
-            <path key={key} d={halfTurnPath(d.to)} strokeWidth={width} strokeDasharray={dash} />
+            <path key={key} d={halfTurnPath(d.side)} strokeWidth={width} strokeDasharray={dash} />
           );
         if (d.t === "rein-back") {
           const p = track(d.at);

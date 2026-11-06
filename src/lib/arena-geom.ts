@@ -266,11 +266,37 @@ export function arcPath(from: string, to: string, bulge: "C" | "A") {
   return `M ${a.x} ${a.y} A ${10 * M_PX.x} ${10 * M_PX.y} 0 0 ${bulge === "C" ? 1 : 0} ${b.x} ${b.y}`;
 }
 
-export function halfTurnPath(to: "H" | "M") {
-  const p = track(to),
-    g = track("G"),
-    sign = to === "H" ? -1 : 1;
-  return `M ${g.x} ${g.y} L ${g.x + sign * 18} ${g.y} Q ${g.x + sign * 18} ${g.y + 24} ${g.x} ${g.y + 18} L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+/**
+ * Half-turn on the haunches beside G.
+ * The horse is walking across the arena through G. `side` is the letter it is
+ * walking toward when the turn starts (H = right turn, M = left turn).
+ * Hindquarters stay on that line, a couple of metres off the centre line, and
+ * the forehand walks a small semicircle into the arena. This is not a half-circle
+ * out to the rail.
+ */
+export function haunchesTurn(side: "H" | "M") {
+  const g = track("G");
+  const sign = side === "H" ? -1 : 1;
+  const radius = 10;
+  const reach = 13;
+  const pivot = { x: g.x + sign * reach, y: g.y };
+  const arcStart = { x: pivot.x - sign * radius, y: g.y };
+  const arcEnd = { x: pivot.x + sign * radius, y: g.y };
+  const crown = { x: pivot.x, y: g.y + radius };
+  return { g, sign, radius, reach, pivot, arcStart, arcEnd, crown };
+}
+
+export function halfTurnPath(side: "H" | "M") {
+  const t = haunchesTurn(side);
+  const f = (n: number) => n.toFixed(1);
+  // Travel reverses between the two turns, so the sweep that bulges toward A flips.
+  const sweep = side === "H" ? 1 : 0;
+  return [
+    `M ${f(t.g.x)} ${f(t.g.y)}`,
+    `L ${f(t.arcStart.x)} ${f(t.arcStart.y)}`,
+    `A ${f(t.radius)} ${f(t.radius)} 0 0 ${sweep} ${f(t.arcEnd.x)} ${f(t.arcEnd.y)}`,
+    `L ${f(t.g.x)} ${f(t.g.y)}`,
+  ].join(" ");
 }
 
 export type LateralTick = {

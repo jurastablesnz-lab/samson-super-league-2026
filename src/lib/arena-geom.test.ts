@@ -14,6 +14,8 @@ import {
   CORNER_RX,
   CORNER_RY,
   halfArc,
+  halfTurnPath,
+  haunchesTurn,
   linePath,
   loopPath,
   railParam,
@@ -585,4 +587,114 @@ test("every set-test and freestyle lateral overlay matches its sheet letters and
     "exact lateral movement audit covers all requested tests and freestyle",
   );
   assert.ok(tickCount > 100);
+});
+
+/** Apex of an SVG circular arc, using endpoint-to-center conversion. */
+function arcApex(
+  x1: number,
+  y1: number,
+  rx: number,
+  ry: number,
+  sweep: number,
+  x2: number,
+  y2: number,
+) {
+  const dx = (x1 - x2) / 2;
+  const dy = (y1 - y2) / 2;
+  const lam = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+  if (lam > 1) {
+    const s = Math.sqrt(lam);
+    rx *= s;
+    ry *= s;
+  }
+  const sign = sweep ? 1 : -1;
+  const sq = Math.max(
+    0,
+    (rx * rx * ry * ry - rx * rx * dy * dy - ry * ry * dx * dx) /
+      (rx * rx * dy * dy + ry * ry * dx * dx),
+  );
+  const coef = sign * Math.sqrt(sq);
+  const cxp = (coef * rx * dy) / ry;
+  const cyp = (coef * -(ry * dx)) / rx;
+  const cx = cxp + (x1 + x2) / 2;
+  const cy = cyp + (y1 + y2) / 2;
+  const angle = (ux: number, uy: number, vx: number, vy: number) => {
+    const dot = ux * vx + uy * vy;
+    const len = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+    let ang = Math.acos(Math.min(1, Math.max(-1, dot / len)));
+    if (ux * vy - uy * vx < 0) ang = -ang;
+    return ang;
+  };
+  const theta1 = angle(1, 0, (dx - cxp) / rx, (dy - cyp) / ry);
+  let dtheta = angle((dx - cxp) / rx, (dy - cyp) / ry, (-dx - cxp) / rx, (-dy - cyp) / ry);
+  if (!sweep && dtheta > 0) dtheta -= 2 * Math.PI;
+  if (sweep && dtheta < 0) dtheta += 2 * Math.PI;
+  const mid = theta1 + dtheta / 2;
+  return { x: rx * Math.cos(mid) + cx, y: ry * Math.sin(mid) + cy };
+}
+
+test("Medium 4B turns on the haunches are small pivots near G", () => {
+  assert.deepEqual(TEST("4b", 4).draw, [
+    { t: "line", pts: ["C", "M", "G"] },
+    { t: "half-turn", at: "G", side: "H" },
+  ]);
+  assert.deepEqual(TEST("4b", 5).draw, [{ t: "half-turn", at: "G", side: "M" }]);
+  assert.deepEqual(TEST("4b", 6).draw, [
+    { t: "line", pts: ["C", "M", "G"] },
+    { t: "half-turn", at: "G", side: "H" },
+    { t: "half-turn", at: "G", side: "M" },
+    { t: "line", pts: ["G", "H"] },
+  ]);
+  const g = track("G");
+  const railGap = Math.abs(track("H").x - CX);
+  for (const side of ["H", "M"] as const) {
+    const turn = haunchesTurn(side);
+    const rail = track(side);
+    assert.equal(turn.radius, 10);
+    assert.equal(turn.reach, 13);
+    assert.equal(turn.pivot.y, g.y);
+    assert.equal(turn.g.x, CX);
+    assert.ok(turn.radius < 3 * M_PX.x, "forehand arc is only a couple of metres");
+    assert.ok(
+      turn.reach + turn.radius < railGap / 2,
+      "stays near G, not a half-circle to the rail",
+    );
+    assert.ok(Math.abs(turn.crown.x - CX) < 20);
+    assert.ok(Math.abs(turn.crown.x - rail.x) > 30);
+    assert.ok(turn.crown.y > g.y && turn.crown.y < track("I").y);
+    assert.equal(Math.sign(turn.pivot.x - CX), side === "H" ? -1 : 1);
+    assert.equal(
+      Math.hypot(turn.crown.x - turn.pivot.x, turn.crown.y - turn.pivot.y),
+      turn.radius,
+    );
+    const path = halfTurnPath(side);
+    assert.ok(!path.includes("Q"));
+    const nums = values(path);
+    assert.deepEqual(nums.slice(0, 2), [g.x, g.y]);
+    assert.deepEqual(nums.slice(-2), [g.x, g.y]);
+    assert.ok(!nums.some((n, i) => i % 2 === 0 && n === rail.x));
+    const arc = path.match(/A ([\d.]+) ([\d.]+) 0 0 ([01]) ([\d.-]+) ([\d.-]+)/);
+    assert.ok(arc);
+    const apex = arcApex(
+      nums[2],
+      nums[3],
+      +arc[1],
+      +arc[2],
+      +arc[3],
+      +arc[4],
+      +arc[5],
+    );
+    assert.ok(Math.abs(apex.x - turn.crown.x) < 0.05, `${side} apex x`);
+    assert.ok(Math.abs(apex.y - turn.crown.y) < 0.05, `${side} apex y ${apex.y} vs ${turn.crown.y}`);
+    for (const p of [turn.pivot, turn.arcStart, turn.arcEnd, turn.crown]) {
+      assert.ok(p.x > LEFT && p.x < RIGHT && p.y > TOP && p.y < BOT);
+    }
+  }
+  const towardH = haunchesTurn("H");
+  const towardM = haunchesTurn("M");
+  assert.equal(towardH.pivot.x, 2 * CX - towardM.pivot.x);
+  assert.equal(towardH.crown.x, 2 * CX - towardM.crown.x);
+  assert.equal(towardH.crown.y, towardM.crown.y);
+  assert.equal(towardH.arcStart.x, 2 * CX - towardM.arcStart.x);
+  assert.equal(towardH.arcEnd.x, 2 * CX - towardM.arcEnd.x);
 });

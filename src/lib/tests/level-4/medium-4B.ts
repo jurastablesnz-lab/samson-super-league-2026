@@ -10,7 +10,7 @@ const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "half",
 const arc = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "arc", from, to, bulge });
 const halt = (at: string): Draw => ({ t: "halt", at });
 const change = (at: string): Draw => ({ t: "change", at });
-const turn = (to: "H" | "M"): Draw => ({ t: "half-turn", to });
+const turn = (side: "H" | "M"): Draw => ({ t: "half-turn", at: "G", side });
 function m(
   n: number,
   steps: [string, string][],
@@ -84,7 +84,7 @@ const mv6 = m(
   6,
   [["C M G(H) G(M) G H", "The medium walks"]],
   "Regularity and quality of the walk",
-  [line(["C", "M", "G"]), turn("H"), turn("M")],
+  [line(["C", "M", "G"]), turn("H"), turn("M"), line(["G", "H"])],
   1,
   "walk",
 );

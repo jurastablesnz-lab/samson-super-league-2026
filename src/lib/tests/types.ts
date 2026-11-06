@@ -22,7 +22,7 @@ export type Draw =
   | { t: "stretch"; at: string }
   | { t: "change"; at: string }
   | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
-  | { t: "half-turn"; to: "H" | "M" }
+  | { t: "half-turn"; at: "G"; side: "H" | "M" }
   | { t: "rein-back"; at: string };
 
 export type LateralKind = "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield";

@@ -89,6 +89,16 @@ export function track(id: string): { x: number; y: number } {
   return { x: CX, y };
 }
 
+/** Flying-change marker, pulled inside the rail so the circle stays in the arena. */
+export function markerAt(at: string) {
+  const p = track(at);
+  if (at === "A") return { x: p.x, y: p.y - 6 };
+  if (at === "C") return { x: p.x, y: p.y + 6 };
+  if (p.x <= LEFT) return { x: LEFT + 6, y: p.y };
+  if (p.x >= RIGHT) return { x: RIGHT - 6, y: p.y };
+  return p;
+}
+
 export function label(id: string): { x: number; y: number } {
   const y = Y[id] ?? 134;
   if (LEFTS.has(id)) return { x: 36, y };
@@ -297,6 +307,18 @@ export function insetLoopPath(from: string, to: string, metres: number): string 
   };
   const control = { x: 2 * apex.x - mid.x, y: 2 * apex.y - mid.y };
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+}
+
+/** Small working-pirouette arc, the same size as the at-G haunches turn. */
+export function pirouettePath(at: string, direction: "left" | "right"): string {
+  const p = track(at);
+  const r = 10;
+  const sweep = direction === "left" ? 1 : 0;
+  if (Math.abs(p.x - CX) < 1) {
+    return `M ${(p.x - r).toFixed(1)} ${p.y.toFixed(1)} A ${r} ${r} 0 0 ${sweep} ${(p.x + r).toFixed(1)} ${p.y.toFixed(1)}`;
+  }
+  const bulge = p.x < CX ? 0 : 1;
+  return `M ${p.x.toFixed(1)} ${(p.y - r).toFixed(1)} A ${r} ${r} 0 0 ${bulge} ${p.x.toFixed(1)} ${(p.y + r).toFixed(1)}`;
 }
 
 export function arcPath(from: string, to: string, bulge: "C" | "A") {

@@ -4,6 +4,8 @@
  */
 import { TESTS_BY_LEVEL } from "./plan-builder.ts";
 import {
+  ADVANCED_FS,
+  ADVANCED_MEDIUM_FS,
   ELEMENTARY_FS,
   MEDIUM_FS,
   MFS_SHEET,
@@ -11,6 +13,8 @@ import {
   SET_1_TESTS,
   SET_3_TESTS,
   SET_4_TESTS,
+  SET_5_TESTS,
+  SET_6_TESTS,
   SET_TESTS,
 } from "./esnz-tests.ts";
 
@@ -36,7 +40,15 @@ function slug(name: string) {
 
 function diagramTests(): CatalogTest[] {
   const sheets = [
-    ...[...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_3_TESTS, ...SET_4_TESTS].map((test) => ({
+    ...[
+      ...SET_0_TESTS,
+      ...SET_1_TESTS,
+      ...SET_TESTS,
+      ...SET_3_TESTS,
+      ...SET_4_TESTS,
+      ...SET_5_TESTS,
+      ...SET_6_TESTS,
+    ].map((test) => ({
       id: test.id,
       name: test.name,
       aliases: [test.short, test.name],
@@ -51,13 +63,25 @@ function diagramTests(): CatalogTest[] {
     {
       id: ELEMENTARY_FS.id,
       name: ELEMENTARY_FS.name,
-      aliases: [
-        ELEMENTARY_FS.short,
-        ELEMENTARY_FS.name,
-        "Level 3 musical freestyle",
-        "L3 MFS",
-      ],
+      aliases: [ELEMENTARY_FS.short, ELEMENTARY_FS.name, "Level 3 musical freestyle", "L3 MFS"],
       viewId: "elementary-fs" as const,
+    },
+    {
+      id: ADVANCED_MEDIUM_FS.id,
+      name: ADVANCED_MEDIUM_FS.name,
+      aliases: [
+        ADVANCED_MEDIUM_FS.short,
+        ADVANCED_MEDIUM_FS.name,
+        "Level 5 musical freestyle",
+        "L5 MFS",
+      ],
+      viewId: "adv-medium-fs" as const,
+    },
+    {
+      id: ADVANCED_FS.id,
+      name: ADVANCED_FS.name,
+      aliases: [ADVANCED_FS.short, ADVANCED_FS.name, "Level 6 musical freestyle", "L6 MFS"],
+      viewId: "advanced-fs" as const,
     },
     {
       id: MEDIUM_FS.id,

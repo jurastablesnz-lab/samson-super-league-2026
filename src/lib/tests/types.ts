@@ -24,7 +24,8 @@ export type Draw =
   | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
   | { t: "half-turn"; at: "G"; side: "H" | "M" }
   | { t: "serpentine"; from: "C" | "A"; first: "left" | "right" }
-  | { t: "rein-back"; at: string };
+  | { t: "rein-back"; at: string }
+  | { t: "pirouette"; at: string; direction: "left" | "right" };
 
 export type LateralKind = "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield";
 export type LateralDirection = "left" | "right";

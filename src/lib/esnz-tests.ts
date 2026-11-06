@@ -50,6 +50,22 @@ export {
   ELEMENTARY_FS,
   ELEMENTARY_PURPOSE,
 } from "./tests/level-3/index.ts";
+export {
+  TEST_5A,
+  TEST_5B,
+  TEST_5C,
+  SET_5_TESTS,
+  ADVANCED_MEDIUM_FS,
+  ADVANCED_MEDIUM_PURPOSE,
+} from "./tests/level-5/index.ts";
+export {
+  TEST_6A,
+  TEST_6B,
+  TEST_6C,
+  SET_6_TESTS,
+  ADVANCED_FS,
+  ADVANCED_PURPOSE,
+} from "./tests/level-6/index.ts";
 export type TestTabId =
   | "2a"
   | "2b"
@@ -62,7 +78,15 @@ export type TestTabId =
   | "4a"
   | "4b"
   | "4c"
-  | "medium-fs";
+  | "medium-fs"
+  | "5a"
+  | "5b"
+  | "5c"
+  | "adv-medium-fs"
+  | "6a"
+  | "6b"
+  | "6c"
+  | "advanced-fs";
 
 export function marksFor(test: SetTest) {
   const tech = test.movements.reduce((n, m) => n + 10 * (m.coeff ?? 1), 0);

@@ -9,7 +9,7 @@ export type Pace =
 export type Draw =
   | { t: "line"; pts: string[] }
   | { t: "diag"; from: string; to: string }
-  | { t: "circle"; at: string; m: 10 | 15 | 20 }
+  | { t: "circle"; at: string; m: 10 | 15 | 20; side?: "left" | "right" }
   | { t: "half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "return-half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "loop"; from: string; to: string }
@@ -626,7 +626,7 @@ export const TEST_2C: SetTest = {
       directive:
         "Regularity and quality of trot; shape and size of circle; bend; balance; straightness on centre line",
       draw: [
-        { t: "circle", at: "I", m: 10 },
+        { t: "circle", at: "I", m: 10, side: "left" },
         { t: "line", pts: ["I", "G", "C", "M", "R", "B"] },
       ],
     },
@@ -750,7 +750,7 @@ export const TEST_2C: SetTest = {
       ],
       directive: "Regularity and quality of trot; shape and size of circle; bend; balance",
       draw: [
-        { t: "circle", at: "I", m: 10 },
+        { t: "circle", at: "I", m: 10, side: "right" },
         { t: "line", pts: ["I", "G", "C", "M"] },
       ],
     },

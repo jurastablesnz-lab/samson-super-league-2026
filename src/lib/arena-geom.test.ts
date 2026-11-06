@@ -5,6 +5,8 @@ import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
   TOP,
+  LEFT,
+  circleCenter,
   M_PX,
   CX,
   halfArc,
@@ -190,4 +192,29 @@ test("matching left/right movement pairs are geometrically symmetrical", () => {
       `2${"ABC"[testIndex]} movements ${leftNumber}/${rightNumber}`,
     );
   }
+});
+
+test("2C movement 4 is a left-sided 10m circle tangent at I and reaching S", () => {
+  const movement = SET_TESTS[2].movements[3];
+  assert.deepEqual(movement.draw[0], { t: "circle", at: "I", m: 10, side: "left" });
+  const center = circleCenter("I", 5, "left");
+  const rx = 5 * M_PX.x;
+  assert.deepEqual(center, { x: CX - rx, y: track("I").y });
+  assert.equal(center.x + rx, track("I").x, "rightmost point starts/ends at I");
+  assert.equal(center.x - rx, LEFT, "leftmost point reaches the track at S");
+  assert.equal(track("S").y, center.y);
+  assert.deepEqual(movement.draw[1], { t: "line", pts: ["I", "G", "C", "M", "R", "B"] });
+  assert.deepEqual(circleCenter("I", 5, "right"), { x: CX + rx, y: track("I").y });
+});
+
+test("2C movement 15 is a right-sided 10m circle tangent at I and reaching R", () => {
+  const movement = SET_TESTS[2].movements[14];
+  assert.deepEqual(movement.draw[0], { t: "circle", at: "I", m: 10, side: "right" });
+  const center = circleCenter("I", 5, "right");
+  const rx = 5 * M_PX.x;
+  assert.deepEqual(center, { x: CX + rx, y: track("I").y });
+  assert.equal(center.x - rx, track("I").x, "leftmost point starts/ends at I");
+  assert.equal(center.x + rx, track("R").x, "rightmost point reaches the track at R");
+  assert.equal(track("R").y, center.y);
+  assert.deepEqual(movement.draw[1], { t: "line", pts: ["I", "G", "C", "M"] });
 });

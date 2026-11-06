@@ -114,7 +114,7 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
         }
         if (d.t === "circle" || d.t === "stretch") {
           const m = d.t === "stretch" ? 20 : d.m;
-          const c = circleCenter(d.at, m / 2);
+          const c = circleCenter(d.at, m / 2, d.t === "circle" ? d.side : undefined);
           return (
             <ellipse
               key={key}

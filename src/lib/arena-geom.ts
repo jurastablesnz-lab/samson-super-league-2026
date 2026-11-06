@@ -102,10 +102,15 @@ export function isRail(id: string) {
   return RAIL.has(id);
 }
 
-export function circleCenter(at: string, m: number): { x: number; y: number } {
+export function circleCenter(
+  at: string,
+  m: number,
+  side?: "left" | "right",
+): { x: number; y: number } {
   const p = track(at);
   if (at === "C") return { x: CX, y: TOP + m * M_PX.y };
   if (at === "A") return { x: CX, y: BOT - m * M_PX.y };
+  if (side) return { x: CX + (side === "left" ? -1 : 1) * m * M_PX.x, y: p.y };
   if (LEFTS.has(at)) return { x: LEFT + m * M_PX.x, y: p.y };
   if (RIGHTS.has(at)) return { x: RIGHT - m * M_PX.x, y: p.y };
   return p;

@@ -154,15 +154,7 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
   );
 }
 
-function TestArena({
-  movement,
-  ghost,
-  ghostMoves,
-}: {
-  movement: Movement;
-  ghost?: Draw[];
-  ghostMoves?: Movement[];
-}) {
+function TestArena({ movement, ghostMoves }: { movement: Movement; ghostMoves?: Movement[] }) {
   const used = useMemo(() => {
     const set = new Set<string>();
     for (const d of movement.draw) for (const id of ptsTo(d)) set.add(id);
@@ -213,17 +205,14 @@ function TestArena({
       />
       {ghostMoves
         ? ghostMoves.map((gm) => (
-            <g key={gm.n} opacity={0.22}>
+            <g key={gm.n} opacity={0.18} strokeDasharray="3 3" aria-hidden="true">
               <MovementPath draw={gm.draw} pace={gm.pace} />
             </g>
           ))
-        : ghost &&
-          ghost.length > 0 && (
-            <g opacity={0.28}>
-              <MovementPath draw={ghost} />
-            </g>
-          )}
-      <MovementPath draw={movement.draw} accent pace={movement.pace} />
+        : null}
+      <g data-active-movement={`${movement.n}`}>
+        <MovementPath draw={movement.draw} accent pace={movement.pace} />
+      </g>
       {LETTER_IDS.map((id) => {
         const p = label(id);
         const on = used.has(id);
@@ -273,7 +262,7 @@ function Caller({
   meta,
   purpose,
   judge,
-  trail = "all",
+  trail,
 }: {
   movements: Movement[];
   idx: number;
@@ -283,11 +272,13 @@ function Caller({
   meta: string;
   purpose?: string;
   judge?: boolean;
-  trail?: "all" | "last";
+  trail?: "last";
 }) {
   const movement = movements[Math.min(idx, movements.length - 1)] ?? movements[0];
-  const ghostMoves =
-    trail === "last" ? movements.slice(Math.max(0, idx - 1), idx) : movements.slice(0, idx);
+  // Set tests show only their selected movement, like the official panels.
+  // The freestyle's own floorplan retains a single, subtle previous-movement
+  // trail so its bespoke sequence remains readable.
+  const ghostMoves = trail === "last" ? movements.slice(Math.max(0, idx - 1), idx) : undefined;
 
   return (
     <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">

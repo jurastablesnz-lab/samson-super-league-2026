@@ -137,7 +137,7 @@ export const TEST_2A: SetTest = {
       directive:
         "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
       draw: [
-        { t: "line", pts: ["X", "C", "H", "S", "E"] },
+        { t: "line", pts: ["C", "H", "S", "E"] },
         { t: "return-half", from: "E", to: "H", bulge: "C" },
         { t: "line", pts: ["H", "C", "M", "B"] },
       ],

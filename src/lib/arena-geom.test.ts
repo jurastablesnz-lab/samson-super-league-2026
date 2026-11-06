@@ -91,3 +91,52 @@ test("arena remains 60 × 20 and marks and movement counts are unchanged", () =>
     [260, 320, 350],
   );
 });
+
+test("every active movement reaches the final track letter in its last line", () => {
+  for (const test of SET_TESTS) {
+    for (const movement of test.movements) {
+      const lastLine = movement.draw.filter((d) => d.t === "line").at(-1);
+      if (!lastLine || lastLine.t !== "line") continue;
+      const lastAt =
+        movement.steps.at(-1)!.at.replaceAll(" ", "") ||
+        movement.steps
+          .filter((s) => s.at)
+          .at(-1)!
+          .at.replaceAll(" ", "");
+      const end = lastAt.at(-1)!.toUpperCase();
+      // Transition-only steps (M/R/A/X/etc.) leave the working movement's
+      // preceding segment in force; the rendered polyline already covers it.
+      if (lastAt.length < 2) continue;
+      assert.equal(lastLine.pts.at(-1), end, `${test.id} movement ${movement.n}`);
+      assert.ok(
+        lastLine.pts.length >= 2,
+        `${test.id} movement ${movement.n} needs an actual segment`,
+      );
+    }
+  }
+});
+
+test("2A C–EX–HB starts at C, has no X–C segment, and reaches B by H–C–M", () => {
+  const movement = SET_TESTS[0].movements[1];
+  assert.deepEqual(movement.draw[0], { t: "line", pts: ["C", "H", "S", "E"] });
+  assert.deepEqual(movement.draw.at(-1), { t: "line", pts: ["H", "C", "M", "B"] });
+  for (const draw of movement.draw) {
+    if (draw.t === "line") {
+      assert.ok(!draw.pts.includes("G"));
+      assert.equal(draw.pts[0] === "X" && draw.pts[1] === "C", false);
+    }
+  }
+});
+
+test("the legacy C–H–M return renders toward C then B on the track", () => {
+  const ends = [track("H"), track("C"), track("M"), track("B")];
+  assert.deepEqual(
+    ends.map((p) => [p.x, p.y]),
+    [
+      [50, 48],
+      [110, 28],
+      [170, 48],
+      [170, 134],
+    ],
+  );
+});

@@ -287,60 +287,61 @@ export function lateralWork(
   kind: "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield",
   direction: "left" | "right",
 ): LateralTick[] {
-  const segments: { a: { x: number; y: number }; b: { x: number; y: number }; length: number }[] =
-    [];
-  let total = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i],
-      b = points[i + 1],
-      length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length < 1) continue;
-    segments.push({ a, b, length });
-    total += length;
-  }
+  const segments = points
+    .slice(1)
+    .map((b, i) => ({ a: points[i], b, length: Math.hypot(b.x - points[i].x, b.y - points[i].y) }))
+    .filter((s) => s.length > 1e-8);
+  const total = segments.reduce((sum, s) => sum + s.length, 0);
   if (total < 3) return [];
-  const count = Math.max(2, Math.round(total / 13) + 1),
-    endpoint = Math.min(8, total / 5);
-  const spacing = (total - 2 * endpoint) / (count - 1);
-  const ticks: LateralTick[] = [];
-  for (let j = 0; j < count; j++) {
-    let pos = endpoint + j * spacing;
-    const segment = segments.find((s) => pos <= s.length) ?? segments.at(-1)!;
-    const a = segment.a,
-      b = segment.b;
-    const dx = (b.x - a.x) / segment.length,
-      dy = (b.y - a.y) / segment.length;
-    const cx = a.x + dx * pos,
-      cy = a.y + dy * pos;
-    const heading = Math.atan2(dy, dx);
-    const sign =
-      kind === "half-pass" || kind === "leg-yield"
-        ? direction === "right"
-          ? 1
-          : -1
-        : (direction === "right" ? 1 : -1) * (kind === "travers" ? -1 : 1);
-    const angle = heading + (sign * Math.PI) / 6,
-      halfLength = 4;
-    const vx = Math.cos(angle),
-      vy = Math.sin(angle);
-    const from = { x: cx - vx * halfLength, y: cy - vy * halfLength };
-    const nose = { x: cx + vx * halfLength, y: cy + vy * halfLength };
-    ticks.push({
-      centre: { x: cx, y: cy },
-      from,
-      to: { x: cx + vx * (halfLength + 1.1), y: cy + vy * (halfLength + 1.1) },
-      nose,
-      tip: { x: nose.x - dy * 1.7, y: nose.y + dx * 1.7 },
-    });
-  }
-  return ticks;
+  const diagonal = kind === "half-pass" || kind === "leg-yield",
+    halfLength = diagonal ? 7.5 : 8;
+  // All bodies use a forward-pointing diagonal; the bend determines which 45° axis.
+  const first = segments[0],
+    ux = (first.b.x - first.a.x) / first.length,
+    uy = (first.b.y - first.a.y) / first.length;
+  const halfAngle = diagonal ? Math.PI / 4 : Math.PI / 6;
+  const offset = diagonal
+    ? ux >= 0
+      ? -halfAngle
+      : halfAngle
+    : (direction === "right" ? 1 : -1) * halfAngle;
+  const angle = Math.atan2(uy, ux) + offset,
+    vx = Math.cos(angle),
+    vy = Math.sin(angle);
+  // Clearance is perpendicular to travel. Do not return a body tip beyond an end letter.
+  const normalReach = halfLength + 2.5 * Math.abs(uy) + 3.6;
+  const edge = diagonal
+    ? Math.max(10, normalReach / Math.max(Math.abs(uy), 0.1))
+    : Math.min(10, total / 10);
+  const count = Math.max(2, Math.round((total - 2 * edge) / 18) + 1),
+    interval = (total - 2 * edge) / (count - 1);
+  return Array.from({ length: count }, (_, j) => {
+    let distance = edge + j * interval,
+      i = 0;
+    while (i < segments.length - 1 && distance > segments[i].length) {
+      distance -= segments[i].length;
+      i++;
+    }
+    const { a, b, length } = segments[i],
+      ux = (b.x - a.x) / length,
+      uy = (b.y - a.y) / length;
+    const centre = { x: a.x + ux * distance, y: a.y + uy * distance };
+    // Shift the body, not its placement foot, into the arena. Preserve all 16px at 30°.
+    const inward = centre.x < CX ? 1 : -1;
+    const inset = diagonal ? 0 : inward * halfLength * Math.abs(vx);
+    const from = { x: centre.x + inset - vx * halfLength, y: centre.y - vy * halfLength };
+    const nose = { x: centre.x + inset + vx * halfLength, y: centre.y + vy * halfLength };
+    const tipClearance = 2.5;
+    const tip = { x: nose.x - uy * tipClearance, y: nose.y + ux * tipClearance };
+    return { centre, from, nose, to: nose, tip };
+  });
 }
 
-function roundedRailPoints(ids: readonly string[]) {
+/** The explicit segment endpoints—never the perimeter shortcut between two rail letters. */
+export function lateralWorkPoints(ids: readonly string[]) {
   const points: { x: number; y: number }[] = [];
   for (let i = 1; i < ids.length; i++) {
-    const pair = isRail(ids[i - 1]) && isRail(ids[i]);
-    const next = pair ? sampleRail(ids[i - 1], ids[i]) : [track(ids[i - 1]), track(ids[i])];
+    const next = [track(ids[i - 1]), track(ids[i])];
     points.push(...(i === 1 ? next : next.slice(1)));
   }
   return points;
@@ -351,7 +352,7 @@ export function lateralWorkPath(
   kind: "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield",
   direction: "left" | "right",
 ) {
-  return lateralWork(roundedRailPoints(ids), kind, direction)
+  return lateralWork(lateralWorkPoints(ids), kind, direction)
     .map(
       (t) =>
         `M ${t.from.x.toFixed(2)} ${t.from.y.toFixed(2)} L ${t.to.x.toFixed(2)} ${t.to.y.toFixed(2)} M ${t.tip.x.toFixed(2)} ${t.tip.y.toFixed(2)} L ${t.nose.x.toFixed(2)} ${t.nose.y.toFixed(2)}`,

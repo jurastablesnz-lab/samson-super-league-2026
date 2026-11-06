@@ -112,7 +112,7 @@ export function MovementPath({
             lateral.kind,
             lateral.direction,
           )}
-          strokeWidth={accent ? 1.5 : 1}
+          strokeWidth={accent ? 2 : 1.4}
           stroke="var(--color-ink-soft)"
           strokeLinecap="round"
         />
@@ -236,6 +236,7 @@ export function TestArena({
     <svg
       viewBox="0 0 220 272"
       className="h-auto w-full"
+      style={{ background: "var(--color-surface)" }}
       role="img"
       aria-label={`Arena diagram, movement ${movement.n}`}
     >

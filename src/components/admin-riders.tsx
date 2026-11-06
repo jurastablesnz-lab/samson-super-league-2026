@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AdminRider } from "@/lib/admin-riders";
-import { prepareRider, type PreparedHorseInput } from "@/lib/rider-admin";
+import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
 import { inputCls, Kicker, Panel, PrimaryButton, StatusBadge } from "./beta-ui";
@@ -23,7 +23,7 @@ export function RiderAdminPanels({
       <Panel className="mt-5">
         <Kicker>Riders</Kicker>
         <p className="mt-1 text-sm text-muted">
-          Every rider workspace, their chosen tests and result checks. Read only.
+          Rider workspaces and result checks. Add or remove available tests on their horses below.
         </p>
         {!riders && <p className="mt-4 text-sm text-muted">Loading workspaces…</p>}
         {riders?.length === 0 && (
@@ -31,7 +31,7 @@ export function RiderAdminPanels({
         )}
         <div className="mt-4 space-y-3">
           {riders?.map((rider) => (
-            <RiderRow key={rider.userId} rider={rider} />
+            <RiderRow key={rider.userId} rider={rider} onChanged={onPrepared} />
           ))}
         </div>
       </Panel>
@@ -39,7 +39,7 @@ export function RiderAdminPanels({
   );
 }
 
-function RiderRow({ rider }: { rider: AdminRider }) {
+function RiderRow({ rider, onChanged }: { rider: AdminRider; onChanged: () => void }) {
   const waiting = rider.horses.reduce((n, h) => n + h.pendingEvo, 0);
   const nameOnly = rider.horses.flatMap((h) => h.tests.filter((t) => t.nameOnly)).length;
   return (
@@ -89,25 +89,7 @@ function RiderRow({ rider }: { rider: AdminRider }) {
               {horse.esnzNumber ? `ESNZ ${horse.esnzNumber}` : "No ESNZ number"} ·{" "}
               {horse.level || "No level"} · {horse.phase}
             </p>
-            <p className="mt-2">
-              <span className="font-semibold">Tests:</span>{" "}
-              {horse.tests.length ? (
-                horse.tests.map((t) => (
-                  <span
-                    key={t.name}
-                    className={cn(
-                      "ml-1 inline-block rounded px-1.5 py-0.5 text-xs",
-                      t.nameOnly ? "bg-orange/15 text-orange" : "bg-accent/15 text-accent",
-                    )}
-                  >
-                    {t.name}
-                    {t.nameOnly ? " — name only" : ""}
-                  </span>
-                ))
-              ) : (
-                <span className="text-orange">No tests chosen</span>
-              )}
-            </p>
+            <HorseTests horse={horse} onChanged={onChanged} />
             <p className="mt-2 text-xs text-muted">
               <span className="font-semibold">Target competitions:</span>{" "}
               {horse.shows.length ? horse.shows.map((s) => s.name).join(", ") : "None yet"}
@@ -145,6 +127,84 @@ function RiderRow({ rider }: { rider: AdminRider }) {
         ))}
       </div>
     </details>
+  );
+}
+
+function HorseTests({
+  horse,
+  onChanged,
+}: {
+  horse: AdminRider["horses"][number];
+  onChanged: () => void;
+}) {
+  const [newTest, setNewTest] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const assigned = new Set(horse.tests.map((t) => t.name));
+  async function update(test: string, action: "add" | "remove") {
+    setBusy(true);
+    setError("");
+    try {
+      await setRiderHorseTest({ data: { horseId: horse.id, test, action } });
+      setNewTest("");
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const choices = testsForLevel(horse.level).filter((t) => !assigned.has(t));
+  return (
+    <div className="mt-2 text-xs">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-semibold">Tests:</span>
+        {horse.tests.map((t) => (
+          <button
+            key={t.name}
+            type="button"
+            className={cn(
+              "rounded px-1.5 py-0.5 disabled:opacity-50",
+              t.nameOnly ? "bg-orange/15 text-orange" : "bg-accent/15 text-accent",
+            )}
+            disabled={busy}
+            title={`Remove ${t.name} from ${horse.name}`}
+            aria-label={`Remove ${t.name} from ${horse.name}`}
+            onClick={() => void update(t.name, "remove")}
+          >
+            {t.name} ×
+          </button>
+        ))}
+        {!horse.tests.length && <span className="text-orange">No tests chosen</span>}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <select
+          className={cn(inputCls, "h-9 w-auto text-xs")}
+          aria-label={`Add a test for ${horse.name}`}
+          value={newTest}
+          onChange={(e) => setNewTest(e.target.value)}
+          disabled={busy}
+        >
+          <option value="">Choose a test…</option>
+          {choices.map((t) => (
+            <option key={t}>{t}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="font-semibold text-accent disabled:opacity-50"
+          disabled={busy || !newTest}
+          onClick={() => void update(newTest, "add")}
+        >
+          {busy ? "Updating…" : "+ Add test"}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-danger">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "./auth/middleware";
 import { COMPETITION_LEVELS } from "./beta";
 import type { AdminRider } from "./admin-riders";
+import { validateRiderTestAssignment } from "./rider-test-assignment";
 
 export type PreparedHorseInput = {
   name: string;
@@ -94,4 +95,14 @@ export const prepareRider = createServerFn({ method: "POST" })
       })),
     });
     return { ok: true as const, email: data.email };
+  });
+
+export const setRiderHorseTest = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(validateRiderTestAssignment)
+  .handler(async ({ context, data }) => {
+    const { assignRiderTest } = await import("./rider-test-assignment");
+    const { getSql } = await import("./db");
+    await requireAdminUser(context.userId);
+    return assignRiderTest(await getSql(), data);
   });

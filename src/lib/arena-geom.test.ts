@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SET_TESTS, marksFor } from "./esnz-tests.ts";
+import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
   TOP,
   M_PX,
+  CX,
   halfArc,
+  linePath,
   loopPath,
   railParam,
   returningHalfArc,
@@ -116,27 +119,75 @@ test("every active movement reaches the final track letter in its last line", ()
   }
 });
 
-test("2A C–EX–HB starts at C, has no X–C segment, and reaches B by H–C–M", () => {
-  const movement = SET_TESTS[0].movements[1];
-  assert.deepEqual(movement.draw[0], { t: "line", pts: ["C", "H", "S", "E"] });
-  assert.deepEqual(movement.draw.at(-1), { t: "line", pts: ["H", "C", "M", "B"] });
-  for (const draw of movement.draw) {
-    if (draw.t === "line") {
-      assert.ok(!draw.pts.includes("G"));
-      assert.equal(draw.pts[0] === "X" && draw.pts[1] === "C", false);
-    }
-  }
+function reflectedX(path: string) {
+  return path
+    .replace(
+      /([MLQ]) ((?:-?\d+(?:\.\d+)? -?\d+(?:\.\d+)? ?)+)/g,
+      (_part, command: string, coords: string) =>
+        `${command} ${coords
+          .trim()
+          .split(" ")
+          .map(Number)
+          .map((n: number, i: number) => (i % 2 === 0 ? 2 * CX - n : n))
+          .map((n: number) => n.toFixed(1))
+          .join(" ")} `,
+    )
+    .trimEnd()
+    .replace(
+      /A ([\d.]+) ([\d.]+) 0 0 ([01])/g,
+      (_arc, rx, ry, sweep) => `A ${rx} ${ry} 0 0 ${1 - Number(sweep)}`,
+    );
+}
+
+test("2A movements 2 and 3 are exact vertical-axis mirrors", () => {
+  const [, left, right] = SET_TESTS[0].movements;
+  const approach = left.draw[0];
+  const returnHalf = left.draw[1];
+  assert.ok(approach.t === "line" && returnHalf.t === "return-half");
+  assert.equal(reflectedX(linePath(approach.pts)), linePath(["C", "M", "R", "B"]));
+  assert.equal(
+    reflectedX(returningHalfArc(returnHalf.from, returnHalf.to, returnHalf.bulge)),
+    returningHalfArc("B", "M", "A"),
+  );
 });
 
-test("the legacy C–H–M return renders toward C then B on the track", () => {
-  const ends = [track("H"), track("C"), track("M"), track("B")];
-  assert.deepEqual(
-    ends.map((p) => [p.x, p.y]),
-    [
-      [50, 48],
-      [110, 28],
-      [170, 48],
-      [170, 134],
-    ],
-  );
+test("matching left/right movement pairs are geometrically symmetrical", () => {
+  const mirror: Record<string, string> = {
+    A: "A",
+    C: "C",
+    I: "I",
+    E: "B",
+    F: "K",
+    H: "M",
+    K: "F",
+    P: "V",
+    R: "S",
+    S: "R",
+    V: "P",
+    B: "E",
+    M: "H",
+  };
+  const pairs = [
+    [1, 9, 14],
+    [1, 11, 16],
+    [2, 3, 14],
+    [2, 7, 18],
+    [2, 8, 19],
+  ] as const;
+  for (const [testIndex, leftNumber, rightNumber] of pairs) {
+    const a: Draw[] = SET_TESTS[testIndex].movements[leftNumber - 1].draw;
+    const b: Draw[] = SET_TESTS[testIndex].movements[rightNumber - 1].draw;
+    assert.deepEqual(
+      a,
+      b.map((d) => {
+        if (d.t === "line") return { ...d, pts: d.pts.map((p) => mirror[p]) };
+        if (d.t === "diag") return { ...d, from: mirror[d.to], to: mirror[d.from] };
+        if (d.t === "yield" || d.t === "loop")
+          return { ...d, from: mirror[d.from], to: mirror[d.to] };
+        if ("at" in d) return { ...d, at: d.at === "I" ? "I" : mirror[d.at] };
+        return d;
+      }),
+      `2${"ABC"[testIndex]} movements ${leftNumber}/${rightNumber}`,
+    );
+  }
 });

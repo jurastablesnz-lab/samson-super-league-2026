@@ -8,10 +8,13 @@ import { cn } from "@/lib/utils";
 import {
   COLLECTIVES,
   MFS_SHEET,
+  ELEMENTARY_FS,
+  ELEMENTARY_PURPOSE,
   MEDIUM_FS,
   MEDIUM_PURPOSE,
   SET_0_TESTS,
   SET_1_TESTS,
+  SET_3_TESTS,
   SET_4_TESTS,
   NOVICE_INSTRUCTIONS,
   NOVICE_PURPOSE,
@@ -43,6 +46,7 @@ import {
   loopPath,
   linePath,
   returningHalfArc,
+  serpentinePath,
   track,
 } from "@/lib/arena-geom";
 
@@ -60,6 +64,8 @@ function ptsTo(d: Draw): string[] {
       return [d.from, "X", d.to];
     case "half-turn":
       return [d.at, d.side];
+    case "serpentine":
+      return [d.from, d.from === "C" ? "A" : "C"];
     case "circle":
     case "stretch":
     case "halt":
@@ -203,6 +209,16 @@ export function MovementPath({
               <line x1={p.x - 7} y1={p.y} x2={p.x + 7} y2={p.y} strokeWidth={2.6} />
               <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 5} strokeWidth={1.4} opacity={0.7} />
             </g>
+          );
+        }
+        if (d.t === "serpentine") {
+          return (
+            <path
+              key={key}
+              d={serpentinePath(d.from, d.first)}
+              strokeWidth={width}
+              strokeDasharray={dash}
+            />
           );
         }
         if (d.t === "change") {
@@ -668,7 +684,7 @@ function MfsSheet() {
   );
 }
 
-function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS }) {
+function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS | typeof ELEMENTARY_FS }) {
   const Row = ({ n, text, coeff }: { n: number; text: string; coeff: number }) => (
     <li className="flex items-start gap-3 rounded-lg bg-bg p-3">
       <span className="font-mono text-xs text-faint">{n}</span>
@@ -719,7 +735,7 @@ function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS }) {
   );
 }
 
-const ALL_SET_TESTS = [...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_4_TESTS];
+const ALL_SET_TESTS = [...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_3_TESTS, ...SET_4_TESTS];
 
 function PublicationBar({
   name,
@@ -845,13 +861,29 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       setBusy(false);
     }
   }
+  const footerPurpose =
+    test?.purpose ??
+    (active === "mfs"
+      ? MFS_SHEET.purpose
+      : active === "medium-fs"
+        ? MEDIUM_PURPOSE
+        : active === "elementary-fs"
+          ? ELEMENTARY_PURPOSE
+          : NOVICE_PURPOSE);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface p-1 shadow-[var(--shadow-card)]">
         {visible.map((item) => {
           const id = item.viewId ?? item.id;
-          const tabLabel = id === "mfs" ? "MFS" : id === "medium-fs" ? "L4 MFS" : id.toUpperCase();
+          const tabLabel =
+            id === "mfs"
+              ? "MFS"
+              : id === "medium-fs"
+                ? "L4 MFS"
+                : id === "elementary-fs"
+                  ? "L3 MFS"
+                  : id.toUpperCase();
           const on = active === id;
           const draft = isAdmin && approvedIds !== null && !approved.has(id);
           return (
@@ -889,6 +921,9 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       {active === "medium-fs" && visible.some((item) => item.viewId === "medium-fs") && (
         <FreestyleTable sheet={MEDIUM_FS} />
       )}
+      {active === "elementary-fs" && visible.some((item) => item.viewId === "elementary-fs") && (
+        <FreestyleTable sheet={ELEMENTARY_FS} />
+      )}
 
       {isAdmin && approvedIds !== null && others.length > 0 && (
         <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
@@ -909,9 +944,7 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       )}
 
       <p className="px-1 text-xs leading-relaxed text-faint">
-        {active.startsWith("4") || active === "medium-fs" ? MEDIUM_PURPOSE : NOVICE_PURPOSE} Working
-        sheet from ESNZ Medium tests effective 1 September 2023. Official test sheets take
-        precedence.{" "}
+        {footerPurpose} Official test sheets take precedence.{" "}
         <a
           href="https://www.nzequestrian.org.nz/disciplines/dressage/resources/dressage-tests/"
           target="_blank"

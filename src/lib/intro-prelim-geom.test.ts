@@ -101,6 +101,7 @@ function drawSamples(d: Draw) {
     case "half-turn":
     case "rein-back":
     case "change":
+    case "serpentine":
       return [];
     case "halt": {
       const p = track(d.at);

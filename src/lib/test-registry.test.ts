@@ -42,5 +42,11 @@ test("riders only see published names, and new registry tests start unpublished"
   assert.equal(isPublishedTest("Introductory 0A", approved), false);
   assert.equal(isPublishedTest("Preliminary 1A", approved), false);
   assert.equal(isPublishedTest("1C", approved), false);
+  assert.equal(isPublishedTest("Elementary 3A", approved), false);
+  assert.equal(isPublishedTest("3B", approved), false);
+  assert.equal(isPublishedTest("3C", approved), false);
+  assert.equal(isPublishedTest("Level 3 musical freestyle", approved), false);
+  assert.equal(testIdForName("Level 3 musical freestyle"), "elementary-fs");
+  assert.equal(testIdForName("3A"), "3a");
   assert.equal(isPublishedTest("preliminary-9z", approved), false);
 });

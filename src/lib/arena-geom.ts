@@ -260,6 +260,29 @@ export function loopPath(from: string, to: string, via = "X"): string {
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }
 
+/**
+ * Three equal loops the full width of the arena, from C to A or A to C.
+ * `first` is the long side the opening loop touches.
+ */
+export function serpentinePath(from: "C" | "A", first: "left" | "right"): string {
+  const y0 = from === "C" ? TOP : BOT;
+  const y1 = from === "C" ? BOT : TOP;
+  const span = (y1 - y0) / 3;
+  const firstSign = first === "left" ? -1 : 1;
+  let d = "";
+  for (let i = 0; i < 3; i++) {
+    const startY = y0 + span * i;
+    const endY = y0 + span * (i + 1);
+    const midY = (startY + endY) / 2;
+    const sign = i % 2 === 0 ? firstSign : -firstSign;
+    const touchX = CX + sign * (RIGHT - CX);
+    const controlX = 2 * touchX - CX;
+    if (i === 0) d = `M ${CX.toFixed(1)} ${startY.toFixed(1)}`;
+    d += ` Q ${controlX.toFixed(1)} ${midY.toFixed(1)} ${CX.toFixed(1)} ${endY.toFixed(1)}`;
+  }
+  return d;
+}
+
 /** Shallow loop whose apex sits `metres` in from the track, toward the arena centre. */
 export function insetLoopPath(from: string, to: string, metres: number): string {
   const a = track(from);

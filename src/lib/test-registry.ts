@@ -4,10 +4,12 @@
  */
 import { TESTS_BY_LEVEL } from "./plan-builder.ts";
 import {
+  ELEMENTARY_FS,
   MEDIUM_FS,
   MFS_SHEET,
   SET_0_TESTS,
   SET_1_TESTS,
+  SET_3_TESTS,
   SET_4_TESTS,
   SET_TESTS,
 } from "./esnz-tests.ts";
@@ -34,7 +36,7 @@ function slug(name: string) {
 
 function diagramTests(): CatalogTest[] {
   const sheets = [
-    ...[...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_4_TESTS].map((test) => ({
+    ...[...SET_0_TESTS, ...SET_1_TESTS, ...SET_TESTS, ...SET_3_TESTS, ...SET_4_TESTS].map((test) => ({
       id: test.id,
       name: test.name,
       aliases: [test.short, test.name],
@@ -45,6 +47,17 @@ function diagramTests(): CatalogTest[] {
       name: MFS_SHEET.name,
       aliases: [MFS_SHEET.short, MFS_SHEET.name, "Level 2 musical freestyle", "L2 MFS"],
       viewId: "mfs" as const,
+    },
+    {
+      id: ELEMENTARY_FS.id,
+      name: ELEMENTARY_FS.name,
+      aliases: [
+        ELEMENTARY_FS.short,
+        ELEMENTARY_FS.name,
+        "Level 3 musical freestyle",
+        "L3 MFS",
+      ],
+      viewId: "elementary-fs" as const,
     },
     {
       id: MEDIUM_FS.id,

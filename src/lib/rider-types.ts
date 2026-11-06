@@ -72,12 +72,25 @@ export type SheetRecord = {
   photos: { id: string; label?: string }[] | null;
 };
 
+/** A coach day the rider added for one horse. Not Samson's fixed visits. */
+export type CoachVisitRecord = {
+  id: string;
+  date: string;
+  endDate: string;
+  title: string;
+  focus: string;
+  film: string;
+  homework: string;
+  leaveIt: string;
+};
+
 export type HorseLog = {
   horseId: string;
   results: ResultRecord[];
   pendingEvoResults: PendingEvoResult[];
   notes: NoteRecord[];
   sheets: SheetRecord[];
+  coachVisits: CoachVisitRecord[];
   progress: Progress;
 };
 

@@ -8,36 +8,41 @@ import { getSql, type Sql } from "./db";
 import { loadUser, resolveRiderAccess, type UserInfo } from "./beta.server";
 import { parseHorseList, type HorseEntry } from "./beta";
 import { generatePlan, sanitisePlanConfig, type PlanConfig } from "./plan-builder";
+import type { CoachVisitDraft } from "./rider-workspace";
+import {
+  deleteCoachVisitFor,
+  ownedHorse,
+  readHorseLog,
+  saveCoachVisitFor,
+  toProgress,
+  upsertSheet,
+  writeProgress,
+} from "./rider-horse.server.ts";
 import { reviewEvoResultsForOwner } from "./evo-review.server";
 import type { EvoRow } from "./evo-csv";
 import type {
   HorseLog,
   HorseRecord,
   LegacySnapshot,
-  PendingEvoResult,
   NoteRecord,
   PlanRecord,
   Progress,
   ResultRecord,
   SetupHorseInput,
-  SheetRecord,
   Workspace,
 } from "./rider-types";
 
 export const SAMSON = { name: "Jura Samson", level: "Level 2", esnz: "" };
 
 const iso = (v: string | Date | null | undefined) => (v == null ? null : new Date(v).toISOString());
-const day = (v: string | Date | null | undefined) => {
-  if (v == null) return "";
-  if (typeof v === "string") return v.slice(0, 10);
-  return v.toISOString().slice(0, 10);
-};
 const dateOrNull = (v: unknown) =>
   typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
 const s = (v: unknown, max = 500) =>
   typeof v === "string" ? v.slice(0, max) : v == null ? "" : String(v).slice(0, max);
 const json = (v: unknown) => (typeof v === "string" ? (JSON.parse(v) as unknown) : v);
 const newId = () => globalThis.crypto.randomUUID();
+
+export { ownedHorse, readHorseLog, upsertSheet, writeProgress, saveCoachVisitFor, deleteCoachVisitFor };
 
 /** Loads the user and refuses anyone without beta access. */
 export async function requireAccess(userId: string): Promise<UserInfo> {
@@ -89,10 +94,6 @@ type PlanRow = {
   freestyle: unknown;
   updated_at: string | Date;
 };
-function toProgress(v: unknown): Progress {
-  const p = (json(v) ?? {}) as Partial<Progress>;
-  return { done: p.done ?? {}, pack: p.pack ?? {} };
-}
 const toPlan = (r: PlanRow): PlanRecord => ({
   horseId: r.horse_id,
   config: json(r.config) as PlanConfig,
@@ -101,13 +102,6 @@ const toPlan = (r: PlanRow): PlanRecord => ({
   freestyle: (json(r.freestyle) as PlanRecord["freestyle"]) ?? null,
   updatedAt: iso(r.updated_at) ?? "",
 });
-
-export async function ownedHorse(sql: Sql, userId: string, horseId: string): Promise<HorseRow> {
-  const rows =
-    await sql<HorseRow>`select * from horses where id = ${horseId} and user_id = ${userId} and not archived`;
-  if (!rows[0]) throw new Error("Horse not found");
-  return rows[0];
-}
 
 export async function loadWorkspace(userId: string): Promise<Workspace> {
   const user = await requireAccess(userId);
@@ -217,111 +211,10 @@ export async function saveSetup(
   return loadWorkspace(userId);
 }
 
-type ResultRow = {
-  client_id: string;
-  source: ResultRecord["source"];
-  show_id: string;
-  show_name: string;
-  ride_date: string | Date | null;
-  test: string;
-  level: string;
-  percent: number | null;
-  place: string;
-  status: string;
-  judges: string;
-  notes: string;
-  event_url: string;
-};
-type PendingEvoRow = ResultRow & { notes: string; rider_name: string };
-const toPendingEvoResult = (r: PendingEvoRow): PendingEvoResult => ({
-  id: r.client_id,
-  date: day(r.ride_date),
-  showName: r.show_name,
-  test: r.test,
-  className: r.notes,
-  percent: r.percent == null ? null : Number(r.percent),
-  place: r.place,
-  status: r.status,
-  riderName: r.rider_name,
-});
-const toResult = (r: ResultRow): ResultRecord => ({
-  id: r.client_id,
-  source: r.source,
-  showId: r.show_id,
-  showName: r.show_name,
-  date: day(r.ride_date),
-  test: r.test,
-  level: r.level,
-  percent: r.percent == null ? null : Number(r.percent),
-  place: r.place,
-  status: r.status,
-  judges: r.judges,
-  notes: r.notes,
-  eventUrl: r.event_url,
-});
-type NoteRow = { client_id: string; note_date: string | Date | null; body: string };
-const toNote = (r: NoteRow): NoteRecord => ({
-  id: r.client_id,
-  date: day(r.note_date),
-  text: r.body,
-});
-type SheetRow = {
-  client_id: string;
-  kind: "sheet" | "video";
-  show_id: string;
-  show_name: string;
-  ride_date: string | Date | null;
-  test: string;
-  note: string;
-  mime: string;
-  sheet: unknown;
-  photos: unknown;
-};
-const toSheet = (r: SheetRow): SheetRecord => ({
-  id: r.client_id,
-  kind: r.kind,
-  showId: r.show_id,
-  showName: r.show_name,
-  date: day(r.ride_date),
-  test: r.test,
-  note: r.note,
-  mime: r.mime,
-  sheet: (json(r.sheet) as SheetRecord["sheet"]) ?? null,
-  photos: (json(r.photos) as SheetRecord["photos"]) ?? null,
-});
-
 export async function loadHorseLog(userId: string, horseId: string): Promise<HorseLog> {
   await requireAccess(userId);
   const sql = await getSql();
-  await ownedHorse(sql, userId, horseId);
-  const results = (
-    await sql<ResultRow>`select * from results where horse_id = ${horseId} and user_id = ${userId}
-      and review_status = 'kept' order by ride_date desc nulls last, id desc`
-  ).map(toResult);
-  const pendingEvoResults = (
-    await sql<PendingEvoRow>`select * from results where horse_id = ${horseId}
-      and user_id = ${userId} and source = 'evo_csv' and review_status = 'pending'
-      order by ride_date desc nulls last, id desc`
-  ).map(toPendingEvoResult);
-  const notes = (
-    await sql<NoteRow>`select * from ride_notes where horse_id = ${horseId} and user_id = ${userId}
-    order by note_date desc nulls last, id desc`
-  ).map(toNote);
-  const sheets = (
-    await sql<SheetRow>`select * from judge_sheets where horse_id = ${horseId} and user_id = ${userId}
-    order by ride_date desc nulls last, id desc`
-  ).map(toSheet);
-  const prog = await sql<{
-    progress: unknown;
-  }>`select progress from plans where horse_id = ${horseId} and user_id = ${userId}`;
-  return {
-    horseId,
-    results,
-    pendingEvoResults,
-    notes,
-    sheets,
-    progress: toProgress(prog[0]?.progress),
-  };
+  return readHorseLog(sql, userId, horseId);
 }
 
 /** Import a rider's own parsed EVO rows as pending review suggestions. */
@@ -385,35 +278,22 @@ export async function upsertNote(
     on conflict (horse_id, client_id) do update set note_date = excluded.note_date, body = excluded.body`;
 }
 
-export async function upsertSheet(
-  sql: Sql,
-  userId: string,
-  horseId: string,
-  x: Partial<SheetRecord>,
-) {
-  await sql`insert into judge_sheets (user_id, horse_id, client_id, kind, show_id, show_name, ride_date, test, note, mime, sheet, photos)
-    values (${userId}, ${horseId}, ${s(x.id, 120) || newId()}, ${x.kind === "video" ? "video" : "sheet"}, ${s(x.showId, 60)},
-      ${s(x.showName, 120)}, ${dateOrNull(x.date)}, ${s(x.test, 80)}, ${s(x.note, 5000)}, ${s(x.mime, 80)},
-      ${x.sheet ? JSON.stringify(x.sheet) : null}::jsonb, ${x.photos ? JSON.stringify(x.photos) : null}::jsonb)
-    on conflict (horse_id, client_id) do update set kind = excluded.kind, show_id = excluded.show_id,
-      show_name = excluded.show_name, ride_date = excluded.ride_date, test = excluded.test, note = excluded.note,
-      mime = excluded.mime, sheet = excluded.sheet, photos = excluded.photos, updated_at = now()`;
-}
-
 export async function setProgress(userId: string, horseId: string, progress: Partial<Progress>) {
   await requireAccess(userId);
   const sql = await getSql();
-  await ownedHorse(sql, userId, horseId);
-  const clean = (o: unknown) =>
-    Object.fromEntries(
-      Object.entries((o ?? {}) as Record<string, unknown>)
-        .filter(([, v]) => v === true)
-        .slice(0, 5000)
-        .map(([k]) => [k.slice(0, 200), true]),
-    );
-  const value = { done: clean(progress.done), pack: clean(progress.pack) };
-  await sql`insert into plans (horse_id, user_id, progress) values (${horseId}, ${userId}, ${JSON.stringify(value)}::jsonb)
-    on conflict (horse_id) do update set progress = excluded.progress, updated_at = now()`;
+  await writeProgress(sql, userId, horseId, progress);
+}
+
+export async function saveCoachVisit(userId: string, horseId: string, draft: CoachVisitDraft) {
+  await requireAccess(userId);
+  const sql = await getSql();
+  return saveCoachVisitFor(sql, userId, horseId, draft);
+}
+
+export async function deleteCoachVisit(userId: string, horseId: string, id: string) {
+  await requireAccess(userId);
+  const sql = await getSql();
+  return deleteCoachVisitFor(sql, userId, horseId, id);
 }
 
 // ---- Owner: Samson's localStorage → Postgres ------------------------------

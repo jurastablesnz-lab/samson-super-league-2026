@@ -146,7 +146,7 @@ export async function claimInvitation(
   await sql.query("begin");
   try {
     await sql.query(
-      "set constraints horses_user_id_fkey, ride_notes_user_id_fkey, judge_sheets_user_id_fkey deferred",
+      "set constraints horses_user_id_fkey, ride_notes_user_id_fkey, judge_sheets_user_id_fkey, coach_visits_user_id_fkey deferred",
     );
     const invites = await sql<{
       id: string;
@@ -168,7 +168,7 @@ export async function claimInvitation(
     }>`select user_id from beta_applications where user_id = ${invite.workspace_user_id} and region = 'Admin prepared' and heard_from = 'Admin' and status = 'approved'`;
     if (!proof.length || !placeholder.length || !prepared.length)
       throw new Error("A verified matching Google email is required for this prepared workspace");
-    for (const table of ["plans", "results", "ride_notes", "judge_sheets", "horses"]) {
+    for (const table of ["plans", "results", "ride_notes", "judge_sheets", "coach_visits", "horses"]) {
       await sql.query(`update ${table} set user_id = $1 where user_id = $2`, [
         identity.id,
         invite.workspace_user_id,

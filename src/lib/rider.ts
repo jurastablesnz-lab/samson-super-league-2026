@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "./auth/middleware";
 import type { EvoRow } from "./evo-csv";
+import type { CoachVisitDraft } from "./rider-workspace";
 import type {
   EvoImportResult,
   HorseLog,
@@ -134,6 +135,28 @@ export const saveProgress = createServerFn({ method: "POST" })
     const { setProgress } = await import("./rider.server");
     await setProgress(context.userId, data.horseId, data.progress);
     return { ok: true };
+  });
+
+export const saveCoachVisit = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; visit: CoachVisitDraft }) => {
+    if (!input?.visit || typeof input.visit !== "object") throw new Error("Visit missing");
+    return { horseId: str(input.horseId), visit: input.visit };
+  })
+  .handler(async ({ context, data }) => {
+    const { saveCoachVisit: save } = await import("./rider.server");
+    return save(context.userId, data.horseId, data.visit);
+  });
+
+export const deleteCoachVisit = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; id: string }) => ({
+    horseId: str(input?.horseId),
+    id: str(input?.id, 120),
+  }))
+  .handler(async ({ context, data }) => {
+    const { deleteCoachVisit: remove } = await import("./rider.server");
+    return remove(context.userId, data.horseId, data.id);
   });
 
 const snapshotValidator = (input: { snapshot: LegacySnapshot; horseId?: string }) => {

@@ -67,6 +67,7 @@ test("only the opted-in app schemas are in the globbed directory", () => {
       "0004_rider_workspace.sql",
       "0005_evo_result_review.sql",
       "0006_admin_rider_workspaces.sql",
+      "0007_rider_coach_visits.sql",
     ],
   );
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));

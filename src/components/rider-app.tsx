@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  GraduationCap,
   Home,
   ImagePlus,
   Music,
@@ -14,6 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { DeviceFreestyleBar } from "@/components/freestyle-player";
+import { CoachTab } from "@/components/rider-coach";
 import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
 import type { EvoRow } from "@/lib/evo-csv";
@@ -40,8 +43,10 @@ import {
   type LegacySnapshot,
   type PendingEvoResult,
   type PlanRecord,
+  type Progress,
   type Workspace,
 } from "@/lib/rider-types";
+import { applyCoachVisits, packKey, packingList, playableFreestyle } from "@/lib/rider-workspace";
 import { MAX_SHEET_PHOTOS } from "@/lib/review-types";
 import {
   daysUntil,
@@ -58,17 +63,20 @@ import { cn } from "@/lib/utils";
 import { BrandShell, inputCls, Kicker, Panel, PrimaryButton, Title } from "./beta-ui";
 import { fmtDay, fmtDuration, SetupWizard } from "./setup-wizard";
 
-type Tab = "today" | "season" | "tests" | "log" | "setup";
+type Tab = "today" | "season" | "tests" | "coach" | "log" | "setup";
 const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "today", label: "Today", icon: Home },
   { id: "season", label: "Season", icon: CalendarDays },
   { id: "tests", label: "Tests", icon: Target },
+  { id: "coach", label: "Coach", icon: GraduationCap },
   { id: "log", label: "Log", icon: NotebookPen },
   { id: "setup", label: "Setup", icon: Settings2 },
 ];
 
 function kindClass(kind: Kind) {
   switch (kind) {
+    case "coach":
+      return "bg-accent text-accent-fg";
     case "show":
       return "bg-fg text-accent-fg";
     case "travel":
@@ -162,23 +170,50 @@ function RiderApp({
   const [horseId, setHorseId] = useState(horses[0].id);
   const horse = horses.find((h) => h.id === horseId) ?? horses[0];
   const record = ws.plans[horse.id];
-  const plan = record.plan as GeneratedPlan;
+  const basePlan = record.plan as GeneratedPlan;
   const [log, setLog] = useState<HorseLog | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
+  const horseIdRef = useRef(horse.id);
+  horseIdRef.current = horse.id;
 
-  const reload = useCallback(() => {
+  useEffect(() => {
+    let dead = false;
+    setLog(null);
     getHorseLog({ data: { horseId: horse.id } })
       .then((l) => {
+        if (dead || l.horseId !== horse.id) return;
         setLog(l);
         setLogError(null);
       })
-      .catch((e: unknown) => setLogError(e instanceof Error ? e.message : String(e)));
+      .catch((e: unknown) => {
+        if (dead) return;
+        setLogError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      dead = true;
+    };
   }, [horse.id]);
-  useEffect(() => {
-    setLog(null);
-    reload();
-  }, [reload]);
 
+  const adoptLog = useCallback((next: HorseLog) => {
+    if (next.horseId !== horseIdRef.current) return;
+    setLog((current) => {
+      if (current && current.horseId !== next.horseId) return current;
+      if (current) return { ...next, progress: current.progress };
+      return next;
+    });
+    setLogError(null);
+  }, []);
+
+  const rememberProgress = useCallback((progress: Progress) => {
+    setLog((current) =>
+      current && current.horseId === horseIdRef.current ? { ...current, progress } : current,
+    );
+  }, []);
+
+  const plan = useMemo(
+    () => applyCoachVisits(basePlan, log?.horseId === horse.id ? log.coachVisits : []),
+    [basePlan, horse.id, log],
+  );
   const phase = phaseIn(plan.phases, TODAY);
 
   return (
@@ -241,6 +276,7 @@ function RiderApp({
             {phase.name}
           </span>
         </header>
+        <RiderMusic horse={horse} record={record} />
         <LocalImportBanner storageKey={storageKey} horse={horse} onImported={setLog} />
         {logError && (
           <p className="mb-3 rounded-lg bg-danger/15 px-3 py-2 text-sm text-danger">{logError}</p>
@@ -249,33 +285,50 @@ function RiderApp({
           <TodayTab
             key={`today-${horse.id}`}
             plan={plan}
-            record={record}
             log={log}
             horse={horse}
             onTab={setTab}
+            onProgress={rememberProgress}
           />
         )}
         {tab === "season" && (
           <SeasonTab
             key={`season-${horse.id}`}
             plan={plan}
-            record={record}
             log={log}
             horse={horse}
+            onProgress={rememberProgress}
           />
         )}
         {tab === "tests" && <TestsTab key={`tests-${horse.id}`} plan={plan} record={record} />}
+        {tab === "coach" && (
+          <CoachTab
+            key={`coach-${horse.id}`}
+            horse={horse}
+            plan={plan}
+            log={log}
+            onLog={adoptLog}
+            onError={setLogError}
+            sheets={
+              log && log.horseId === horse.id ? (
+                <SheetsCard plan={plan} horse={horse} log={log} setLog={adoptLog} />
+              ) : (
+                <Card>
+                  <p className="text-sm text-muted">Loading…</p>
+                </Card>
+              )
+            }
+          />
+        )}
         {tab === "log" && (
           <LogTab
             key={`log-${horse.id}`}
             plan={plan}
             horse={horse}
             log={log}
-            setLog={(next) => {
-              setLog(next);
-              setLogError(null);
-            }}
+            setLog={adoptLog}
             onError={setLogError}
+            onProgress={rememberProgress}
           />
         )}
         {tab === "setup" && (
@@ -293,7 +346,7 @@ function RiderApp({
         className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur-md"
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       >
-        <ul className="mx-auto grid max-w-3xl grid-cols-5 px-2 pt-1">
+        <ul className="mx-auto grid max-w-3xl grid-cols-6 px-1 pt-1">
           {TABS.map((t) => {
             const Icon = t.icon;
             const on = tab === t.id;
@@ -303,7 +356,7 @@ function RiderApp({
                   type="button"
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    "flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[11px] font-medium",
+                    "flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-medium sm:text-[11px]",
                     on ? "text-accent" : "text-muted",
                   )}
                 >
@@ -319,28 +372,53 @@ function RiderApp({
   );
 }
 
-/** Done-ticks live in Postgres (plans.progress); writes are debounced. */
-function useDone(horseId: string, log: HorseLog | null) {
-  const [done, setDone] = useState<Record<string, boolean>>({});
+/** Done ticks and packing ticks live in Postgres (plans.progress), per horse. */
+function useHorseProgress(horseId: string, log: HorseLog | null, onProgress: (p: Progress) => void) {
+  const [progress, setProgress] = useState<Progress>({ done: {}, pack: {} });
+  const latest = useRef<Progress>(progress);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const packRef = useRef<Record<string, boolean>>({});
+  const pending = useRef<{ horseId: string; progress: Progress } | null>(null);
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
+
   useEffect(() => {
     if (log && log.horseId === horseId) {
-      setDone(log.progress.done);
-      packRef.current = log.progress.pack;
+      setProgress(log.progress);
+      latest.current = log.progress;
     }
   }, [log, horseId]);
-  const toggle = (id: string) => {
-    setDone((d) => {
-      const next = { ...d, [id]: !d[id] };
+
+  useEffect(() => {
+    return () => {
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        void saveProgress({ data: { horseId, progress: { done: next, pack: packRef.current } } });
-      }, 600);
-      return next;
-    });
+      const queued = pending.current;
+      pending.current = null;
+      if (queued) void saveProgress({ data: { horseId: queued.horseId, progress: queued.progress } });
+    };
+  }, []);
+
+  function queue(next: Progress) {
+    latest.current = next;
+    pending.current = { horseId, progress: next };
+    onProgressRef.current(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      pending.current = null;
+      void saveProgress({ data: { horseId, progress: next } });
+    }, 600);
+  }
+
+  const toggleDone = (id: string) => {
+    const current = latest.current;
+    queue({ done: { ...current.done, [id]: !current.done[id] }, pack: current.pack });
+    setProgress(latest.current);
   };
-  return { done, toggle };
+  const togglePack = (id: string) => {
+    const current = latest.current;
+    queue({ done: current.done, pack: { ...current.pack, [id]: !current.pack[id] } });
+    setProgress(latest.current);
+  };
+  return { done: progress.done, pack: progress.pack, toggleDone, togglePack };
 }
 
 function SessionRow({ s, done, onToggle }: { s: Session; done: boolean; onToggle: () => void }) {
@@ -379,14 +457,15 @@ function TodayTab({
   log,
   horse,
   onTab,
+  onProgress,
 }: {
   plan: GeneratedPlan;
-  record: PlanRecord;
   log: HorseLog | null;
   horse: HorseRecord;
   onTab: (t: Tab) => void;
+  onProgress: (p: Progress) => void;
 }) {
-  const { done, toggle } = useDone(horse.id, log);
+  const { done, toggleDone } = useHorseProgress(horse.id, log, onProgress);
   const todayIso = iso(TODAY);
   const inRange = plan.weeks.length > 0 && plan.weeks[0].id <= todayIso;
   const week = weekIn(plan.weeks, TODAY);
@@ -395,6 +474,10 @@ function TodayTab({
   const best = (log?.results ?? [])
     .filter((r) => r.percent != null && r.status === "ok")
     .sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0))[0];
+  const nextVisit = (log?.horseId === horse.id ? log.coachVisits : []).find(
+    (v) => (v.endDate || v.date) >= todayIso,
+  );
+  const visitDays = nextVisit ? daysUntil(nextVisit.date) : 0;
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
@@ -427,6 +510,25 @@ function TodayTab({
           </p>
         </button>
       </div>
+      {nextVisit && (
+        <button
+          type="button"
+          onClick={() => onTab("coach")}
+          className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-card)]"
+        >
+          <Kicker>Next coach</Kicker>
+          <p className="font-display mt-1 text-xl leading-tight font-medium">
+            {nextVisit.title || "Coach"}
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            {fmtDay(nextVisit.date)}
+            {nextVisit.endDate !== nextVisit.date ? ` – ${fmtDay(nextVisit.endDate)}` : ""}
+            {" · "}
+            {visitDays > 0 ? `${visitDays} days` : visitDays === 0 ? "Today" : "This visit"}
+          </p>
+          {nextVisit.focus && <p className="mt-1 text-sm text-muted">{nextVisit.focus}</p>}
+        </button>
+      )}
       <Card>
         <Kicker>This week · {week.label}</Kicker>
         <h2 className="font-display mt-1 text-xl leading-snug font-medium">{week.headline}</h2>
@@ -438,7 +540,7 @@ function TodayTab({
         {week.caution && <p className="mt-2 text-sm text-warn">{week.caution}</p>}
         <ul className="mt-4 flex flex-col gap-2">
           {week.sessions.map((s) => (
-            <SessionRow key={s.id} s={s} done={!!done[s.id]} onToggle={() => toggle(s.id)} />
+            <SessionRow key={s.id} s={s} done={!!done[s.id]} onToggle={() => toggleDone(s.id)} />
           ))}
         </ul>
       </Card>
@@ -477,13 +579,14 @@ function SeasonTab({
   plan,
   log,
   horse,
+  onProgress,
 }: {
   plan: GeneratedPlan;
-  record: PlanRecord;
   log: HorseLog | null;
   horse: HorseRecord;
+  onProgress: (p: Progress) => void;
 }) {
-  const { done, toggle } = useDone(horse.id, log);
+  const { done, toggleDone } = useHorseProgress(horse.id, log, onProgress);
   const current = weekIn(plan.weeks, TODAY);
   const [idx, setIdx] = useState(() =>
     Math.max(
@@ -593,7 +696,7 @@ function SeasonTab({
           {week.caution && <p className="mt-2 text-sm text-warn">{week.caution}</p>}
           <ul className="mt-4 flex flex-col gap-2">
             {week.sessions.map((s) => (
-              <SessionRow key={s.id} s={s} done={!!done[s.id]} onToggle={() => toggle(s.id)} />
+              <SessionRow key={s.id} s={s} done={!!done[s.id]} onToggle={() => toggleDone(s.id)} />
             ))}
           </ul>
         </Card>
@@ -636,6 +739,38 @@ function TestsTab({ plan, record }: { plan: GeneratedPlan; record: PlanRecord })
       </Card>
       <FreestyleCard record={record} />
     </div>
+  );
+}
+
+function RiderMusic({ horse, record }: { horse: HorseRecord; record: PlanRecord }) {
+  const track = playableFreestyle(record.freestyle ?? record.config.freestyle);
+  const mediaId = track?.mediaId ?? "";
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    let url: string | null = null;
+    setSrc(null);
+    if (!mediaId) return;
+    void getMediaBlob(mediaId)
+      .then((blob) => {
+        if (dead || !blob) return;
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      dead = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [mediaId]);
+  if (!track || !src) return null;
+  return (
+    <DeviceFreestyleBar
+      src={src}
+      title={track.title}
+      horse={horse.name}
+      durationHint={record.freestyle?.durationSec ?? record.config.freestyle?.durationSec}
+    />
   );
 }
 
@@ -684,12 +819,14 @@ function LogTab({
   log,
   setLog,
   onError,
+  onProgress,
 }: {
   plan: GeneratedPlan;
   horse: HorseRecord;
   log: HorseLog | null;
   setLog: (l: HorseLog) => void;
   onError: (message: string | null) => void;
+  onProgress: (p: Progress) => void;
 }) {
   const [showName, setShowName] = useState(
     plan.shows.find((s) => s.start <= iso(TODAY))?.name ?? plan.shows[0]?.name ?? "",
@@ -702,6 +839,13 @@ function LogTab({
   const [noteText, setNoteText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { pack, togglePack } = useHorseProgress(horse.id, log, onProgress);
+  const groups = useMemo(() => packingList(plan.tests), [plan.tests]);
+  const packIds = useMemo(
+    () => groups.flatMap((g) => g.items.map((item) => packKey(g.id, item.id))),
+    [groups],
+  );
+  const packDone = packIds.filter((id) => pack[id]).length;
 
   async function run(fn: () => Promise<HorseLog>) {
     setBusy(true);
@@ -848,6 +992,47 @@ function LogTab({
             </li>
           ))}
         </ul>
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between">
+          <Kicker>Pack for the next show</Kicker>
+          <span className="font-mono text-xs text-muted tabular-nums">
+            {packDone}/{packIds.length}
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          Tick this off for {horse.name}. The list is saved with this horse.
+        </p>
+        <div className="mt-3 space-y-4">
+          {groups.map((g) => (
+            <div key={g.id}>
+              <p className="text-sm font-semibold">{g.title}</p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {g.items.map((item) => {
+                  const id = packKey(g.id, item.id);
+                  const on = !!pack[id];
+                  return (
+                    <li key={id}>
+                      <button
+                        type="button"
+                        onClick={() => togglePack(id)}
+                        className="flex min-h-11 w-full items-center gap-3 text-left text-sm"
+                      >
+                        {on ? (
+                          <Check className="size-4 text-accent" />
+                        ) : (
+                          <Circle className="size-4 text-faint" />
+                        )}
+                        <span className={on ? "text-muted line-through" : ""}>{item.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </Card>
 
       <Card>
@@ -1260,7 +1445,9 @@ function SheetsCard({
       )}
       {err && <p className="mt-2 text-sm text-danger">{err}</p>}
       <ul className="mt-4 flex flex-col gap-3">
-        {log.sheets.map((x) => (
+        {log.sheets
+          .filter((x) => x.kind !== "video")
+          .map((x) => (
           <li key={x.id} className="rounded-lg bg-bg p-3 text-sm">
             <div className="flex items-start justify-between gap-2">
               <p className="font-semibold">
@@ -1338,7 +1525,7 @@ function SetupTab({
           Change horses, tests, shows or goals
         </PrimaryButton>
         <p className="mt-2 text-xs text-muted">
-          Rebuilding keeps your scores, notes and judge sheets.
+          Rebuilding keeps your scores, notes, videos, coach visits and packing list.
         </p>
       </Card>
     </div>

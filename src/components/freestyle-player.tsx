@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FREESTYLE } from "@/lib/season";
@@ -105,6 +105,114 @@ export function FreestyleBar() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold tracking-[0.14em] uppercase">{FREESTYLE.title}</p>
           <p className="truncate text-xs text-accent-fg/75">{FREESTYLE.horse}</p>
+        </div>
+        <span className="font-mono shrink-0 text-xs tabular-nums">
+          {fmt(current)}
+          <span className="text-accent-fg/60"> / {fmt(duration)}</span>
+        </span>
+      </div>
+      <label className="mt-2 block">
+        <span className="sr-only">Freestyle playback position</span>
+        <input
+          type="range"
+          min={0}
+          max={max}
+          step={0.1}
+          value={Math.min(current, max)}
+          onChange={(e) => seek(Number(e.target.value))}
+          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-accent-fg/20 accent-accent-fg"
+        />
+      </label>
+    </div>
+  );
+}
+
+/**
+ * Pinned player for a file the rider uploaded on this device.
+ * `src` is an object URL for that file. There is no fallback track.
+ */
+export function DeviceFreestyleBar({
+  src,
+  title,
+  horse,
+  durationHint,
+}: {
+  src: string;
+  title: string;
+  horse: string;
+  durationHint?: number | null;
+}) {
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(durationHint && durationHint > 0 ? durationHint : 0);
+
+  useEffect(() => {
+    const a = new Audio(src);
+    a.preload = "metadata";
+    audio.current = a;
+    const sync = () => {
+      setPlaying(!a.paused && !a.ended);
+      setCurrent(a.currentTime);
+      if (Number.isFinite(a.duration) && a.duration > 0) setDuration(a.duration);
+    };
+    a.addEventListener("play", sync);
+    a.addEventListener("pause", sync);
+    a.addEventListener("ended", sync);
+    a.addEventListener("timeupdate", sync);
+    a.addEventListener("loadedmetadata", sync);
+    a.addEventListener("durationchange", sync);
+    return () => {
+      a.pause();
+      a.removeEventListener("play", sync);
+      a.removeEventListener("pause", sync);
+      a.removeEventListener("ended", sync);
+      a.removeEventListener("timeupdate", sync);
+      a.removeEventListener("loadedmetadata", sync);
+      a.removeEventListener("durationchange", sync);
+      a.src = "";
+      audio.current = null;
+    };
+  }, [src]);
+
+  const max = duration > 0 ? duration : 1;
+  const play = () => void audio.current?.play().catch(() => setPlaying(false));
+  const pause = () => audio.current?.pause();
+  const replay = () => {
+    const a = audio.current;
+    if (!a) return;
+    a.currentTime = 0;
+    void a.play().catch(() => setPlaying(false));
+  };
+  const seek = (time: number) => {
+    const a = audio.current;
+    if (!a) return;
+    a.currentTime = time;
+    setCurrent(time);
+  };
+
+  return (
+    <div className="vd-player mb-5 rounded-xl bg-accent px-3 py-3 text-accent-fg sm:px-4">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={playing ? pause : play}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-fg text-accent"
+          aria-label={playing ? "Pause freestyle music" : "Play freestyle music"}
+        >
+          {playing ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}
+        </button>
+        <button
+          type="button"
+          onClick={replay}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-fg/15 text-accent-fg"
+          aria-label="Replay freestyle from the start"
+        >
+          <RotateCcw className="size-5" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold tracking-[0.14em] uppercase">{title}</p>
+          <p className="truncate text-xs text-accent-fg/75">{horse}</p>
         </div>
         <span className="font-mono shrink-0 text-xs tabular-nums">
           {fmt(current)}

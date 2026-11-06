@@ -197,6 +197,8 @@ export const MFS_FLOOR = {
 export const PACE_LABEL: Record<Pace, string> = {
   trot: "Working trot",
   medium: "Medium trot",
+  extended: "Extended trot",
+  "extended-canter": "Extended canter",
   walk: "Walk",
   free: "Free walk",
   canter: "Working canter",

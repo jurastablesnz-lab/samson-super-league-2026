@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 import {
   COLLECTIVES,
   MFS_SHEET,
+  MEDIUM_FS,
+  MEDIUM_PURPOSE,
+  SET_4_TESTS,
   NOVICE_INSTRUCTIONS,
   NOVICE_PURPOSE,
   SET_TESTS,
@@ -29,6 +32,8 @@ import {
   TOP,
   circleCenter,
   halfArc,
+  halfTurnPath,
+  arcPath,
   label,
   loopPath,
   linePath,
@@ -42,15 +47,21 @@ function ptsTo(d: Draw): string[] {
       return d.pts;
     case "diag":
     case "yield":
+    case "arc":
     case "loop":
     case "half":
       return [d.from, d.to];
     case "return-half":
       return [d.from, "X", d.to];
+    case "half-turn":
+      return [d.to];
+    case "half-turn":
+      return [d.to];
     case "circle":
     case "stretch":
     case "halt":
     case "change":
+    case "rein-back":
       return [d.at];
   }
 }
@@ -72,6 +83,7 @@ function strokeFor(pace: Pace | undefined, accent: boolean) {
 function dashFor(d: Draw, pace?: Pace) {
   if (d.t === "diag" || d.t === "stretch") return "6 4";
   if (d.t === "yield" || pace === "yield") return "2 3";
+  if (pace === "extended" || pace === "extended-canter") return "9 3 2 3";
   if (pace === "medium" || pace === "medium-canter" || pace === "free") return "6 4";
   return undefined;
 }
@@ -105,6 +117,29 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
         if (d.t === "loop") {
           return <path key={key} d={loopPath(d.from, d.to)} strokeWidth={width} />;
         }
+        if (d.t === "half-turn")
+          return (
+            <path key={key} d={halfTurnPath(d.to)} strokeWidth={width} strokeDasharray={dash} />
+          );
+        if (d.t === "rein-back") {
+          const p = track(d.at);
+          return (
+            <path
+              key={key}
+              d={`M ${p.x} ${p.y} L ${p.x} ${p.y + 16} L ${p.x - 4} ${p.y + 11} M ${p.x} ${p.y + 16} L ${p.x + 4} ${p.y + 11}`}
+              strokeWidth={width}
+            />
+          );
+        }
+        if (d.t === "arc")
+          return (
+            <path
+              key={key}
+              d={arcPath(d.from, d.to, d.bulge)}
+              strokeWidth={width}
+              strokeDasharray={dash}
+            />
+          );
         if (d.t === "half" || d.t === "return-half") {
           const dPath =
             d.t === "half"
@@ -154,7 +189,13 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
   );
 }
 
-function TestArena({ movement, ghostMoves }: { movement: Movement; ghostMoves?: Movement[] }) {
+export function TestArena({
+  movement,
+  ghostMoves,
+}: {
+  movement: Movement;
+  ghostMoves?: Movement[];
+}) {
   const used = useMemo(() => {
     const set = new Set<string>();
     for (const d of movement.draw) for (const id of ptsTo(d)) set.add(id);
@@ -435,7 +476,7 @@ function SetSheet({ test }: { test: SetTest }) {
         movements={test.movements}
         idx={idx}
         setIdx={setIdx}
-        kicker={test.role}
+        kicker={test.role ?? test.name}
         title={test.name}
         meta={`${test.year} · ${test.arena} · ${test.time}`}
         purpose={test.purpose}
@@ -447,7 +488,7 @@ function SetSheet({ test }: { test: SetTest }) {
         idx={idx}
         setIdx={setIdx}
         heading={`${test.movements.length} movements · ${marks.total} marks`}
-        intro={`Introduces ${test.introduces}. ${NOVICE_INSTRUCTIONS} Draw time ${test.drawTime}.`}
+        intro={`Introduces ${test.introduces}. ${test.instructions ?? NOVICE_INSTRUCTIONS} Draw time ${test.drawTime}.`}
         leave={test.leave}
       />
 
@@ -456,7 +497,7 @@ function SetSheet({ test }: { test: SetTest }) {
           Collective marks
         </p>
         <ul className="mt-3 flex flex-col gap-2">
-          {COLLECTIVES.map((c) => (
+          {(test.collectives ?? COLLECTIVES).map((c) => (
             <li
               key={c.name}
               className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3"
@@ -479,7 +520,7 @@ function SetSheet({ test }: { test: SetTest }) {
           School it
         </p>
         <ul className="mt-3 flex flex-col gap-3">
-          {test.keys.map((k) => (
+          {(test.keys ?? []).map((k) => (
             <li key={k.move} className="rounded-lg bg-bg p-3">
               <p className="text-sm font-semibold">{k.move}</p>
               <p className="mt-1 text-sm text-muted">
@@ -592,15 +633,66 @@ function MfsSheet() {
   );
 }
 
+function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS }) {
+  const Row = ({ n, text, coeff }: { n: number; text: string; coeff: number }) => (
+    <li className="flex items-start gap-3 rounded-lg bg-bg p-3">
+      <span className="font-mono text-xs text-faint">{n}</span>
+      <p className="flex-1 text-sm">{text}</p>
+      <Coeff n={coeff} />
+    </li>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl bg-surface p-4">
+        <h2 className="font-display text-xl">{s.name}</h2>
+        <p className="mt-2 text-sm text-muted">
+          {s.year} · {s.arena}m · {s.time} · {s.bridle}
+        </p>
+      </div>
+      <section className="rounded-xl bg-surface p-4">
+        <h2 className="font-display text-xl">Technical execution · {s.technicalTotal}</h2>
+        <ol className="mt-3 flex flex-col gap-1">
+          {s.compulsory.map((m) => (
+            <Row key={m.n} n={m.n} text={m.move} coeff={m.coeff} />
+          ))}
+        </ol>
+      </section>
+      <section className="rounded-xl bg-surface p-4">
+        <h2 className="font-display text-xl">Artistic presentation · {s.artisticTotal}</h2>
+        <ol className="mt-3 flex flex-col gap-1">
+          {s.artistic.map((m) => (
+            <Row key={m.n} n={m.n} text={m.move} coeff={m.coeff} />
+          ))}
+        </ol>
+      </section>
+      <section className="rounded-xl bg-surface p-4">
+        <h3 className="font-semibold">Permitted</h3>
+        <ul className="mt-2 list-disc pl-5 text-sm text-muted">
+          {s.permitted.map((x) => (
+            <li key={x}>{x}</li>
+          ))}
+        </ul>
+        <h3 className="mt-4 font-semibold">Not permitted</h3>
+        <ul className="mt-2 list-disc pl-5 text-sm text-muted">
+          {s.notPermitted.map((x) => (
+            <li key={x}>{x}</li>
+          ))}
+        </ul>
+        <p className="mt-3 text-sm text-muted">{s.penalties}</p>
+      </section>
+    </div>
+  );
+}
+
 export function TestsPanel() {
   const [active, setActive] = useState<TestTabId>("2b");
-  const test = SET_TESTS.find((t) => t.id === active);
+  const test = [...SET_TESTS, ...SET_4_TESTS].find((t) => t.id === active);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface p-1 shadow-[var(--shadow-card)]">
-        {(["2a", "2b", "2c", "mfs"] as const).map((id) => {
-          const tabLabel = id === "mfs" ? "MFS" : id.toUpperCase();
+        {(["2a", "2b", "2c", "mfs", "4a", "4b", "4c", "medium-fs"] as const).map((id) => {
+          const tabLabel = id === "mfs" ? "MFS" : id === "medium-fs" ? "L4 MFS" : id.toUpperCase();
           const on = active === id;
           return (
             <button
@@ -620,10 +712,12 @@ export function TestsPanel() {
 
       {test && <SetSheet test={test} />}
       {active === "mfs" && <MfsSheet />}
+      {active === "medium-fs" && <FreestyleTable sheet={MEDIUM_FS} />}
 
       <p className="px-1 text-xs leading-relaxed text-faint">
-        {NOVICE_PURPOSE} Working sheet from ESNZ Novice tests effective 1 September 2023. Official
-        test sheets take precedence.{" "}
+        {active.startsWith("4") || active === "medium-fs" ? MEDIUM_PURPOSE : NOVICE_PURPOSE} Working
+        sheet from ESNZ Medium tests effective 1 September 2023. Official test sheets take
+        precedence.{" "}
         <a
           href="https://www.nzequestrian.org.nz/disciplines/dressage/resources/dressage-tests/"
           target="_blank"

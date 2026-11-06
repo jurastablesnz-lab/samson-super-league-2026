@@ -1,5 +1,14 @@
 export type Pace =
-  "trot" | "medium" | "walk" | "free" | "canter" | "medium-canter" | "yield" | "change";
+  | "trot"
+  | "medium"
+  | "extended"
+  | "walk"
+  | "free"
+  | "canter"
+  | "medium-canter"
+  | "extended-canter"
+  | "yield"
+  | "change";
 
 export type Draw =
   | { t: "line"; pts: string[] }
@@ -11,7 +20,10 @@ export type Draw =
   | { t: "yield"; from: string; to: string }
   | { t: "halt"; at: string }
   | { t: "stretch"; at: string }
-  | { t: "change"; at: string };
+  | { t: "change"; at: string }
+  | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
+  | { t: "half-turn"; to: "H" | "M" }
+  | { t: "rein-back"; at: string };
 
 export type Step = { at: string; do: string };
 
@@ -25,19 +37,21 @@ export type Movement = {
 };
 
 export type SetTest = {
-  id: "2a" | "2b" | "2c";
+  id: `${number}${"a" | "b" | "c"}`;
   short: string;
   name: string;
-  role: string;
+  role?: string;
   year: string;
   time: string;
   drawTime: string;
   arena: string;
-  purpose: string;
-  introduces: string;
-  leave: string;
+  purpose?: string;
+  instructions?: string;
+  introduces?: string;
+  leave?: string;
   movements: Movement[];
-  keys: { move: string; judge: string; school: string }[];
+  keys?: { move: string; judge: string; school: string }[];
+  collectives?: Collective[];
 };
 
 export type Collective = { name: string; detail: string; coeff: 1 | 2 };

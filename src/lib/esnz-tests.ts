@@ -33,10 +33,17 @@ export const NOVICE_PURPOSE =
 export const NOVICE_INSTRUCTIONS =
   "To be ridden in a snaffle. All trot sitting or rising unless stated otherwise.";
 
-export type TestTabId = "2a" | "2b" | "2c" | "mfs";
+export {
+  COLLECTIVES as MEDIUM_COLLECTIVES,
+  MEDIUM_PURPOSE,
+  MEDIUM_INSTRUCTIONS,
+  MEDIUM_ENTER,
+} from "./tests/medium.ts";
+export { TEST_4A, TEST_4B, TEST_4C, SET_4_TESTS, MEDIUM_FS } from "./tests/level-4/index.ts";
+export type TestTabId = "2a" | "2b" | "2c" | "mfs" | "4a" | "4b" | "4c" | "medium-fs";
 
 export function marksFor(test: SetTest) {
   const tech = test.movements.reduce((n, m) => n + 10 * (m.coeff ?? 1), 0);
-  const coll = COLLECTIVES.reduce((n, c) => n + 10 * c.coeff, 0);
+  const coll = (test.collectives ?? COLLECTIVES).reduce((n, c) => n + 10 * c.coeff, 0);
   return { tech, coll, total: tech + coll };
 }

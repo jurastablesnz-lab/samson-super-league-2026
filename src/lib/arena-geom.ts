@@ -197,6 +197,14 @@ function sampleRail(a: string, b: string): { x: number; y: number }[] {
   const dir = shortestDir(a, b);
   const len = dir === "cw" ? wrap(t1 - t0) : wrap(t0 - t1);
   if (len < 0.8) return [track(a), track(b)];
+  if (len < 16) {
+    const turn = dir === "cw" ? 1 : -1;
+    return [
+      roundCorner(pointOnSharp(t0)),
+      roundCorner(pointOnSharp(t0 + (turn * len) / 2)),
+      roundCorner(pointOnSharp(t0 + turn * len)),
+    ];
+  }
   const n = Math.max(4, Math.ceil(len / 3.5));
   const pts: { x: number; y: number }[] = [];
   for (let i = 0; i <= n; i++) {
@@ -250,4 +258,17 @@ export function loopPath(from: string, to: string, via = "X"): string {
   const p = track(via);
   const control = { x: 2 * p.x - (a.x + b.x) / 2, y: 2 * p.y - (a.y + b.y) / 2 };
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+}
+
+export function arcPath(from: string, to: string, bulge: "C" | "A") {
+  const a = track(from),
+    b = track(to);
+  return `M ${a.x} ${a.y} A ${10 * M_PX.x} ${10 * M_PX.y} 0 0 ${bulge === "C" ? 1 : 0} ${b.x} ${b.y}`;
+}
+
+export function halfTurnPath(to: "H" | "M") {
+  const p = track(to),
+    g = track("G"),
+    sign = to === "H" ? -1 : 1;
+  return `M ${g.x} ${g.y} L ${g.x + sign * 18} ${g.y} Q ${g.x + sign * 18} ${g.y + 24} ${g.x} ${g.y + 18} L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
 }

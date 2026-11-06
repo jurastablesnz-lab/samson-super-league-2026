@@ -101,6 +101,7 @@ export const setRiderHorseTest = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(validateRiderTestAssignment)
   .handler(async ({ context, data }) => {
+    const { requireAdminUser } = await import("./rider.server");
     const { assignRiderTest } = await import("./rider-test-assignment");
     const { getSql } = await import("./db");
     await requireAdminUser(context.userId);

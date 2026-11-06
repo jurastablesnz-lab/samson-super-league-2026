@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SET_TESTS, marksFor } from "./esnz-tests.ts";
+import { SET_TESTS, SET_4_TESTS, marksFor } from "./esnz-tests.ts";
 import type { Draw } from "./esnz-tests.ts";
 import {
   BOT,
   TOP,
   LEFT,
-  circleCenter,
   M_PX,
+  isRail,
+  circleCenter,
   CX,
   halfArc,
   linePath,
@@ -136,13 +137,17 @@ function reflectedX(path: string) {
     )
     .trimEnd()
     .replace(
+      /(x[12]|cx)="([\d.]+)"/g,
+      (_m, attr, value) => `${attr}="${(2 * CX - Number(value)).toFixed(1)}"`,
+    )
+    .replace(
       /A ([\d.]+) ([\d.]+) 0 0 ([01])/g,
       (_arc, rx, ry, sweep) => `A ${rx} ${ry} 0 0 ${1 - Number(sweep)}`,
     );
 }
 
 test("2A movements 2 and 3 are exact vertical-axis mirrors", () => {
-  const [, left, right] = SET_TESTS[0].movements;
+  const [, left] = SET_TESTS[0].movements;
   const approach = left.draw[0];
   const returnHalf = left.draw[1];
   assert.ok(approach.t === "line" && returnHalf.t === "return-half");
@@ -217,4 +222,160 @@ test("2C movement 15 is a right-sided 10m circle tangent at I and reaching R", (
   assert.equal(center.x + rx, track("R").x, "rightmost point reaches the track at R");
   assert.equal(track("R").y, center.y);
   assert.deepEqual(movement.draw[1], { t: "line", pts: ["I", "G", "C", "M"] });
+});
+
+test("Medium 4 has all set tests, correct numbering, coefficients and marks", () => {
+  assert.deepEqual(
+    SET_4_TESTS.map((t) => [t.id, t.movements.length]),
+    [
+      ["4a", 20],
+      ["4b", 21],
+      ["4c", 22],
+    ],
+  );
+  assert.deepEqual(
+    SET_4_TESTS.map((t) => t.movements.filter((m) => m.coeff === 2).map((m) => m.n)),
+    [
+      [12, 13, 15, 18],
+      [3, 7, 8, 11],
+      [10, 12],
+    ],
+  );
+  for (const test of SET_4_TESTS)
+    test.movements.forEach((m, i) => {
+      assert.equal(m.n, i + 1);
+      for (const step of m.steps) {
+        assert.notEqual(step.at, "at");
+        assert.notEqual(step.do, "do");
+        assert.ok(step.do.length > 2);
+      }
+    });
+  assert.deepEqual(
+    [TEST("4a", 12), TEST("4a", 13), TEST("4a", 15), TEST("4a", 18), TEST("4a", 19)].map(
+      (m) => m.coeff ?? 1,
+    ),
+    [2, 2, 2, 2, 1],
+  );
+});
+function TEST(id: string, n: number) {
+  const m = SET_4_TESTS.find((t) => t.id === id)?.movements[n - 1];
+  assert.ok(m);
+  return m;
+}
+
+test("Medium 4 yields reach the side and every track segment is sampled", () => {
+  for (const test of SET_4_TESTS)
+    for (const m of test.movements)
+      for (const d of m.draw)
+        if (d.t === "line") {
+          const path = linePath(d.pts);
+          assert.ok(path.length > 0, `${test.id}/${m.n}`);
+          if (d.pts.length === 2) {
+            const a = d.pts[0],
+              b = d.pts[1];
+            if (isRail(a) && isRail(b))
+              assert.ok(path.split(" L ").length > 2, `${test.id}/${m.n} ${a}-${b}`);
+          }
+        }
+});
+test("Medium 4B 20m half circle crosses X between B and E", () => {
+  assert.deepEqual(TEST("4b", 16).draw[0], { t: "arc", from: "B", to: "E", bulge: "C" });
+  assert.deepEqual(TEST("4b", 16).draw[1], { t: "line", pts: ["E", "V", "K", "A"] });
+});
+test("Medium 4C half circles reach X and the correct track, continuing to FAK", () => {
+  assert.deepEqual(TEST("4c", 2).draw.at(-1), { t: "half", from: "E", to: "X", bulge: "C" });
+  assert.deepEqual(TEST("4c", 3).draw[0], { t: "half", from: "X", to: "B", bulge: "C" });
+  assert.deepEqual(TEST("4c", 3).draw[1], { t: "line", pts: ["B", "P", "F", "A", "K"] });
+});
+test("Medium 4C half passes lead into the correct R and S changes", () => {
+  assert.deepEqual(TEST("4c", 15).draw, [
+    { t: "line", pts: ["A", "D"] },
+    { t: "yield", from: "D", to: "B" },
+    { t: "line", pts: ["B", "R"] },
+  ]);
+  assert.equal(TEST("4c", 16).draw.at(-1)?.t, "change");
+  assert.deepEqual(TEST("4c", 18).draw, [
+    { t: "line", pts: ["A", "D"] },
+    { t: "yield", from: "D", to: "E" },
+    { t: "line", pts: ["E", "S"] },
+  ]);
+  assert.equal(TEST("4c", 19).draw.at(-1)?.t, "change");
+});
+test("Medium 4B final turns and changes are on the correct centre markers", () => {
+  assert.deepEqual(TEST("4b", 10).draw, [{ t: "line", pts: ["F", "A", "D", "L"] }]);
+  assert.deepEqual(TEST("4b", 14).draw.at(-1), { t: "line", pts: ["F", "A", "K", "V", "L"] });
+  assert.deepEqual(TEST("4b", 17).draw, [
+    { t: "line", pts: ["A", "L"] },
+    { t: "yield", from: "L", to: "S" },
+  ]);
+  assert.ok(TEST("4b", 15).draw.some((d) => d.t === "change"));
+});
+
+test("all Medium final track and centreline segments are included", () => {
+  const expected: Record<string, [string, string[]]> = {
+    "4a:3": ["diag", ["H", "P"]],
+    "4c:18": ["line", ["E", "S"]],
+    "4b:10": ["line", ["F", "A", "D", "L"]],
+  };
+  for (const test of SET_4_TESTS)
+    for (const m of test.movements) {
+      assert.ok(m.draw.length > 0, `${test.id}/${m.n}`);
+      for (const d of m.draw)
+        if (d.t === "line") {
+          for (let i = 1; i < d.pts.length; i++) {
+            const a = d.pts[i - 1],
+              b = d.pts[i];
+            assert.ok(track(a) && track(b));
+            assert.ok(
+              !isRail(a) || !isRail(b) || linePath([a, b]).split(" L ").length > 2,
+              `${test.id}/${m.n} ${a}-${b}`,
+            );
+          }
+        }
+    }
+  for (const [key, [kind, points]] of Object.entries(expected)) {
+    const [id, n] = key.split(":");
+    const m = TEST(id, Number(n));
+    assert.ok(
+      m.draw.some(
+        (d) =>
+          d.t === kind &&
+          (d.t === "line"
+            ? JSON.stringify(d.pts) === JSON.stringify(points)
+            : d.t === "diag"
+              ? [d.from, d.to].every((v, i) => v === points[i])
+              : false),
+      ),
+    );
+  }
+});
+
+test("Medium circle endpoints, extended canter and walking turns have exact geometry", () => {
+  assert.deepEqual(TEST("4c", 17).draw, [
+    { t: "line", pts: ["H", "S", "E", "V"] },
+    { t: "line", pts: ["V", "K", "A"] },
+  ]);
+  assert.deepEqual(TEST("4c", 15).draw.at(-1), { t: "line", pts: ["B", "R"] });
+  for (const id of ["4b", "4c"])
+    for (const m of SET_4_TESTS.find((t) => t.id === id)!.movements)
+      for (const d of m.draw)
+        if (d.t === "yield") assert.ok(d.to === "X" || (isRail(d.to) && track(d.to).x !== CX));
+  assert.equal(TEST("4b", 4).draw.at(-1)?.t, "half-turn");
+  assert.equal(TEST("4b", 5).draw.at(-1)?.t, "half-turn");
+  assert.equal(TEST("4c", 11).draw.find((d) => d.t === "rein-back")?.t, "rein-back");
+  for (const at of ["E", "B"] as const) {
+    const c = circleCenter(at, 5);
+    assert.equal(Math.abs(c.x - CX), 5 * M_PX.x);
+  }
+});
+
+test("adjacent perimeter letters follow rounded corners, including A-F", () => {
+  const path = linePath(["A", "F"]);
+  const points = Array.from(path.matchAll(/[ML] ([\d.]+) ([\d.]+)/g), (m) => [+m[1], +m[2]]);
+  assert.ok(
+    points.some(([x, y]) => x > CX + 10 && y > BOT - 10),
+    "must include rounded A-F corner",
+  );
+  assert.ok(Math.max(...points.map((p) => p[0])) > track("A").x + 40, "must cover towards F");
+  assert.deepEqual(TEST("4a", 14).draw, [{ t: "line", pts: ["A", "F"] }]);
 });

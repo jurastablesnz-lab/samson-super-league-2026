@@ -5,7 +5,7 @@
  * sheets. Admin-only helpers say so in their name.
  */
 import { getSql, type Sql } from "./db";
-import { loadUser, preApproved, authOff, type UserInfo } from "./beta.server";
+import { loadUser, resolveRiderAccess, type UserInfo } from "./beta.server";
 import { parseHorseList, type HorseEntry } from "./beta";
 import { generatePlan, sanitisePlanConfig, type PlanConfig } from "./plan-builder";
 import { reviewEvoResultsForOwner } from "./evo-review.server";
@@ -41,25 +41,25 @@ const newId = () => globalThis.crypto.randomUUID();
 
 /** Loads the user and refuses anyone without beta access. */
 export async function requireAccess(userId: string): Promise<UserInfo> {
-  const user = await loadUser(userId);
-  if (user.isAdmin || authOff()) return user;
+  const { user, approved } = await resolveRiderAccess(userId);
+  if (!approved) throw new Error("Your beta place is not approved yet");
   const sql = await getSql();
-  const rows = await sql<{
-    status: string;
-  }>`select status from beta_applications where user_id = ${userId}`;
-  if (rows[0]?.status === "approved" || preApproved(user.email)) return user;
-  throw new Error("Your beta place is not approved yet");
+  await sql`insert into riders (user_id, display_name, last_active_at) values (${userId}, ${user.name ?? ""}, now())
+    on conflict (user_id) do update set last_active_at = now(), updated_at = now(),
+      display_name = case when riders.display_name = '' then excluded.display_name else riders.display_name end`;
+  return user;
 }
 
-export async function requireAdminUser(userId: string): Promise<UserInfo> {
-  const user = await loadUser(userId);
+export async function requireAdminUser(userId: string, sql?: Sql): Promise<UserInfo> {
+  const user = await loadUser(userId, sql);
   if (!user.isAdmin) throw new Error("Admins only");
   return user;
 }
 
 async function ensureRider(sql: Sql, user: UserInfo) {
-  await sql`insert into riders (user_id, display_name) values (${user.id}, ${user.name ?? ""})
-    on conflict (user_id) do nothing`;
+  await sql`insert into riders (user_id, display_name, last_active_at) values (${user.id}, ${user.name ?? ""}, now())
+    on conflict (user_id) do update set last_active_at = now(), updated_at = now(),
+      display_name = case when riders.display_name = '' then excluded.display_name else riders.display_name end`;
 }
 
 type HorseRow = {

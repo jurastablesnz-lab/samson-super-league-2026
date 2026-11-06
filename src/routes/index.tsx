@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
-import { App } from "@/components/app";
-import { OwnerSync } from "@/components/owner-sync";
 import { RiderHome } from "@/components/rider-app";
 import { StatusView } from "@/components/beta-status";
 import { BrandShell, Kicker, Panel, Title } from "@/components/beta-ui";
 import { signOut } from "@/lib/auth/client";
-import { scopePlanStorage } from "@/lib/store";
 import { useBetaAccess } from "@/lib/use-beta-access";
 import type { BetaAccess } from "@/lib/beta";
 
@@ -36,9 +32,15 @@ function AccountBar({ access }: { access: BetaAccess }) {
     <div className="flex items-center justify-end gap-3 bg-sunken px-4 py-1.5 text-[11px] text-muted">
       <span className="truncate">{access.email}</span>
       {access.isAdmin && (
-        <Link to="/admin" className="font-semibold text-accent">Admin</Link>
+        <Link to="/admin" className="font-semibold text-accent">
+          Admin
+        </Link>
       )}
-      <button type="button" className="cursor-pointer underline-offset-2 hover:underline" onClick={() => void signOut("/")}>
+      <button
+        type="button"
+        className="cursor-pointer underline-offset-2 hover:underline"
+        onClick={() => void signOut("/")}
+      >
         Sign out
       </button>
     </div>
@@ -46,40 +48,12 @@ function AccountBar({ access }: { access: BetaAccess }) {
 }
 
 function TrainingApp({ access }: { access: BetaAccess }) {
-  // Samson's hand-written plan is the owner's only. Every other rider gets
-  // their own generated plan from Postgres (or the setup wizard).
-  if (!access.isAdmin) {
-    return (
-      <>
-        <AccountBar access={access} />
-        <RiderHome storageKey={access.storageKey} />
-      </>
-    );
-  }
-  return <OwnerApp access={access} />;
-}
-
-function OwnerApp({ access }: { access: BetaAccess }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    void scopePlanStorage(access.storageKey).then(() => setReady(true));
-  }, [access.storageKey]);
-  if (!ready) return <div className="vd-glow min-h-dvh" />;
+  // Admins use the same rider wizard and plan as everyone else. Their admin
+  // tools stay one click away in the account bar above.
   return (
     <>
-      {access.email && (
-        <div className="flex items-center justify-end gap-3 bg-sunken px-4 py-1.5 text-[11px] text-muted">
-          <span className="truncate">{access.email}</span>
-          {access.isAdmin && (
-            <Link to="/admin" className="font-semibold text-accent">Admin</Link>
-          )}
-          <button type="button" className="cursor-pointer underline-offset-2 hover:underline" onClick={() => void signOut("/")}>
-            Sign out
-          </button>
-        </div>
-      )}
-      {access.email && <OwnerSync />}
-      <App />
+      <AccountBar access={access} />
+      <RiderHome storageKey={access.storageKey} />
     </>
   );
 }
@@ -90,14 +64,20 @@ function Welcome() {
       <Kicker>Plan · Train · Compete · Reflect</Kicker>
       <Title>Your dressage season, in one place.</Title>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        XSalute by Virtual Dressage NZ is in private beta with a small group of riders. Apply for a place, or sign in if
-        you already have one.
+        XSalute by Virtual Dressage NZ is in private beta with a small group of riders. Apply for a
+        place, or sign in if you already have one.
       </p>
       <Panel className="mt-5 space-y-3">
-        <Link to="/join" className="block rounded-lg bg-accent px-4 py-3 text-center font-display font-extrabold text-accent-fg">
+        <Link
+          to="/join"
+          className="block rounded-lg bg-accent px-4 py-3 text-center font-display font-extrabold text-accent-fg"
+        >
           Apply to join the beta
         </Link>
-        <Link to="/login" className="block rounded-lg border border-line px-4 py-3 text-center text-sm font-semibold text-ink-soft">
+        <Link
+          to="/login"
+          className="block rounded-lg border border-line px-4 py-3 text-center text-sm font-semibold text-ink-soft"
+        >
           Sign in
         </Link>
       </Panel>

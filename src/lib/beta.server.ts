@@ -9,10 +9,11 @@
  * BETA_ADMIN_TRUST_PASSWORD=true relaxes this for local testing only — never
  * set it on a deployed app.
  */
-import { getSql } from "./db";
+import { type Sql } from "./db";
 import { env } from "./env.server";
 import { authConfigured, DEV_USER_ID } from "./auth/verify.server";
 import { gateIdentityEnabled } from "./auth/gate-identity.server";
+import { isAdminIdentity } from "./beta-admin";
 
 /** Only Google sign-in proves an admin address. */
 export const ADMIN_PROVIDERS = ["grok-google", "google"];
@@ -36,25 +37,55 @@ export function authOff(): boolean {
 
 export type UserInfo = { id: string; email: string | null; name: string | null; isAdmin: boolean };
 
-export async function loadUser(userId: string): Promise<UserInfo> {
+export async function loadUser(userId: string, providedSql?: Sql): Promise<UserInfo> {
   if (userId === DEV_USER_ID && authOff()) {
     return { id: userId, email: null, name: "Dev User", isAdmin: true };
   }
-  const sql = await getSql();
+  const sql = providedSql ?? (await (await import("./db")).getSql());
   const rows = await sql<{ email: string; name: string }>`
     select email, name from "user" where id = ${userId}`;
   const email = rows[0]?.email?.toLowerCase() ?? null;
   let isAdmin = false;
-  if (email && adminEmails().includes(email)) {
-    if (env("BETA_ADMIN_TRUST_PASSWORD") === "true") {
-      isAdmin = true;
-    } else {
-      const accounts = await sql<{ providerId: string }>`
-        select "providerId" from account where "userId" = ${userId}`;
-      isAdmin = accounts.some((a) => ADMIN_PROVIDERS.includes(a.providerId));
-    }
-  }
+  const accounts = await sql<{
+    providerId: string;
+  }>`select "providerId" from account where "userId" = ${userId}`;
+  if (
+    isAdminIdentity(
+      email,
+      adminEmails(),
+      accounts.map((a) => a.providerId),
+      env("BETA_ADMIN_TRUST_PASSWORD") === "true",
+    )
+  )
+    isAdmin = true;
+  // Normal rider access uses the same verified identity as workspace claiming.
   return { id: userId, email, name: rows[0]?.name ?? null, isAdmin };
+}
+
+export async function resolveRiderAccess(
+  userId: string,
+): Promise<{ user: UserInfo; approved: boolean }> {
+  const sql = await (await import("./db")).getSql();
+  const user = await loadUser(userId, sql);
+  if (user.isAdmin || authOff()) {
+    await sql`insert into riders (user_id, display_name, last_active_at) values (${userId}, ${user.name ?? ""}, now()) on conflict (user_id) do update set last_active_at = now(), updated_at = now()`;
+    return { user, approved: true };
+  }
+  const { loadVerifiedIdentity, verifiedGoogle, claimInvitation, assertWorkspaceAccess } =
+    await import("./rider-invites.server");
+  const identity = await loadVerifiedIdentity(sql, userId);
+  // One Google-linked account owns this claim. A same-email password account
+  // cannot claim, grant or use a prepared workspace.
+  const claimed = await claimInvitation(sql, identity);
+  const rows = await sql<{
+    status: string;
+  }>`select status from beta_applications where user_id = ${userId}`;
+  const approved = rows[0]?.status === "approved" || preApproved(user.email);
+  const appScoredClaim = !!claimed && verifiedGoogle(identity);
+  return {
+    user,
+    approved: await assertWorkspaceAccess(identity, approved || appScoredClaim, user.isAdmin),
+  };
 }
 
 export function preApproved(email: string | null): boolean {

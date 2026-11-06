@@ -1,21 +1,49 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "./auth/middleware";
 
+export function riderStorageKey(userId: string): string {
+  return `xsalute-plan:${userId}`;
+}
+
 export type BetaStatus = "pending" | "approved" | "declined" | "waitlist";
 
 export const RIDER_GRADES = ["Bronze", "Silver", "Gold", "Non-graded"] as const;
 export const REGIONS = [
-  "Northland", "Auckland", "Waikato", "Bay of Plenty", "Gisborne", "Hawke's Bay",
-  "Taranaki", "Manawatū-Whanganui", "Wellington", "Nelson / Tasman / Marlborough",
-  "West Coast", "Canterbury", "Otago", "Southland", "Outside NZ",
+  "Northland",
+  "Auckland",
+  "Waikato",
+  "Bay of Plenty",
+  "Gisborne",
+  "Hawke's Bay",
+  "Taranaki",
+  "Manawatū-Whanganui",
+  "Wellington",
+  "Nelson / Tasman / Marlborough",
+  "West Coast",
+  "Canterbury",
+  "Otago",
+  "Southland",
+  "Outside NZ",
 ] as const;
 export const COMPETITION_LEVELS = [
-  "Not competing yet", "Training / Preliminary", "Level 1", "Level 2", "Level 3",
-  "Level 4", "Level 5", "Level 6", "Level 7 / FEI Small Tour", "Grand Prix",
+  "Not competing yet",
+  "Training / Preliminary",
+  "Level 1",
+  "Level 2",
+  "Level 3",
+  "Level 4",
+  "Level 5",
+  "Level 6",
+  "Level 7 / FEI Small Tour",
+  "Grand Prix",
 ] as const;
 export const HEARD_FROM = [
-  "Virtual Dressage NZ website", "Instagram / Facebook", "A friend or fellow rider",
-  "My coach", "At a show", "Other",
+  "Virtual Dressage NZ website",
+  "Instagram / Facebook",
+  "A friend or fellow rider",
+  "My coach",
+  "At a show",
+  "Other",
 ] as const;
 
 export const MAX_HORSES = 6;
@@ -70,21 +98,48 @@ const STATUSES: BetaStatus[] = ["pending", "approved", "declined", "waitlist"];
 const LEGACY_KEY = "samson-super5-plan";
 
 type Row = {
-  user_id: string; email: string; full_name: string; phone: string | null; region: string;
-  rider_grade: string; competition_level: string; horses: string; horse_list?: unknown; esnz_member: boolean;
-  coach: string | null; goals: string; heard_from: string; consent: boolean; status: BetaStatus;
-  admin_notes: string; created_at: string | Date; decided_at: string | Date | null;
+  user_id: string;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  region: string;
+  rider_grade: string;
+  competition_level: string;
+  horses: string;
+  horse_list?: unknown;
+  esnz_member: boolean;
+  coach: string | null;
+  goals: string;
+  heard_from: string;
+  consent: boolean;
+  status: BetaStatus;
+  admin_notes: string;
+  created_at: string | Date;
+  decided_at: string | Date | null;
 };
 
 const iso = (v: string | Date | null) => (v == null ? null : new Date(v).toISOString());
 
 function toApp(r: Row): Application {
   return {
-    userId: r.user_id, email: r.email, fullName: r.full_name, phone: r.phone ?? "",
-    region: r.region, riderGrade: r.rider_grade, competitionLevel: r.competition_level,
-    horses: r.horses, horseList: parseHorseList(r.horse_list, r.horses), esnzMember: r.esnz_member, coach: r.coach ?? "", goals: r.goals,
-    heardFrom: r.heard_from, consent: r.consent, status: r.status, adminNotes: r.admin_notes,
-    createdAt: iso(r.created_at) ?? "", decidedAt: iso(r.decided_at),
+    userId: r.user_id,
+    email: r.email,
+    fullName: r.full_name,
+    phone: r.phone ?? "",
+    region: r.region,
+    riderGrade: r.rider_grade,
+    competitionLevel: r.competition_level,
+    horses: r.horses,
+    horseList: parseHorseList(r.horse_list, r.horses),
+    esnzMember: r.esnz_member,
+    coach: r.coach ?? "",
+    goals: r.goals,
+    heardFrom: r.heard_from,
+    consent: r.consent,
+    status: r.status,
+    adminNotes: r.admin_notes,
+    createdAt: iso(r.created_at) ?? "",
+    decidedAt: iso(r.decided_at),
   };
 }
 
@@ -94,12 +149,21 @@ const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slic
 export function parseHorseList(raw: unknown, legacy: string | null | undefined): HorseEntry[] {
   let v = raw;
   if (typeof v === "string") {
-    try { v = JSON.parse(v); } catch { v = null; }
+    try {
+      v = JSON.parse(v);
+    } catch {
+      v = null;
+    }
   }
   if (Array.isArray(v)) {
     const list = v
       .map((h) => (h ?? {}) as Record<string, unknown>)
-      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300), esnzNumber: cleanEsnz(h.esnzNumber) }))
+      .map((h) => ({
+        name: clip(h.name, 80),
+        level: clip(h.level, 60),
+        notes: clip(h.notes, 300),
+        esnzNumber: cleanEsnz(h.esnzNumber),
+      }))
       .filter((h) => h.name);
     if (list.length) return list;
   }
@@ -110,7 +174,12 @@ export function parseHorseList(raw: unknown, legacy: string | null | undefined):
 export function summariseHorses(list: HorseEntry[]): string {
   return list
     .map((h) =>
-      [h.name, h.level && `— ${h.level}`, h.esnzNumber && `[ESNZ ${h.esnzNumber}]`, h.notes && `(${h.notes})`]
+      [
+        h.name,
+        h.level && `— ${h.level}`,
+        h.esnzNumber && `[ESNZ ${h.esnzNumber}]`,
+        h.notes && `(${h.notes})`,
+      ]
         .filter(Boolean)
         .join(" "),
     )
@@ -129,7 +198,12 @@ function validate(input: unknown): ApplicationInput {
     horseList: (Array.isArray(i.horseList) ? i.horseList : [])
       .slice(0, MAX_HORSES)
       .map((h) => (h ?? {}) as Record<string, unknown>)
-      .map((h) => ({ name: clip(h.name, 80), level: clip(h.level, 60), notes: clip(h.notes, 300), esnzNumber: cleanEsnz(h.esnzNumber) }))
+      .map((h) => ({
+        name: clip(h.name, 80),
+        level: clip(h.level, 60),
+        notes: clip(h.notes, 300),
+        esnzNumber: cleanEsnz(h.esnzNumber),
+      }))
       .filter((h) => h.name || h.level || h.notes || h.esnzNumber),
     esnzMember: i.esnzMember === true,
     coach: clip(i.coach, 120),
@@ -137,20 +211,25 @@ function validate(input: unknown): ApplicationInput {
     heardFrom: clip(i.heardFrom, 200),
     consent: i.consent === true,
   };
-  const missing = (["fullName", "region", "riderGrade", "competitionLevel", "goals", "heardFrom"] as const)
-    .filter((k) => !out[k]);
+  const missing = (
+    ["fullName", "region", "riderGrade", "competitionLevel", "goals", "heardFrom"] as const
+  ).filter((k) => !out[k]);
   if (missing.length) throw new Error(`Please complete: ${missing.join(", ")}`);
   if (!out.horseList.length) throw new Error("Please add at least one horse with a name");
-  if (out.horseList.some((h) => !h.name)) throw new Error("Every horse needs a name (or remove the empty one)");
-  if (Array.isArray(i.horseList) && i.horseList.length > MAX_HORSES) throw new Error(`Up to ${MAX_HORSES} horses`);
+  if (out.horseList.some((h) => !h.name))
+    throw new Error("Every horse needs a name (or remove the empty one)");
+  if (Array.isArray(i.horseList) && i.horseList.length > MAX_HORSES)
+    throw new Error(`Up to ${MAX_HORSES} horses`);
   for (const h of out.horseList) {
-    if (h.level && !(COMPETITION_LEVELS as readonly string[]).includes(h.level)) throw new Error("Pick a level for each horse");
+    if (h.level && !(COMPETITION_LEVELS as readonly string[]).includes(h.level))
+      throw new Error("Pick a level for each horse");
     if (h.esnzNumber && !/^[A-Za-z0-9][A-Za-z0-9 -]*$/.test(h.esnzNumber)) {
       throw new Error(`ESNZ number for ${h.name} can only use letters, numbers, spaces and dashes`);
     }
   }
   out.horses = summariseHorses(out.horseList);
-  if (!(RIDER_GRADES as readonly string[]).includes(out.riderGrade)) throw new Error("Pick a rider grade");
+  if (!(RIDER_GRADES as readonly string[]).includes(out.riderGrade))
+    throw new Error("Pick a rider grade");
   if (!out.consent) throw new Error("Please accept the privacy note and beta terms");
   return out;
 }
@@ -164,17 +243,26 @@ export const getAuthFeatures = createServerFn({ method: "GET" }).handler(async (
 export const getBetaAccess = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<BetaAccess> => {
-    const { loadUser, preApproved, authOff } = await import("./beta.server");
+    const { resolveRiderAccess, authOff } = await import("./beta.server");
     const { getSql } = await import("./db");
-    const user = await loadUser(context.userId);
+    const { user, approved } = await resolveRiderAccess(context.userId);
     if (authOff()) {
-      return { email: null, name: user.name, isAdmin: true, hasAccess: true, status: null, application: null, storageKey: LEGACY_KEY };
+      return {
+        email: null,
+        name: user.name,
+        isAdmin: true,
+        hasAccess: true,
+        status: null,
+        application: null,
+        storageKey: LEGACY_KEY,
+      };
     }
     const sql = await getSql();
     const rows = await sql<Row>`select * from beta_applications where user_id = ${user.id}`;
     const app = rows[0] ? toApp(rows[0]) : null;
     const status = app?.status ?? null;
-    const hasAccess = user.isAdmin || status === "approved" || preApproved(user.email);
+    const hasAccess = user.isAdmin || approved;
+    const storageKey = riderStorageKey(user.id);
     let application: BetaAccess["application"] = null;
     if (app) {
       const { adminNotes: _n, ...rest } = app;
@@ -182,9 +270,13 @@ export const getBetaAccess = createServerFn({ method: "GET" })
       application = rest;
     }
     return {
-      email: user.email, name: user.name, isAdmin: user.isAdmin, hasAccess, status, application,
-      // Admins keep the original single-rider plan; riders get their own space.
-      storageKey: user.isAdmin ? LEGACY_KEY : `xsalute-plan:${user.id}`,
+      email: user.email,
+      name: user.name,
+      isAdmin: user.isAdmin,
+      hasAccess,
+      status,
+      application,
+      storageKey,
     };
   });
 
@@ -197,7 +289,9 @@ export const submitApplication = createServerFn({ method: "POST" })
     const user = await loadUser(context.userId);
     if (!user.email) throw new Error("Your account has no email address");
     const sql = await getSql();
-    const existing = await sql<{ user_id: string }>`select user_id from beta_applications where user_id = ${user.id}`;
+    const existing = await sql<{
+      user_id: string;
+    }>`select user_id from beta_applications where user_id = ${user.id}`;
     await sql`
       insert into beta_applications (user_id, email, full_name, phone, region, rider_grade,
         competition_level, horses, horse_list, esnz_member, coach, goals, heard_from, consent, consent_at)
@@ -262,7 +356,11 @@ export const decideApplication = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { userId: string; status?: BetaStatus; notes?: string }) => {
     if (input.status && !STATUSES.includes(input.status)) throw new Error("Bad status");
-    return { userId: String(input.userId), status: input.status, notes: input.notes == null ? undefined : String(input.notes).slice(0, 2000) };
+    return {
+      userId: String(input.userId),
+      status: input.status,
+      notes: input.notes == null ? undefined : String(input.notes).slice(0, 2000),
+    };
   })
   .handler(async ({ context, data }) => {
     const admin = await requireAdmin(context.userId);

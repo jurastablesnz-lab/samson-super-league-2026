@@ -10,7 +10,18 @@ import {
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
 import { EvoImportPanel } from "@/components/evo-import";
-import { BrandShell, HorseListView, inputCls, Kicker, Panel, StatusBadge, Title } from "@/components/beta-ui";
+import { getAdminRiders } from "@/lib/rider-admin";
+import type { AdminRider } from "@/lib/admin-riders";
+import { RiderAdminPanels } from "@/components/admin-riders";
+import {
+  BrandShell,
+  HorseListView,
+  inputCls,
+  Kicker,
+  Panel,
+  StatusBadge,
+  Title,
+} from "@/components/beta-ui";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({ component: AdminPage });
@@ -27,7 +38,9 @@ function AdminPage() {
         <Title>Admins only</Title>
         <p className="mt-3 text-sm text-muted">
           Sign in with Susan’s Google account (Continue with Google) to manage beta applications.{" "}
-          <Link to="/login" className="text-accent underline">Sign in</Link>
+          <Link to="/login" className="text-accent underline">
+            Sign in
+          </Link>
         </p>
       </BrandShell>
     );
@@ -37,16 +50,28 @@ function AdminPage() {
 
 function AdminDashboard() {
   const [data, setData] = useState<AdminOverview | null>(null);
+  const [riders, setRiders] = useState<AdminRider[] | null>(null);
   const [filter, setFilter] = useState<Filter>("pending");
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
-    getAdminOverview().then(setData).catch((e: unknown) => setError(String(e)));
+    getAdminOverview()
+      .then(setData)
+      .catch((e: unknown) => setError(String(e)));
+    getAdminRiders()
+      .then(setRiders)
+      .catch((e: unknown) => setError(String(e)));
   }, []);
   useEffect(load, [load]);
 
-  if (error) return <BrandShell><p className="text-danger">{error}</p></BrandShell>;
+  if (error)
+    return (
+      <BrandShell>
+        <p className="text-danger">{error}</p>
+      </BrandShell>
+    );
   if (!data) return <div className="vd-glow min-h-dvh" />;
-  const count = (f: Filter) => (f === "all" ? data.applications.length : data.applications.filter((a) => a.status === f).length);
+  const count = (f: Filter) =>
+    f === "all" ? data.applications.length : data.applications.filter((a) => a.status === f).length;
   const list = data.applications.filter((a) => filter === "all" || a.status === filter);
   const full = data.approved >= data.cap;
 
@@ -57,7 +82,9 @@ function AdminDashboard() {
           <Kicker>Admin · beta riders</Kicker>
           <Title>Applications</Title>
         </div>
-        <Link to="/" className="text-sm font-semibold text-accent">Open app →</Link>
+        <Link to="/" className="text-sm font-semibold text-accent">
+          Open app →
+        </Link>
       </div>
 
       <Panel className="mt-5">
@@ -73,6 +100,7 @@ function AdminDashboard() {
         </div>
       </Panel>
 
+      <RiderAdminPanels riders={riders} onPrepared={load} />
       <EvoImportPanel />
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -92,7 +120,9 @@ function AdminDashboard() {
       </div>
 
       <div className="mt-3 space-y-3">
-        {list.length === 0 && <p className="py-8 text-center text-sm text-muted">No applications here yet.</p>}
+        {list.length === 0 && (
+          <p className="py-8 text-center text-sm text-muted">No applications here yet.</p>
+        )}
         {list.map((a) => (
           <ApplicationCard key={a.userId} app={a} capReached={full} onChanged={load} />
         ))}
@@ -111,18 +141,45 @@ function CapEditor({ cap, onSaved }: { cap: number; onSaved: () => void }) {
         void setBetaCap({ data: { cap: Number(value) } }).then(onSaved);
       }}
     >
-      <label className="text-xs text-muted" htmlFor="cap">Cap</label>
-      <input id="cap" className={cn(inputCls, "w-20 py-1.5")} inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} />
-      <button type="submit" className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-semibold">Save</button>
+      <label className="text-xs text-muted" htmlFor="cap">
+        Cap
+      </label>
+      <input
+        id="cap"
+        className={cn(inputCls, "w-20 py-1.5")}
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button
+        type="submit"
+        className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-semibold"
+      >
+        Save
+      </button>
     </form>
   );
 }
 
-function ApplicationCard({ app, capReached, onChanged }: { app: Application; capReached: boolean; onChanged: () => void }) {
+function ApplicationCard({
+  app,
+  capReached,
+  onChanged,
+}: {
+  app: Application;
+  capReached: boolean;
+  onChanged: () => void;
+}) {
   const [notes, setNotes] = useState(app.adminNotes);
   const [busy, setBusy] = useState(false);
   const act = async (status?: BetaStatus) => {
-    if (status === "approved" && capReached && app.status !== "approved" && !window.confirm("The beta cap is reached. Approve anyway?")) return;
+    if (
+      status === "approved" &&
+      capReached &&
+      app.status !== "approved" &&
+      !window.confirm("The beta cap is reached. Approve anyway?")
+    )
+      return;
     if (status) setBusy(true);
     try {
       await decideApplication({ data: { userId: app.userId, status, notes } });
@@ -139,19 +196,27 @@ function ApplicationCard({ app, capReached, onChanged }: { app: Application; cap
     ["Region", app.region],
     ["Grade", app.riderGrade],
     ["Competing at", app.competitionLevel],
-    [app.horseList.length > 1 ? `Horses (${app.horseList.length})` : "Horse", <HorseListView horses={app.horseList} />],
+    [
+      app.horseList.length > 1 ? `Horses (${app.horseList.length})` : "Horse",
+      <HorseListView horses={app.horseList} />,
+    ],
     ["ESNZ member", app.esnzMember ? "Yes" : "No"],
     ["Coach", app.coach || "—"],
     ["Goals", app.goals],
     ["Heard via", app.heardFrom],
-    ["Applied", new Date(app.createdAt).toLocaleString("en-NZ", { dateStyle: "medium", timeStyle: "short" })],
+    [
+      "Applied",
+      new Date(app.createdAt).toLocaleString("en-NZ", { dateStyle: "medium", timeStyle: "short" }),
+    ],
   ];
   return (
     <Panel>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-display text-lg font-extrabold leading-tight">{app.fullName}</p>
-          <p className="text-xs text-muted">{app.riderGrade} · {app.competitionLevel} · {app.region}</p>
+          <p className="text-xs text-muted">
+            {app.riderGrade} · {app.competitionLevel} · {app.region}
+          </p>
         </div>
         <StatusBadge status={app.status} />
       </div>
@@ -172,20 +237,49 @@ function ApplicationCard({ app, capReached, onChanged }: { app: Application; cap
         onBlur={() => notes !== app.adminNotes && void act()}
       />
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <ActionButton disabled={busy} active={app.status === "approved"} className="bg-accent text-accent-fg" onClick={() => void act("approved")}>Approve</ActionButton>
-        <ActionButton disabled={busy} active={app.status === "waitlist"} className="bg-orange/20 text-orange" onClick={() => void act("waitlist")}>Waitlist</ActionButton>
-        <ActionButton disabled={busy} active={app.status === "declined"} className="bg-danger/15 text-danger" onClick={() => void act("declined")}>Decline</ActionButton>
+        <ActionButton
+          disabled={busy}
+          active={app.status === "approved"}
+          className="bg-accent text-accent-fg"
+          onClick={() => void act("approved")}
+        >
+          Approve
+        </ActionButton>
+        <ActionButton
+          disabled={busy}
+          active={app.status === "waitlist"}
+          className="bg-orange/20 text-orange"
+          onClick={() => void act("waitlist")}
+        >
+          Waitlist
+        </ActionButton>
+        <ActionButton
+          disabled={busy}
+          active={app.status === "declined"}
+          className="bg-danger/15 text-danger"
+          onClick={() => void act("declined")}
+        >
+          Decline
+        </ActionButton>
       </div>
     </Panel>
   );
 }
 
-function ActionButton({ active, className, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active: boolean }) {
+function ActionButton({
+  active,
+  className,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active: boolean }) {
   return (
     <button
       type="button"
       {...rest}
-      className={cn("cursor-pointer rounded-lg px-2 py-2.5 text-sm font-bold disabled:opacity-50", active && "ring-2 ring-fg/60", className)}
+      className={cn(
+        "cursor-pointer rounded-lg px-2 py-2.5 text-sm font-bold disabled:opacity-50",
+        active && "ring-2 ring-fg/60",
+        className,
+      )}
     />
   );
 }

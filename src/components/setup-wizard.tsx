@@ -398,6 +398,18 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
       </Panel>
       <Panel className="space-y-3">
         <Kicker>Your own competitions</Kicker>
+        <p className="text-sm text-muted">
+          Find upcoming dressage competitions on{" "}
+          <a
+            className="font-semibold text-accent underline"
+            href="https://www.evoevents.co.nz/?sport=1&country=1&discipline=1&view=list"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            EVO Events
+          </a>
+          , then add the ones you’re aiming at below.
+        </p>
         {dateError && <p className="text-sm text-danger" role="alert">{dateError}</p>}
         {customs.map((s) => (
           <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm">

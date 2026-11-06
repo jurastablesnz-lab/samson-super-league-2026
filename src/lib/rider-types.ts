@@ -110,6 +110,8 @@ export type Workspace = {
   /** Horses from the beta application, to prefill the setup wizard. */
   applicationHorses: HorseEntry[];
   riderGrade: string;
+  /** Registry test ids an admin has published. Drafts are absent. */
+  approvedTestIds: string[];
 };
 
 /** What the owner's original single-rider app keeps in localStorage. */

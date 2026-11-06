@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { getPublishedTests, setTestPublished } from "@/lib/test-publication";
+import { catalogTests } from "@/lib/test-registry";
 import { Button } from "@/components/ui/button";
 import { FreestyleCard } from "@/components/freestyle-player";
 import { cn } from "@/lib/utils";
@@ -716,16 +718,140 @@ function FreestyleTable({ sheet: s }: { sheet: typeof MEDIUM_FS }) {
   );
 }
 
-export function TestsPanel() {
+const DIAGRAM_TABS = ["2a", "2b", "2c", "mfs", "4a", "4b", "4c", "medium-fs"] as const;
+
+function PublicationBar({
+  name,
+  approved,
+  busy,
+  onToggle,
+}: {
+  name: string;
+  approved: boolean;
+  busy: boolean;
+  onToggle: (approved: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
+      <p className="text-sm">
+        <span className={cn("font-semibold", approved ? "text-good" : "text-warn")}>
+          {approved ? "Published" : "Draft"}
+        </span>
+        <span className="text-muted"> · {name}</span>
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onToggle(!approved)}
+        className="cursor-pointer rounded-lg border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50"
+      >
+        {busy ? "Saving…" : approved ? "Unapprove" : "Approve"}
+      </button>
+    </div>
+  );
+}
+
+export function TestCatalog() {
+  const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getPublishedTests()
+      .then((result) => setApprovedIds(result.ids))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+  const approved = new Set(approvedIds ?? []);
+
+  async function toggle(testId: string, next: boolean) {
+    setBusyId(testId);
+    setError(null);
+    try {
+      setApprovedIds((await setTestPublished({ data: { testId, approved: next } })).ids);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="mt-5 rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
+      <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Test publication</p>
+      <h2 className="font-display mt-1 text-xl font-medium">Publish a test before riders can see it</h2>
+      <p className="mt-2 text-sm text-muted">
+        Draft tests stay off rider plans and off the add-test list. Approving publishes that test for every rider.
+      </p>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      <ul className="mt-4 flex flex-col gap-2">
+        {catalogTests().map((item) => {
+          const on = approved.has(item.id);
+          return (
+            <li key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-bg px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">
+                  {item.name}{" "}
+                  {!on && <span className="text-xs font-semibold tracking-wide text-warn uppercase">Draft</span>}
+                </p>
+                <p className="truncate text-xs text-faint">{item.levels.join(" · ") || "Sheet"}</p>
+              </div>
+              <button
+                type="button"
+                disabled={approvedIds === null || busyId === item.id}
+                onClick={() => void toggle(item.id, !on)}
+                className="shrink-0 cursor-pointer rounded-lg border border-line px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                {busyId === item.id ? "Saving…" : on ? "Unapprove" : "Approve"}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
   const [active, setActive] = useState<TestTabId>("2b");
-  const test = [...SET_TESTS, ...SET_4_TESTS].find((t) => t.id === active);
+  const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getPublishedTests()
+      .then((result) => setApprovedIds(result.ids))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+  }, []);
+  const approved = useMemo(() => new Set(approvedIds ?? []), [approvedIds]);
+  const diagrams = catalogTests().filter((item) => item.viewId);
+  const visible = diagrams.filter((item) => isAdmin || (approvedIds !== null && approved.has(item.id)));
+  useEffect(() => {
+    const shown = catalogTests().filter(
+      (item) => item.viewId && (isAdmin || (approvedIds !== null && new Set(approvedIds).has(item.id))),
+    );
+    if (!shown.some((item) => item.viewId === active) && shown[0]?.viewId) setActive(shown[0].viewId);
+  }, [active, approvedIds, isAdmin]);
+  const test = [...SET_TESTS, ...SET_4_TESTS].find((item) => item.id === active);
+  const activeMeta = diagrams.find((item) => item.viewId === active);
+  const others = catalogTests().filter((item) => !item.viewId);
+
+  async function toggle(testId: string, next: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      setApprovedIds((await setTestPublished({ data: { testId, approved: next } })).ids);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface p-1 shadow-[var(--shadow-card)]">
-        {(["2a", "2b", "2c", "mfs", "4a", "4b", "4c", "medium-fs"] as const).map((id) => {
+        {DIAGRAM_TABS.filter((id) => visible.some((item) => item.viewId === id)).map((id) => {
           const tabLabel = id === "mfs" ? "MFS" : id === "medium-fs" ? "L4 MFS" : id.toUpperCase();
           const on = active === id;
+          const draft = isAdmin && approvedIds !== null && !approved.has(id);
           return (
             <button
               key={id}
@@ -737,14 +863,48 @@ export function TestsPanel() {
               )}
             >
               {tabLabel}
+              {draft ? " · Draft" : ""}
             </button>
           );
         })}
       </div>
+      {approvedIds === null && !error && <p className="text-sm text-muted">Loading tests…</p>}
+      {visible.length === 0 && approvedIds !== null && (
+        <p className="text-sm text-muted">Published test sheets will appear here.</p>
+      )}
+      {isAdmin && activeMeta && approvedIds !== null && (
+        <PublicationBar
+          name={activeMeta.name}
+          approved={approved.has(activeMeta.id)}
+          busy={busy}
+          onToggle={(next) => void toggle(activeMeta.id, next)}
+        />
+      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      {test && <SetSheet test={test} />}
-      {active === "mfs" && <MfsSheet />}
-      {active === "medium-fs" && <FreestyleTable sheet={MEDIUM_FS} />}
+      {test && visible.some((item) => item.viewId === test.id) && <SetSheet test={test} />}
+      {active === "mfs" && visible.some((item) => item.viewId === "mfs") && <MfsSheet />}
+      {active === "medium-fs" && visible.some((item) => item.viewId === "medium-fs") && (
+        <FreestyleTable sheet={MEDIUM_FS} />
+      )}
+
+      {isAdmin && approvedIds !== null && others.length > 0 && (
+        <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Other tests</p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {others.map((item) => (
+              <li key={item.id}>
+                <PublicationBar
+                  name={item.name}
+                  approved={approved.has(item.id)}
+                  busy={busy}
+                  onToggle={(next) => void toggle(item.id, next)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <p className="px-1 text-xs leading-relaxed text-faint">
         {active.startsWith("4") || active === "medium-fs" ? MEDIUM_PURPOSE : NOVICE_PURPOSE} Working

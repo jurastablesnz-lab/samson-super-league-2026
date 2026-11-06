@@ -68,18 +68,31 @@ export const prepareRider = createServerFn({ method: "POST" })
     const { getSql } = await import("./db");
     const sql = await getSql();
     const { prepareRiderWorkspace } = await import("./rider-invites.server");
-    const { generatePlan, sanitisePlanConfig } = await import("./plan-builder");
+    const { publishedTestIds } = await import("./test-approvals.server");
+    const { testIdForName } = await import("./test-registry");
+    const approved = new Set(await publishedTestIds(sql));
+    for (const horse of data.horses) {
+      for (const test of horse.tests) {
+        if (!approved.has(testIdForName(test))) throw new Error("That test is not published yet");
+      }
+    }
+    const { generatePlan, sanitisePlanConfig, testsForLevel } = await import("./plan-builder");
     const prepared = data.horses.map((horse) => {
       const config = sanitisePlanConfig(
         { horseName: horse.name, level: horse.level, tests: horse.tests, shows: [], goals: [] },
         { horseName: horse.name, level: horse.level },
       );
+      if (!config.tests.length) {
+        config.tests = testsForLevel(horse.level)
+          .filter((test) => approved.has(testIdForName(test)))
+          .slice(0, 2);
+      }
       return {
         name: horse.name,
         level: horse.level,
         esnzNumber: horse.esnzNumber || null,
         config,
-        plan: generatePlan(config),
+        plan: generatePlan(config, new Date(), { defaults: config.tests.length > 0 }),
       };
     });
     await prepareRiderWorkspace(sql, {

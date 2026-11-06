@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AdminRider } from "@/lib/admin-riders";
 import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
+import { getPublishedTests } from "@/lib/test-publication";
+import { isPublishedTest } from "@/lib/test-registry";
 import { inputCls, Kicker, Panel, PrimaryButton, StatusBadge } from "./beta-ui";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +19,15 @@ export function RiderAdminPanels({
   riders: AdminRider[] | null;
   onPrepared: () => void;
 }) {
+  const [published, setPublished] = useState<string[] | null>(null);
+  useEffect(() => {
+    getPublishedTests()
+      .then((result) => setPublished(result.ids))
+      .catch(() => setPublished([]));
+  }, []);
   return (
     <>
-      <AddRiderForm onPrepared={onPrepared} />
+      <AddRiderForm onPrepared={onPrepared} published={published ?? []} />
       <Panel className="mt-5">
         <Kicker>Riders</Kicker>
         <p className="mt-1 text-sm text-muted">
@@ -31,7 +39,12 @@ export function RiderAdminPanels({
         )}
         <div className="mt-4 space-y-3">
           {riders?.map((rider) => (
-            <RiderRow key={rider.userId} rider={rider} onChanged={onPrepared} />
+            <RiderRow
+              key={rider.userId}
+              rider={rider}
+              published={published ?? []}
+              onChanged={onPrepared}
+            />
           ))}
         </div>
       </Panel>
@@ -39,7 +52,15 @@ export function RiderAdminPanels({
   );
 }
 
-function RiderRow({ rider, onChanged }: { rider: AdminRider; onChanged: () => void }) {
+function RiderRow({
+  rider,
+  published,
+  onChanged,
+}: {
+  rider: AdminRider;
+  published: string[];
+  onChanged: () => void;
+}) {
   const waiting = rider.horses.reduce((n, h) => n + h.pendingEvo, 0);
   const nameOnly = rider.horses.flatMap((h) => h.tests.filter((t) => t.nameOnly)).length;
   return (
@@ -89,7 +110,7 @@ function RiderRow({ rider, onChanged }: { rider: AdminRider; onChanged: () => vo
               {horse.esnzNumber ? `ESNZ ${horse.esnzNumber}` : "No ESNZ number"} ·{" "}
               {horse.level || "No level"} · {horse.phase}
             </p>
-            <HorseTests horse={horse} onChanged={onChanged} />
+            <HorseTests horse={horse} published={published} onChanged={onChanged} />
             <p className="mt-2 text-xs text-muted">
               <span className="font-semibold">Target competitions:</span>{" "}
               {horse.shows.length ? horse.shows.map((s) => s.name).join(", ") : "None yet"}
@@ -132,9 +153,11 @@ function RiderRow({ rider, onChanged }: { rider: AdminRider; onChanged: () => vo
 
 function HorseTests({
   horse,
+  published,
   onChanged,
 }: {
   horse: AdminRider["horses"][number];
+  published: string[];
   onChanged: () => void;
 }) {
   const [newTest, setNewTest] = useState("");
@@ -154,7 +177,9 @@ function HorseTests({
       setBusy(false);
     }
   }
-  const choices = testsForLevel(horse.level).filter((t) => !assigned.has(t));
+  const choices = testsForLevel(horse.level).filter(
+    (test) => !assigned.has(test) && isPublishedTest(test, published),
+  );
   return (
     <div className="mt-2 text-xs">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -208,7 +233,7 @@ function HorseTests({
   );
 }
 
-function AddRiderForm({ onPrepared }: { onPrepared: () => void }) {
+function AddRiderForm({ onPrepared, published }: { onPrepared: () => void; published: string[] }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [horses, setHorses] = useState<PreparedHorseInput[]>([]);
@@ -313,7 +338,9 @@ function AddRiderForm({ onPrepared }: { onPrepared: () => void }) {
                 Tests
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   {horse.level &&
-                    testsForLevel(horse.level).map((test) => (
+                    testsForLevel(horse.level)
+                      .filter((test) => isPublishedTest(test, published))
+                      .map((test) => (
                       <label key={test} className="flex items-center gap-1">
                         <input
                           type="checkbox"

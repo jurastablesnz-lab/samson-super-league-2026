@@ -13,6 +13,7 @@ import { EvoImportPanel } from "@/components/evo-import";
 import { getAdminRiders } from "@/lib/rider-admin";
 import type { AdminRider } from "@/lib/admin-riders";
 import { RiderAdminPanels } from "@/components/admin-riders";
+import { TestCatalog } from "@/components/test-sheet";
 import {
   BrandShell,
   HorseListView,
@@ -101,6 +102,7 @@ function AdminDashboard() {
       </Panel>
 
       <RiderAdminPanels riders={riders} onPrepared={load} />
+      <TestCatalog />
       <EvoImportPanel />
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">

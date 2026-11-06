@@ -6,13 +6,13 @@ import { putMediaBlob } from "@/lib/media-db";
 import {
   GOALS,
   describeWhen,
-  testsForLevel,
   type FreestyleRef,
   type GoalId,
   type PlanConfig,
   type TargetShow,
 } from "@/lib/plan-builder";
 import { saveSetup } from "@/lib/rider";
+import { isPublishedTest, testsForLevelPublished } from "@/lib/test-registry";
 import type { Workspace } from "@/lib/rider-types";
 import { SHOWS, TODAY, iso } from "@/lib/season";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,9 @@ export function wizardHorsesFrom(ws: Workspace): WizardHorse[] {
         level: h.level,
         esnzNumber: h.esnzNumber,
         notes: h.notes,
-        tests: c?.tests ?? [],
+        tests: (c?.tests ?? []).filter(
+          (test) => ws.isOwner || isPublishedTest(test, ws.approvedTestIds),
+        ),
         shows: c?.shows ?? [],
         goals: c?.goals ?? [],
         goalNote: c?.goalNote ?? "",
@@ -114,8 +116,12 @@ export function SetupWizard({
       if (horses.some((h) => !h.name.trim())) return setError("Every horse needs a name.");
       if (horses.some((h) => !h.level)) return setError("Pick a level for each horse.");
     }
-    if (step.kind === "tests" && horses[step.i].tests.length === 0) {
-      return setError("Pick at least one test to load.");
+    if (step.kind === "tests") {
+      const chosen = horses[step.i].tests.filter(
+        (test) => workspace.isOwner || isPublishedTest(test, workspace.approvedTestIds),
+      );
+      if (chosen.length === 0) return setError("Pick at least one published test.");
+      if (chosen.length !== horses[step.i].tests.length) update(step.i, { tests: chosen });
     }
     setStepIdx((n) => Math.min(steps.length - 1, n + 1));
     window.scrollTo({ top: 0 });
@@ -229,7 +235,14 @@ export function SetupWizard({
         </>
       )}
 
-      {step.kind === "tests" && h && <TestsStep horse={h} onChange={(p) => update(step.i, p)} />}
+      {step.kind === "tests" && h && (
+        <TestsStep
+          horse={h}
+          isAdmin={workspace.isOwner}
+          approvedTestIds={workspace.approvedTestIds}
+          onChange={(p) => update(step.i, p)}
+        />
+      )}
       {step.kind === "shows" && h && <ShowsStep horse={h} onChange={(p) => update(step.i, p)} />}
       {step.kind === "goals" && h && <GoalsStep horse={h} onChange={(p) => update(step.i, p)} />}
 
@@ -326,9 +339,21 @@ function Chip({ on, children, onClick }: { on: boolean; children: React.ReactNod
   );
 }
 
-function TestsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Partial<WizardHorse>) => void }) {
+function TestsStep({
+  horse,
+  isAdmin,
+  approvedTestIds,
+  onChange,
+}: {
+  horse: WizardHorse;
+  isAdmin: boolean;
+  approvedTestIds: string[];
+  onChange: (p: Partial<WizardHorse>) => void;
+}) {
   const [custom, setCustom] = useState("");
-  const options = Array.from(new Set([...testsForLevel(horse.level), ...horse.tests]));
+  const [customError, setCustomError] = useState<string | null>(null);
+  const options = testsForLevelPublished(horse.level, approvedTestIds, isAdmin);
+  const selected = horse.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
   const toggle = (t: string) =>
     onChange({ tests: horse.tests.includes(t) ? horse.tests.filter((x) => x !== t) : [...horse.tests, t] });
   return (
@@ -340,19 +365,31 @@ function TestsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((t) => (
-          <Chip key={t} on={horse.tests.includes(t)} onClick={() => toggle(t)}>
+          <Chip key={t} on={selected.includes(t)} onClick={() => toggle(t)}>
             {t}
-            {horse.tests.indexOf(t) === 0 && <span className="ml-1 text-xs font-normal">· main</span>}
-            {horse.tests.indexOf(t) === 1 && <span className="ml-1 text-xs font-normal">· homework</span>}
+            {isAdmin && !isPublishedTest(t, approvedTestIds) && (
+              <span className="ml-1 text-xs font-normal text-warn">· Draft</span>
+            )}
+            {selected.indexOf(t) === 0 && <span className="ml-1 text-xs font-normal">· main</span>}
+            {selected.indexOf(t) === 1 && <span className="ml-1 text-xs font-normal">· homework</span>}
           </Chip>
         ))}
       </div>
+      {options.length === 0 && (
+        <p className="text-sm text-muted">No published tests for this level yet.</p>
+      )}
       <form
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           const t = custom.trim();
-          if (t && !horse.tests.includes(t)) onChange({ tests: [...horse.tests, t] });
+          setCustomError(null);
+          if (!t) return;
+          if (!isAdmin && !isPublishedTest(t, approvedTestIds)) {
+            setCustomError("That test is not published yet.");
+            return;
+          }
+          if (!horse.tests.includes(t)) onChange({ tests: [...horse.tests, t] });
           setCustom("");
         }}
       >
@@ -361,6 +398,7 @@ function TestsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           <Plus className="size-4" />
         </button>
       </form>
+      {customError && <p className="text-sm text-danger">{customError}</p>}
     </>
   );
 }

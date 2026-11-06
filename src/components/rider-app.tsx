@@ -17,6 +17,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
+import { TestsPanel } from "@/components/test-sheet";
 import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
 import type { EvoRow } from "@/lib/evo-csv";
@@ -47,6 +48,7 @@ import {
   type Workspace,
 } from "@/lib/rider-types";
 import { applyCoachVisits, packKey, packingList, playableFreestyle } from "@/lib/rider-workspace";
+import { isPublishedTest } from "@/lib/test-registry";
 import { MAX_SHEET_PHOTOS } from "@/lib/review-types";
 import {
   daysUntil,
@@ -300,7 +302,15 @@ function RiderApp({
             onProgress={rememberProgress}
           />
         )}
-        {tab === "tests" && <TestsTab key={`tests-${horse.id}`} plan={plan} record={record} />}
+        {tab === "tests" && (
+          <TestsTab
+            key={`tests-${horse.id}`}
+            plan={plan}
+            record={record}
+            isAdmin={ws.isOwner}
+            approvedTestIds={ws.approvedTestIds}
+          />
+        )}
         {tab === "coach" && (
           <CoachTab
             key={`coach-${horse.id}`}
@@ -705,15 +715,32 @@ function SeasonTab({
   );
 }
 
-function TestsTab({ plan, record }: { plan: GeneratedPlan; record: PlanRecord }) {
+function TestsTab({
+  plan,
+  record,
+  isAdmin,
+  approvedTestIds,
+}: {
+  plan: GeneratedPlan;
+  record: PlanRecord;
+  isAdmin: boolean;
+  approvedTestIds: string[];
+}) {
+  const shown = plan.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
   return (
     <div className="flex flex-col gap-4">
+      <TestsPanel isAdmin={isAdmin} />
       <Card>
         <Kicker>Your tests</Kicker>
         <ul className="mt-3 flex flex-col gap-2">
-          {plan.tests.map((t) => (
+          {shown.map((t) => (
             <li key={t} className="flex items-center justify-between rounded-lg bg-bg p-3 text-sm">
-              <span className="font-semibold">{t}</span>
+              <span className="font-semibold">
+                {t}
+                {isAdmin && !isPublishedTest(t, approvedTestIds) && (
+                  <span className="ml-2 text-xs font-semibold tracking-wide text-warn uppercase">Draft</span>
+                )}
+              </span>
               <span className="text-xs text-muted">
                 {t === plan.mainTest
                   ? "Main test — from memory"
@@ -723,6 +750,7 @@ function TestsTab({ plan, record }: { plan: GeneratedPlan; record: PlanRecord })
               </span>
             </li>
           ))}
+          {shown.length === 0 && <li className="text-sm text-muted">No published tests on this horse yet.</li>}
         </ul>
         <p className="mt-3 text-xs text-muted">
           Official test sheets are on the{" "}

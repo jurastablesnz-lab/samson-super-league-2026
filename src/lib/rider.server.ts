@@ -7,7 +7,10 @@
 import { getSql, type Sql } from "./db";
 import { loadUser, resolveRiderAccess, type UserInfo } from "./beta.server";
 import { parseHorseList, type HorseEntry } from "./beta";
-import { generatePlan, sanitisePlanConfig, type PlanConfig } from "./plan-builder";
+import { generatePlan, sanitisePlanConfig, testsForLevel, type PlanConfig } from "./plan-builder";
+import { isVerifiedAdmin } from "./admin-user.server.ts";
+import { publishedTestIds } from "./test-approvals.server.ts";
+import { testIdForName } from "./test-registry.ts";
 import type { CoachVisitDraft } from "./rider-workspace";
 import {
   deleteCoachVisitFor,
@@ -130,6 +133,7 @@ export async function loadWorkspace(userId: string): Promise<Workspace> {
   const applicationHorses: HorseEntry[] = app[0]
     ? parseHorseList(app[0].horse_list, app[0].horses)
     : [];
+  const approvedTestIds = await publishedTestIds(sql);
   return {
     userId: user.id,
     isOwner: user.isAdmin,
@@ -143,6 +147,7 @@ export async function loadWorkspace(userId: string): Promise<Workspace> {
     plans,
     applicationHorses,
     riderGrade: app[0]?.rider_grade ?? "",
+    approvedTestIds,
   };
 }
 
@@ -159,6 +164,8 @@ export async function saveSetup(
   if (input.length > 6) throw new Error("Up to 6 horses");
   const keep: string[] = [];
   let order = 0;
+  const admin = await isVerifiedAdmin(user.id, sql);
+  const approved = admin ? null : new Set(await publishedTestIds(sql));
   for (const h of input) {
     const name = s(h.name, 80).trim();
     if (!name) throw new Error("Every horse needs a name");
@@ -186,7 +193,17 @@ export async function saveSetup(
     const config = sanitisePlanConfig(h.config, { horseName: name, level });
     config.horseName = name;
     config.level = level || config.level;
-    const plan = generatePlan(config);
+    if (!admin && approved) {
+      if (config.tests.some((test) => !approved.has(testIdForName(test)))) {
+        throw new Error("That test is not published yet");
+      }
+      if (!config.tests.length) {
+        config.tests = testsForLevel(config.level)
+          .filter((test) => approved.has(testIdForName(test)))
+          .slice(0, 2);
+      }
+    }
+    const plan = generatePlan(config, new Date(), { defaults: admin || config.tests.length > 0 });
     await sql`insert into plans (horse_id, user_id, config, plan, freestyle)
       values (${id}, ${user.id}, ${JSON.stringify(config)}::jsonb, ${JSON.stringify(plan)}::jsonb,
         ${config.freestyle ? JSON.stringify(config.freestyle) : null}::jsonb)

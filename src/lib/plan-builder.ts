@@ -289,9 +289,17 @@ function principlesFor(goals: GoalId[], mainTest: string, level: string): Genera
   return list;
 }
 
-export function generatePlan(config: PlanConfig, now: Date = new Date()): GeneratedPlan {
+export function generatePlan(
+  config: PlanConfig,
+  now: Date = new Date(),
+  opts?: { defaults?: boolean },
+): GeneratedPlan {
   const level = config.level || "Level 2";
-  const tests = config.tests.length ? config.tests : testsForLevel(level).slice(0, 2);
+  const tests = config.tests.length
+    ? config.tests
+    : opts?.defaults === false
+      ? []
+      : testsForLevel(level).slice(0, 2);
   const ridden = tests.filter((t) => !isFreestyle(t));
   const mainTest = ridden[0] ?? tests[0] ?? "your test";
   const homeworkTest = ridden[1] ?? mainTest;

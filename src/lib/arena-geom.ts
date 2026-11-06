@@ -116,14 +116,24 @@ const W = RIGHT - LEFT;
 const H = BOT - TOP;
 export const PERIM = 2 * (W + H);
 
+const RAIL_POSITIONS: Record<string, number> = {
+  A: 0,
+  F: 84,
+  P: 108,
+  B: 170,
+  R: 232,
+  M: 256,
+  C: 336,
+  H: 416,
+  S: 440,
+  E: 502,
+  V: 564,
+  K: 588,
+};
+
 /** Clockwise distance from A along the sharp rectangle. */
 export function railParam(id: string): number {
-  const { x, y } = track(id);
-  if (Math.abs(x - RIGHT) < 2.5) return HW + (BOT - y);
-  if (Math.abs(y - TOP) < 2.5) return HW + H + (RIGHT - x);
-  if (Math.abs(x - LEFT) < 2.5) return HW + H + W + (y - TOP);
-  if (x >= CX - 1) return x - CX;
-  return HW + H + W + H + (x - LEFT);
+  return RAIL_POSITIONS[id] ?? 0;
 }
 
 function wrap(t: number) {
@@ -220,4 +230,19 @@ export function halfArc(from: string, to: string, bulge: "C" | "A"): string {
   // SVG sweep 1 is clockwise in screen space, which bulges toward A (down) on a horizontal chord.
   const sweep = bulge === "A" ? 1 : 0;
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 ${sweep} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+}
+
+/** Half circle from E/B to X, then the straight return to H/M. */
+export function returningHalfArc(from: string, returnTo: string, bulge: "C" | "A"): string {
+  const end = track(returnTo);
+  return `${halfArc(from, "X", bulge)} L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+}
+
+/** Quadratic loop through X at its midpoint, rather than merely towards X. */
+export function loopPath(from: string, to: string, via = "X"): string {
+  const a = track(from);
+  const b = track(to);
+  const p = track(via);
+  const control = { x: 2 * p.x - (a.x + b.x) / 2, y: 2 * p.y - (a.y + b.y) / 2 };
+  return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }

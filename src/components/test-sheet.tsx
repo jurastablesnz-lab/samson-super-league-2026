@@ -30,7 +30,9 @@ import {
   circleCenter,
   halfArc,
   label,
+  loopPath,
   linePath,
+  returningHalfArc,
   track,
 } from "@/lib/arena-geom";
 
@@ -43,6 +45,8 @@ function ptsTo(d: Draw): string[] {
     case "loop":
     case "half":
       return [d.from, d.to];
+    case "return-half":
+      return [d.from, "X", d.to];
     case "circle":
     case "stretch":
     case "halt":
@@ -99,13 +103,14 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
           );
         }
         if (d.t === "loop") {
-          const a = track(d.from);
-          const b = track(d.to);
-          const x = track("X");
-          return <path key={key} d={`M ${a.x} ${a.y} Q ${x.x} ${x.y} ${b.x} ${b.y}`} strokeWidth={width} />;
+          return <path key={key} d={loopPath(d.from, d.to)} strokeWidth={width} />;
         }
-        if (d.t === "half") {
-          return <path key={key} d={halfArc(d.from, d.to, d.bulge)} strokeWidth={width} strokeDasharray={dash} />;
+        if (d.t === "half" || d.t === "return-half") {
+          const dPath =
+            d.t === "half"
+              ? halfArc(d.from, d.to, d.bulge)
+              : returningHalfArc(d.from, d.to, d.bulge);
+          return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }
         if (d.t === "circle" || d.t === "stretch") {
           const m = d.t === "stretch" ? 20 : d.m;
@@ -136,7 +141,10 @@ function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; 
           return (
             <g key={key}>
               <circle cx={p.x} cy={p.y} r="5" fill="var(--color-surface)" strokeWidth={2} />
-              <path d={`M ${p.x - 5} ${p.y} L ${p.x} ${p.y - 6} L ${p.x + 5} ${p.y}`} strokeWidth={1.8} />
+              <path
+                d={`M ${p.x - 5} ${p.y} L ${p.x} ${p.y - 6} L ${p.x + 5} ${p.y}`}
+                strokeWidth={1.8}
+              />
             </g>
           );
         }
@@ -185,8 +193,24 @@ function TestArena({
         stroke="var(--color-accent)"
         strokeWidth="1.6"
       />
-      <line x1={CX} y1={TOP} x2={CX} y2={BOT} stroke="var(--color-line)" strokeWidth="0.8" strokeDasharray="3 3" />
-      <line x1={LEFT} y1={134} x2={RIGHT} y2={134} stroke="var(--color-line)" strokeWidth="0.8" strokeDasharray="3 3" />
+      <line
+        x1={CX}
+        y1={TOP}
+        x2={CX}
+        y2={BOT}
+        stroke="var(--color-line)"
+        strokeWidth="0.8"
+        strokeDasharray="3 3"
+      />
+      <line
+        x1={LEFT}
+        y1={134}
+        x2={RIGHT}
+        y2={134}
+        stroke="var(--color-line)"
+        strokeWidth="0.8"
+        strokeDasharray="3 3"
+      />
       {ghostMoves
         ? ghostMoves.map((gm) => (
             <g key={gm.n} opacity={0.22}>
@@ -269,7 +293,9 @@ function Caller({
     <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{kicker}</p>
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            {kicker}
+          </p>
           <h2 className="font-display mt-1 text-xl font-medium">{title}</h2>
           <p className="mt-1 font-mono text-xs text-faint">{meta}</p>
         </div>
@@ -349,7 +375,9 @@ function MovementList({
 }) {
   return (
     <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-      <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Official sheet</p>
+      <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+        Official sheet
+      </p>
       <h2 className="font-display mt-1 text-xl font-medium">{heading}</h2>
       {intro && <p className="mt-2 text-sm text-muted">{intro}</p>}
       <ol className="mt-4 flex flex-col gap-1">
@@ -389,7 +417,9 @@ function MovementList({
                     ))}
                   </ul>
                   {mv.coeff === 2 && !on && (
-                    <p className="mt-1 text-[10px] font-semibold tracking-wide text-accent uppercase">Coefficient 2</p>
+                    <p className="mt-1 text-[10px] font-semibold tracking-wide text-accent uppercase">
+                      Coefficient 2
+                    </p>
                   )}
                 </div>
               </button>
@@ -431,10 +461,15 @@ function SetSheet({ test }: { test: SetTest }) {
       />
 
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Collective marks</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          Collective marks
+        </p>
         <ul className="mt-3 flex flex-col gap-2">
           {COLLECTIVES.map((c) => (
-            <li key={c.name} className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3">
+            <li
+              key={c.name}
+              className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3"
+            >
               <div>
                 <p className="text-sm font-semibold">{c.name}</p>
                 <p className="mt-0.5 text-sm leading-relaxed text-muted">{c.detail}</p>
@@ -449,7 +484,9 @@ function SetSheet({ test }: { test: SetTest }) {
       </section>
 
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">School it</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          School it
+        </p>
         <ul className="mt-3 flex flex-col gap-3">
           {test.keys.map((k) => (
             <li key={k.move} className="rounded-lg bg-bg p-3">
@@ -499,12 +536,18 @@ function MfsSheet() {
       />
 
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Compulsory movements</p>
-        <h2 className="font-display mt-1 text-xl font-medium">Technical execution · {s.technicalTotal}</h2>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          Compulsory movements
+        </p>
+        <h2 className="font-display mt-1 text-xl font-medium">
+          Technical execution · {s.technicalTotal}
+        </h2>
         <ol className="mt-3 flex flex-col gap-1">
           {s.compulsory.map((mv) => (
             <li key={mv.n} className="flex items-start gap-3 rounded-lg bg-bg p-3">
-              <span className="font-mono mt-0.5 w-6 shrink-0 text-xs text-faint tabular-nums">{mv.n}</span>
+              <span className="font-mono mt-0.5 w-6 shrink-0 text-xs text-faint tabular-nums">
+                {mv.n}
+              </span>
               <p className="min-w-0 flex-1 text-sm leading-snug">{mv.move}</p>
               <Coeff n={mv.coeff} />
             </li>
@@ -513,12 +556,16 @@ function MfsSheet() {
       </section>
 
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Artistic presentation</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          Artistic presentation
+        </p>
         <h2 className="font-display mt-1 text-xl font-medium">Artistic · {s.artisticTotal}</h2>
         <ol className="mt-3 flex flex-col gap-1">
           {s.artistic.map((mv) => (
             <li key={mv.n} className="flex items-start gap-3 rounded-lg bg-bg p-3">
-              <span className="font-mono mt-0.5 w-6 shrink-0 text-xs text-faint tabular-nums">{mv.n}</span>
+              <span className="font-mono mt-0.5 w-6 shrink-0 text-xs text-faint tabular-nums">
+                {mv.n}
+              </span>
               <p className="min-w-0 flex-1 text-sm leading-snug">{mv.move}</p>
               <Coeff n={mv.coeff} />
             </li>
@@ -527,7 +574,9 @@ function MfsSheet() {
       </section>
 
       <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">What you may show</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          What you may show
+        </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-bg p-3">
             <p className="text-sm font-semibold">Permitted</p>
@@ -582,8 +631,8 @@ export function TestsPanel() {
       {active === "mfs" && <MfsSheet />}
 
       <p className="px-1 text-xs leading-relaxed text-faint">
-        {NOVICE_PURPOSE} Working sheet from ESNZ Novice tests effective 1 September 2023. Official test sheets take
-        precedence.{" "}
+        {NOVICE_PURPOSE} Working sheet from ESNZ Novice tests effective 1 September 2023. Official
+        test sheets take precedence.{" "}
         <a
           href="https://www.nzequestrian.org.nz/disciplines/dressage/resources/dressage-tests/"
           target="_blank"

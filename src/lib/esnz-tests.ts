@@ -11,6 +11,7 @@ export type Draw =
   | { t: "diag"; from: string; to: string }
   | { t: "circle"; at: string; m: 10 | 15 | 20 }
   | { t: "half"; from: string; to: string; bulge: "C" | "A" }
+  | { t: "return-half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "loop"; from: string; to: string }
   | { t: "yield"; from: string; to: string }
   | { t: "halt"; at: string }
@@ -136,9 +137,9 @@ export const TEST_2A: SetTest = {
       directive:
         "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
       draw: [
-        { t: "line", pts: ["X", "C", "H"] },
-        { t: "half", from: "E", to: "X", bulge: "A" },
-        { t: "line", pts: ["X", "G", "H", "C", "M", "B"] },
+        { t: "line", pts: ["X", "C", "H", "S", "E"] },
+        { t: "return-half", from: "E", to: "H", bulge: "C" },
+        { t: "line", pts: ["H", "C", "M", "B"] },
       ],
     },
     {
@@ -150,8 +151,8 @@ export const TEST_2A: SetTest = {
       directive:
         "Regularity and quality of trot; shape and size of half circle; bend; balance; straightness",
       draw: [
-        { t: "half", from: "B", to: "X", bulge: "A" },
-        { t: "line", pts: ["X", "G", "M", "C"] },
+        { t: "return-half", from: "B", to: "M", bulge: "C" },
+        { t: "line", pts: ["M", "C"] },
       ],
     },
     {
@@ -284,7 +285,7 @@ export const TEST_2A: SetTest = {
         "Moderate lengthening of frame and stride; regularity and quality of trot; straightness; consistent tempo; willing, clear transitions; bend and balance in corners",
       draw: [
         { t: "diag", from: "K", to: "R" },
-        { t: "line", pts: ["R", "B", "P", "F"] },
+        { t: "line", pts: ["R", "B", "E"] },
       ],
     },
     {
@@ -297,7 +298,7 @@ export const TEST_2A: SetTest = {
       directive:
         "Bend and balance in half circle, regularity and quality of trot, willing, clear transition; straightness, attentiveness; immobility (min. 3 secs)",
       draw: [
-        { t: "half", from: "E", to: "X", bulge: "A" },
+        { t: "half", from: "E", to: "X", bulge: "C" },
         { t: "line", pts: ["X", "G"] },
         { t: "halt", at: "G" },
       ],
@@ -603,7 +604,7 @@ export const TEST_2C: SetTest = {
       draw: [
         { t: "line", pts: ["C", "H"] },
         { t: "diag", from: "H", to: "F" },
-        { t: "line", pts: ["F", "P", "B"] },
+        { t: "line", pts: ["F", "V"] },
       ],
     },
     {
@@ -829,7 +830,7 @@ export const TEST_2C: SetTest = {
         "Bend and balance in corner and half circle; regularity and quality of trot; willing, clear transition; straightness; attentiveness; immobility (min. 3 secs)",
       draw: [
         { t: "line", pts: ["M", "R", "B"] },
-        { t: "half", from: "B", to: "X", bulge: "A" },
+        { t: "half", from: "B", to: "X", bulge: "C" },
         { t: "line", pts: ["X", "G"] },
         { t: "halt", at: "G" },
       ],

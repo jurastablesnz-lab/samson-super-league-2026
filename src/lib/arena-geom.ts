@@ -272,3 +272,89 @@ export function halfTurnPath(to: "H" | "M") {
     sign = to === "H" ? -1 : 1;
   return `M ${g.x} ${g.y} L ${g.x + sign * 18} ${g.y} Q ${g.x + sign * 18} ${g.y + 24} ${g.x} ${g.y + 18} L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
 }
+
+export type LateralTick = {
+  centre: { x: number; y: number };
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  nose: { x: number; y: number };
+  tip: { x: number; y: number };
+};
+
+/** The angled body-axis hatches used by ESNZ, with a subtle directional tip. */
+export function lateralWork(
+  points: readonly { x: number; y: number }[],
+  kind: "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield",
+  direction: "left" | "right",
+): LateralTick[] {
+  const segments: { a: { x: number; y: number }; b: { x: number; y: number }; length: number }[] =
+    [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i],
+      b = points[i + 1],
+      length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 1) continue;
+    segments.push({ a, b, length });
+    total += length;
+  }
+  if (total < 3) return [];
+  const count = Math.max(2, Math.round(total / 13) + 1),
+    endpoint = Math.min(8, total / 5);
+  const spacing = (total - 2 * endpoint) / (count - 1);
+  const ticks: LateralTick[] = [];
+  for (let j = 0; j < count; j++) {
+    let pos = endpoint + j * spacing;
+    const segment = segments.find((s) => pos <= s.length) ?? segments.at(-1)!;
+    const a = segment.a,
+      b = segment.b;
+    const dx = (b.x - a.x) / segment.length,
+      dy = (b.y - a.y) / segment.length;
+    const cx = a.x + dx * pos,
+      cy = a.y + dy * pos;
+    const heading = Math.atan2(dy, dx);
+    const sign =
+      kind === "half-pass" || kind === "leg-yield"
+        ? direction === "right"
+          ? 1
+          : -1
+        : (direction === "right" ? 1 : -1) * (kind === "travers" ? -1 : 1);
+    const angle = heading + (sign * Math.PI) / 6,
+      halfLength = 4;
+    const vx = Math.cos(angle),
+      vy = Math.sin(angle);
+    const from = { x: cx - vx * halfLength, y: cy - vy * halfLength };
+    const nose = { x: cx + vx * halfLength, y: cy + vy * halfLength };
+    ticks.push({
+      centre: { x: cx, y: cy },
+      from,
+      to: { x: cx + vx * (halfLength + 1.1), y: cy + vy * (halfLength + 1.1) },
+      nose,
+      tip: { x: nose.x - dy * 1.7, y: nose.y + dx * 1.7 },
+    });
+  }
+  return ticks;
+}
+
+function roundedRailPoints(ids: readonly string[]) {
+  const points: { x: number; y: number }[] = [];
+  for (let i = 1; i < ids.length; i++) {
+    const pair = isRail(ids[i - 1]) && isRail(ids[i]);
+    const next = pair ? sampleRail(ids[i - 1], ids[i]) : [track(ids[i - 1]), track(ids[i])];
+    points.push(...(i === 1 ? next : next.slice(1)));
+  }
+  return points;
+}
+
+export function lateralWorkPath(
+  ids: readonly string[],
+  kind: "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield",
+  direction: "left" | "right",
+) {
+  return lateralWork(roundedRailPoints(ids), kind, direction)
+    .map(
+      (t) =>
+        `M ${t.from.x.toFixed(2)} ${t.from.y.toFixed(2)} L ${t.to.x.toFixed(2)} ${t.to.y.toFixed(2)} M ${t.tip.x.toFixed(2)} ${t.tip.y.toFixed(2)} L ${t.nose.x.toFixed(2)} ${t.nose.y.toFixed(2)}`,
+    )
+    .join(" ");
+}

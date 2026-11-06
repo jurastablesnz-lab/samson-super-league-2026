@@ -75,6 +75,7 @@ export const TEST_2B: SetTest = {
         { t: "yield", from: "L", to: "M" },
         { t: "line", pts: ["M", "C", "H"] },
       ],
+      lateral: { kind: "leg-yield", direction: "right", line: true, pts: ["L", "M"] },
     },
     {
       n: 4,
@@ -103,6 +104,7 @@ export const TEST_2B: SetTest = {
         { t: "yield", from: "L", to: "H" },
         { t: "line", pts: ["H", "C"] },
       ],
+      lateral: { kind: "leg-yield", direction: "left", line: true, pts: ["L", "H"] },
     },
     {
       n: 6,

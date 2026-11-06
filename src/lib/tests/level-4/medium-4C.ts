@@ -1,3 +1,4 @@
+import type { Lateral } from "../types.ts";
 import { MEDIUM_ENTER } from "./shared.ts";
 import { COLLECTIVES, MEDIUM_PURPOSE, MEDIUM_INSTRUCTIONS } from "../medium.ts";
 import type { Draw, Pace, SetTest } from "../types.ts";
@@ -27,6 +28,14 @@ function m(
     ...(pace ? { pace } : {}),
   };
 }
+
+const lateral = (
+  movement: typeof mv2,
+  kind: Lateral["kind"],
+  direction: Lateral["direction"],
+  from: string,
+  to: string,
+) => ({ ...movement, lateral: { kind, direction, from, to } });
 
 const mv2 = m(
   2,
@@ -260,12 +269,12 @@ export const TEST_4C: SetTest = {
   leave: "Leave arena in walk on a long rein at A",
   movements: [
     MEDIUM_ENTER,
-    mv2,
-    mv3,
-    mv4,
+    lateral(mv2, "shoulder-in", "left", "H", "E"),
+    lateral(mv3, "shoulder-in", "right", "B", "F"),
+    lateral(mv4, "half-pass", "right", "K", "X"),
     mv5,
     mv6,
-    mv7,
+    lateral(mv7, "half-pass", "left", "F", "X"),
     mv8,
     mv9,
     mv10,
@@ -273,10 +282,10 @@ export const TEST_4C: SetTest = {
     mv12,
     mv13,
     mv14,
-    mv15,
+    lateral(mv15, "half-pass", "right", "D", "B"),
     mv16,
     mv17,
-    mv18,
+    lateral(mv18, "half-pass", "left", "D", "E"),
     mv19,
     mv20,
     mv21,

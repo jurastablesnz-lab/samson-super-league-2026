@@ -34,6 +34,7 @@ import {
   halfArc,
   halfTurnPath,
   arcPath,
+  lateralWorkPath,
   label,
   loopPath,
   linePath,
@@ -53,8 +54,6 @@ function ptsTo(d: Draw): string[] {
       return [d.from, d.to];
     case "return-half":
       return [d.from, "X", d.to];
-    case "half-turn":
-      return [d.to];
     case "half-turn":
       return [d.to];
     case "circle":
@@ -88,11 +87,36 @@ function dashFor(d: Draw, pace?: Pace) {
   return undefined;
 }
 
-function MovementPath({ draw, accent, pace }: { draw: Draw[]; accent?: boolean; pace?: Pace }) {
+export function MovementPath({
+  draw,
+  accent,
+  pace,
+  lateral,
+}: {
+  draw: Draw[];
+  accent?: boolean;
+  pace?: Pace;
+  lateral?: Movement["lateral"];
+}) {
   const stroke = strokeFor(pace, !!accent);
   const width = accent ? 2.4 : 1.6;
   return (
     <g fill="none" stroke={stroke} strokeLinecap="round" strokeLinejoin="round">
+      {lateral ? (
+        <path
+          className="lateral-work"
+          data-lateral={lateral.kind}
+          data-direction={lateral.direction}
+          d={lateralWorkPath(
+            lateral.line ? lateral.pts : [lateral.from, lateral.to],
+            lateral.kind,
+            lateral.direction,
+          )}
+          strokeWidth={accent ? 1.5 : 1}
+          stroke="var(--color-ink-soft)"
+          strokeLinecap="round"
+        />
+      ) : null}
       {draw.map((d, i) => {
         const key = `${d.t}-${i}`;
         const dash = dashFor(d, pace);
@@ -247,12 +271,12 @@ export function TestArena({
       {ghostMoves
         ? ghostMoves.map((gm) => (
             <g key={gm.n} opacity={0.18} strokeDasharray="3 3" aria-hidden="true">
-              <MovementPath draw={gm.draw} pace={gm.pace} />
+              <MovementPath draw={gm.draw} pace={gm.pace} lateral={gm.lateral} />
             </g>
           ))
         : null}
       <g data-active-movement={`${movement.n}`}>
-        <MovementPath draw={movement.draw} accent pace={movement.pace} />
+        <MovementPath draw={movement.draw} accent pace={movement.pace} lateral={movement.lateral} />
       </g>
       {LETTER_IDS.map((id) => {
         const p = label(id);

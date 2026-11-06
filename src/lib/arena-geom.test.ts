@@ -14,6 +14,8 @@ import {
   linePath,
   loopPath,
   railParam,
+  lateralWork,
+  lateralWorkPath,
   returningHalfArc,
   track,
 } from "./arena-geom.ts";
@@ -378,4 +380,180 @@ test("adjacent perimeter letters follow rounded corners, including A-F", () => {
   );
   assert.ok(Math.max(...points.map((p) => p[0])) > track("A").x + 40, "must cover towards F");
   assert.deepEqual(TEST("4a", 14).draw, [{ t: "line", pts: ["A", "F"] }]);
+});
+
+test("lateral work produces even body-axis hatches centred on its path", () => {
+  const a = lateralWork(
+    [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ],
+    "shoulder-in",
+    "right",
+  );
+  assert.ok(a.length >= 5);
+  const midpoint = a[Math.floor(a.length / 2)];
+  assert.equal(midpoint.centre.x, 0);
+  assert.ok(Math.abs(midpoint.centre.y - 50) < 1);
+  for (let i = 1; i < a.length; i++)
+    assert.ok(Math.abs(a[i].centre.y - a[i - 1].centre.y - 84 / (a.length - 1)) < 1e-8);
+  for (const t of a) {
+    assert.equal(t.centre.x, 0);
+    assert.ok(t.centre.y >= 8 && t.centre.y <= 92);
+    assert.ok(Math.abs(Math.hypot(t.nose.x - t.centre.x, t.nose.y - t.centre.y) - 4) < 1e-8);
+  }
+});
+function tickInside(t: ReturnType<typeof lateralWork>[number], leftRail: boolean) {
+  return leftRail ? t.nose.x > t.centre.x : t.nose.x < t.centre.x;
+}
+function angleOf(t: ReturnType<typeof lateralWork>[number]) {
+  return Math.atan2(t.to.y - t.from.y, t.to.x - t.from.x);
+}
+test("lateral types and mirrored diagonals orient the body relative to the arena", () => {
+  const k = track("K"),
+    si = lateralWork([k, track("E")], "shoulder-in", "right")[0];
+  const tr = lateralWork([k, track("E")], "travers", "right")[0];
+  assert.ok(si.nose.x > k.x, "shoulder-in right: forehand inside left rail");
+  assert.ok(tr.nose.x < k.x, "travers right: forehand stays outside left rail");
+  const re = lateralWork([track("F"), track("B")], "renvers", "left")[0];
+  assert.ok(re.nose.x < track("F").x, "renvers left: forehand is outside right rail");
+  assert.ok(angleOf(si) > -Math.PI / 2 && angleOf(si) < 0);
+  assert.ok(angleOf(tr) < -Math.PI / 2 && angleOf(tr) > -Math.PI);
+  const mirror = lateralWork([track("F"), track("B")], "shoulder-in", "left")[0];
+  assert.ok(Math.abs(si.nose.x - si.centre.x + (mirror.nose.x - mirror.centre.x)) < 1e-8);
+  const right = lateralWork([track("L"), track("M")], "leg-yield", "right")[0];
+  const left = lateralWork([track("L"), track("H")], "leg-yield", "left")[0];
+  assert.ok(
+    Math.abs(right.nose.x - right.centre.x + (left.nose.x - left.centre.x)) < 1e-8,
+    "mirror lateral displacement",
+  );
+  assert.ok(
+    Math.abs(right.nose.y - right.centre.y - (left.nose.y - left.centre.y)) < 1e-8,
+    "same parallel pitch",
+  );
+  const half = lateralWork([track("L"), track("M")], "half-pass", "right")[0];
+  assert.equal(angleOf(half), angleOf(right));
+  assert.ok(right.nose.x > CX);
+  assert.ok(left.nose.x < CX);
+});
+test("the rail sampler places hatches on the same rounded rail, clear of corners", () => {
+  const a = lateralWorkPath(["C", "H"], "shoulder-in", "right");
+  assert.ok(a.split(" M ").length >= 10);
+  const points = Array.from(a.matchAll(/[ML] (-?[\d.]+) (-?[\d.]+)/g), (m) => ({
+    x: +m[1],
+    y: +m[2],
+  }));
+  assert.ok(points.every((p) => p.x >= LEFT - 4 && p.y >= TOP));
+  const cornerMarks = lateralWork([track("C"), track("H")], "shoulder-in", "right");
+  assert.ok(cornerMarks.every((t) => t.centre.x >= LEFT && t.centre.y > TOP));
+  for (const pair of [
+    ["K", "E"],
+    ["E", "H"],
+    ["F", "B"],
+    ["B", "M"],
+  ] as const) {
+    const isRight = pair[0] === "K" || pair[0] === "E";
+    const ticks = lateralWork(
+      [track(pair[0]), track(pair[1])],
+      "shoulder-in",
+      isRight ? "right" : "left",
+    );
+    assert.ok(ticks.every((t) => tickInside(t, track(pair[0]).x < 110)));
+    assert.ok(ticks[0].centre.x === track(pair[0]).x);
+    assert.ok(ticks[0].centre.y < track(pair[0]).y && ticks[0].centre.y > track(pair[1]).y);
+    assert.ok(lateralWorkPath(pair, "shoulder-in", isRight ? "right" : "left").length > 100);
+  }
+});
+test("all named lateral paths are annotated, without changing their base path", () => {
+  const expected: Record<string, number[]> = {
+    "2b": [3, 5],
+    "2c": [3, 14],
+    "4a": [4, 6, 9, 11, 15, 18],
+    "4b": [3, 8, 11, 17],
+    "4c": [2, 3, 4, 7, 15, 18],
+  };
+  for (const test of [...SET_TESTS, ...SET_4_TESTS]) {
+    assert.deepEqual(
+      test.movements.filter((m) => m.lateral).map((m) => m.n),
+      expected[test.id] ?? [],
+      test.id,
+    );
+    for (const m of test.movements)
+      for (const d of m.draw)
+        if (d.t === "yield") {
+          assert.match(m.lateral?.kind ?? "", /leg-yield|half-pass/);
+          const from = m.lateral?.line ? m.lateral.pts[0] : m.lateral?.from;
+          const to = m.lateral?.line ? m.lateral.pts.at(-1) : m.lateral?.to;
+          assert.equal(from, d.from);
+          assert.equal(to, d.to);
+        }
+  }
+  assert.equal(TEST("4a", 6).lateral?.kind, "travers");
+  assert.equal(TEST("4a", 4).lateral?.kind, "shoulder-in");
+  assert.equal(TEST("4a", 9).lateral?.direction, "left");
+  assert.equal(TEST("4a", 11).lateral?.direction, "left");
+  assert.ok(lateralWorkPath(["A", "F"], "shoulder-in", "left").length > 0);
+});
+
+test("both freestyle yield paths also get the shared leg-yield body angle", async () => {
+  const { MFS_FLOOR } = await import("./freestyle-floor.ts");
+  const yields = MFS_FLOOR.movements.filter((m) => m.lateral);
+  assert.deepEqual(
+    yields.map((m) => m.n),
+    [7, 14],
+  );
+  assert.deepEqual(
+    yields.map((m) =>
+      !m.lateral || m.lateral.line ? [] : [m.lateral.from, m.lateral.to, m.lateral.direction],
+    ),
+    [
+      ["F", "I", "left"],
+      ["K", "I", "right"],
+    ],
+  );
+});
+
+test("each lateral descriptor matches its existing travel path, not the whole movement", () => {
+  for (const test of [...SET_TESTS, ...SET_4_TESTS])
+    for (const m of test.movements)
+      if (m.lateral) {
+        const a = m.lateral.line ? m.lateral.pts[0] : m.lateral.from;
+        const b = m.lateral.line ? m.lateral.pts.at(-1)! : m.lateral.to;
+        assert.ok(
+          m.draw.some((d) =>
+            d.t === "line"
+              ? d.pts.includes(a) && d.pts.includes(b)
+              : d.t === "yield" && d.from === a && d.to === b,
+          ),
+          `${test.id}/${m.n} ${a}-${b}`,
+        );
+      }
+});
+
+test("lateral hatch overlays on tested movement paths retain their original endpoints", () => {
+  const covers = [
+    ["4a", 4, "K", "E"],
+    ["4a", 6, "E", "H"],
+    ["4a", 9, "F", "B"],
+    ["4a", 11, "B", "M"],
+  ] as const;
+  for (const [id, n, from, to] of covers) {
+    const m = TEST(id, n);
+    assert.ok(m.lateral);
+    const seg = m.lateral.line ? m.lateral.pts : [m.lateral.from, m.lateral.to];
+    assert.deepEqual(seg, [from, to]);
+    const points = lateralWorkPath(seg, m.lateral.kind, m.lateral.direction).split(" M ");
+    assert.ok(points.length >= 10);
+  }
+});
+
+test("4A/4 and 4A/6 point the forehand opposite on the left rail", () => {
+  const shoulder = TEST("4a", 4).lateral!,
+    haunches = TEST("4a", 6).lateral!;
+  const a = lateralWork([track("K"), track("E")], shoulder.kind, shoulder.direction)[0];
+  const b = lateralWork([track("E"), track("H")], haunches.kind, haunches.direction)[0];
+  assert.ok(a.nose.x > track("K").x);
+  assert.ok(b.nose.x < track("E").x);
+  assert.equal(shoulder.direction, "right");
+  assert.equal(haunches.direction, "right");
 });

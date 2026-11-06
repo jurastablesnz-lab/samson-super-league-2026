@@ -65,6 +65,7 @@ export const TEST_2C: SetTest = {
       steps: [{ at: "V I", do: "Leg yield right" }],
       directive: "Regularity and quality of trot, consistent tempo; alignment, balance and flow",
       draw: [{ t: "yield", from: "V", to: "I" }],
+      lateral: { kind: "leg-yield", direction: "right", from: "V", to: "I" },
     },
     {
       n: 4,
@@ -191,6 +192,7 @@ export const TEST_2C: SetTest = {
       steps: [{ at: "P I", do: "Leg yield left" }],
       directive: "Regularity and quality of trot; consistent tempo; alignment; balance and flow",
       draw: [{ t: "yield", from: "P", to: "I" }],
+      lateral: { kind: "leg-yield", direction: "left", from: "P", to: "I" },
     },
     {
       n: 15,

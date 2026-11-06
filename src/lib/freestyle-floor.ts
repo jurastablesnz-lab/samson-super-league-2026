@@ -6,8 +6,9 @@ function m(
   steps: Movement["steps"],
   draw: Movement["draw"],
   directive = "",
+  lateral?: Movement["lateral"],
 ): Movement {
-  return { n, pace, steps, draw, directive };
+  return { n, pace, steps, draw, directive, lateral };
 }
 
 /** DCD October 2023 Level 2 musical freestyle floorplan — Jura Samson. */
@@ -52,6 +53,8 @@ export const MFS_FLOOR = {
       "yield",
       [{ at: "F I", do: "Leg yield left in working trot" }],
       [{ t: "yield", from: "F", to: "I" }],
+      "",
+      { kind: "leg-yield", direction: "left", from: "F", to: "I" },
     ),
     m(
       8,
@@ -84,6 +87,8 @@ export const MFS_FLOOR = {
       "yield",
       [{ at: "K I", do: "Leg yield right in working trot" }],
       [{ t: "yield", from: "K", to: "I" }],
+      "",
+      { kind: "leg-yield", direction: "right", from: "K", to: "I" },
     ),
     m(
       15,

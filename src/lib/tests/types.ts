@@ -25,6 +25,12 @@ export type Draw =
   | { t: "half-turn"; to: "H" | "M" }
   | { t: "rein-back"; at: string };
 
+export type LateralKind = "shoulder-in" | "travers" | "renvers" | "half-pass" | "leg-yield";
+export type LateralDirection = "left" | "right";
+export type Lateral = { kind: LateralKind; direction: LateralDirection } & (
+  { line: true; pts: string[] } | { line?: false; from: string; to: string }
+);
+
 export type Step = { at: string; do: string };
 
 export type Movement = {
@@ -34,6 +40,7 @@ export type Movement = {
   directive: string;
   draw: Draw[];
   pace?: Pace;
+  lateral?: Lateral;
 };
 
 export type SetTest = {

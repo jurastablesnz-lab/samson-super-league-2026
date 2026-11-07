@@ -73,6 +73,7 @@ import {
   pirouettePath,
   pointOn,
   quarterTurnPath,
+  approachTravel,
   returningHalfArc,
   serpentinePath,
   track,
@@ -263,10 +264,16 @@ export function MovementPath({
             />
           );
         if (d.t === "half" || d.t === "return-half") {
+          const prev = draw[i - 1];
+          const inferred =
+            prev?.t === "line" && prev.pts.at(-1) === d.from
+              ? approachTravel(prev.pts.at(-2), d.from)
+              : undefined;
+          const travel = (d.t === "half" ? d.travel : undefined) ?? inferred;
           const dPath =
             d.t === "half"
-              ? halfArc(d.from, d.to, d.bulge, d.hand)
-              : returningHalfArc(d.from, d.to, d.bulge);
+              ? halfArc(d.from, d.to, d.bulge, d.hand, travel)
+              : returningHalfArc(d.from, d.to, d.bulge, travel);
           return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }
         if (d.t === "circle" || d.t === "stretch") {

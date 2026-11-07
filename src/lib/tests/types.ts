@@ -21,7 +21,15 @@ export type Draw =
       /** 10m circle on the same centre as the 20m circle, spanning the quarterlines. */
       betweenQuarterlines?: boolean;
     }
-  | { t: "half"; from: string; to: string; bulge: "C" | "A"; hand?: "left" | "right" }
+  | {
+      t: "half";
+      from: string;
+      to: string;
+      bulge: "C" | "A";
+      hand?: "left" | "right";
+      /** Way the horse is going on the track as this half circle starts. The arc continues that way. */
+      travel?: "A" | "C";
+    }
   | { t: "return-half"; from: string; to: string; bulge: "C" | "A" }
   | { t: "loop"; from: string; to: string; insetM?: number }
   | { t: "yield"; from: string; to: string }

@@ -29,6 +29,7 @@ import {
   CX,
   CORNER_RX,
   CORNER_RY,
+  approachTravel,
   halfArc,
   halfTurnPath,
   haunchesTurn,
@@ -77,18 +78,69 @@ function halvesGoViaG(from: string, to: string) {
   return moves!.draw.some((d) => d.t === "line" && d.pts.includes("G"));
 }
 
-test("the final half circles bend towards C before turning towards G", () => {
-  for (const id of ["2a", "2c"] as const) {
-    const draw = SET_TESTS.find((t) => t.id === id)!
-      .movements.at(-1)!
-      .draw.find((d) => d.t === "half");
-    assert.ok(draw && draw.t === "half");
-    assert.equal(draw.to, "X");
-    assert.equal(draw.bulge, "C");
-    const v = values(halfArc(draw.from, draw.to, draw.bulge));
-    assert.deepEqual(v.slice(0, 2), [track(draw.from).x, track(draw.from).y]);
-    assert.deepEqual(v.slice(-2), [track("X").x, track("X").y]);
+test("2C's final half circle continues toward A, then up the centre line to G", () => {
+  const movement = SET_TESTS.find((t) => t.id === "2c")!.movements.at(-1)!;
+  const index = movement.draw.findIndex((d) => d.t === "half");
+  const draw = movement.draw[index];
+  assert.ok(draw && draw.t === "half" && draw.from === "B" && draw.to === "X");
+  const prev = movement.draw[index - 1];
+  assert.ok(prev && prev.t === "line");
+  assert.equal(approachTravel(prev.pts.at(-2), draw.from), "A");
+  const crown = arcCrownOf(halfArc(draw.from, draw.to, draw.bulge, draw.hand, "A"));
+  assert.ok(crown.y > track("B").y, "the half circle bulges toward A, below the B-E line");
+  assert.deepEqual(
+    movement.draw.find((d) => d.t === "line" && d.pts[0] === "X"),
+    { t: "line", pts: ["X", "G"] },
+  );
+});
+
+test("half circles onto the centre line follow the direction of travel", () => {
+  const centre = new Set(["X", "I", "L", "D", "G"]);
+  const sheets = [
+    ...SET_0_TESTS,
+    ...SET_1_TESTS,
+    ...SET_TESTS,
+    ...SET_3_TESTS,
+    ...SET_4_TESTS,
+    ...SET_5_TESTS,
+    ...SET_6_TESTS,
+    ...SET_7_TESTS,
+    ...SET_G1_TESTS,
+    ...SET_G2_TESTS,
+    ...SET_G3_TESTS,
+    ...SET_G4_TESTS,
+    ...SET_GV_TESTS,
+    ...SET_EVENTING_TESTS,
+  ];
+  const changed: string[] = [];
+  for (const t of sheets) {
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    withArena(size, () => {
+      for (const m of t.movements) {
+        m.draw.forEach((d, i) => {
+          if (d.t !== "half" && d.t !== "return-half") return;
+          const to = d.t === "return-half" ? "X" : d.to;
+          if (!centre.has(to)) return;
+          if (Math.abs(track(d.from).x - track(to).x) <= Math.abs(track(d.from).y - track(to).y))
+            return;
+          const prev = m.draw[i - 1];
+          const inferred =
+            prev?.t === "line" && prev.pts.at(-1) === d.from
+              ? approachTravel(prev.pts.at(-2), d.from)
+              : undefined;
+          const travel = (d.t === "half" ? d.travel : undefined) ?? inferred;
+          if (!travel) return;
+          const hand = d.t === "half" ? d.hand : undefined;
+          const before = arcCrownOf(halfArc(d.from, to, d.bulge, hand));
+          const after = arcCrownOf(halfArc(d.from, to, d.bulge, hand, travel));
+          const side = (y: number) => (y > track(d.from).y + 2 ? "A" : "C");
+          assert.equal(side(after.y), travel, `${t.id}/${m.n} ${d.from} ${travel}`);
+          if (side(before.y) !== side(after.y)) changed.push(`${t.id}/${m.n}`);
+        });
+      }
+    });
   }
+  assert.deepEqual(changed, ["2c/22", "5a/3", "gv-a/4", "ev-a3/16", "ev-c3/13", "ev-c3/16"]);
 });
 
 function isStraightVee(path: string, from: string, to: string) {

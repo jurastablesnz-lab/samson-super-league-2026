@@ -47,7 +47,7 @@ const halfPassLeft = mv(
     ["H R", "Collected trot"],
   ],
   "Shape and size of half circle; alignment, bend, fluency and crossing of legs; engagement and self carriage",
-  [half("V", "L", "A"), yieldTo("L", "H"), line(["H", "C", "M", "R"])],
+  [{ ...half("V", "L", "A"), travel: "A" }, yieldTo("L", "H"), line(["H", "C", "M", "R"])],
   { coeff: 2 },
 );
 

@@ -554,6 +554,19 @@ function arcCrown(
   return { x: cx + arx * Math.cos(mid), y: cy + ary * Math.sin(mid) };
 }
 
+const CENTRE_LETTERS = new Set(["X", "I", "L", "D", "G"]);
+
+/**
+ * Direction along the track from `prev` into `at`. Larger screen y is toward A.
+ * A flat step (B to E, for example) has no along-track direction.
+ */
+export function approachTravel(prev: string | undefined, at: string): "A" | "C" | undefined {
+  if (!prev) return undefined;
+  const dy = track(at).y - track(prev).y;
+  if (Math.abs(dy) < 2) return undefined;
+  return dy > 0 ? "A" : "C";
+}
+
 /**
  * Side the crown should sit for a left or right half circle.
  * On the centre line the rider travels along the chord, so left is the rider's
@@ -583,6 +596,7 @@ export function halfArc(
   to: string,
   bulge: "C" | "A",
   hand?: "left" | "right",
+  travel?: "A" | "C",
 ): string {
   const a = track(from);
   const b = track(to);
@@ -590,8 +604,14 @@ export function halfArc(
   const metres = Math.hypot((b.x - a.x) / geom.mPx.x, (b.y - a.y) / geom.mPx.y);
   const rx = Math.max(8, (metres / 2) * geom.mPx.x);
   const ry = Math.max(8, (metres / 2) * geom.mPx.y);
+  const ontoCentre = CENTRE_LETTERS.has(to) && Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
   let sweep: 0 | 1;
-  if (hand) {
+  if (travel && ontoCentre) {
+    // The horse keeps going the way it was already travelling. Toward A is below the line.
+    const midY = (a.y + b.y) / 2;
+    const score = (c: { y: number }) => (travel === "A" ? 1 : -1) * (c.y - midY);
+    sweep = score(arcCrown(a, b, rx, ry, 1)) > score(arcCrown(a, b, rx, ry, 0)) ? 1 : 0;
+  } else if (hand) {
     const want = handOffset(a, b, hand);
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const score = (c: { x: number; y: number }) => (c.x - mid.x) * want.x + (c.y - mid.y) * want.y;
@@ -621,9 +641,14 @@ export function halfArc(
 }
 
 /** Half circle from E/B to X, then the straight return to H/M. */
-export function returningHalfArc(from: string, returnTo: string, bulge: "C" | "A"): string {
+export function returningHalfArc(
+  from: string,
+  returnTo: string,
+  bulge: "C" | "A",
+  travel?: "A" | "C",
+): string {
   const end = track(returnTo);
-  return `${halfArc(from, "X", bulge)} L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+  return `${halfArc(from, "X", bulge, undefined, travel)} L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
 }
 
 /** Quadratic loop through X at its midpoint, rather than merely towards X. */

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { getPublishedTests, setTestPublished } from "@/lib/test-publication";
-import { catalogTests } from "@/lib/test-registry";
+import { catalogTests, type CatalogTest } from "@/lib/test-registry";
 import { Button } from "@/components/ui/button";
 import { FreestyleCard } from "@/components/freestyle-player";
 import { cn } from "@/lib/utils";
@@ -905,6 +905,268 @@ const MORE_FREESTYLES: Record<string, Parameters<typeof FreestyleTable>[0]["shee
   "int-i-fs": INTERMEDIATE_I_FS,
 };
 
+type FreestyleSheet = {
+  name: string;
+  time: string;
+  arena: string;
+  technicalTotal: number;
+  artisticTotal: number;
+  compulsory: { n: number; move: string; coeff: number }[];
+  permitted: string[];
+  notPermitted: string[];
+  penalties?: string;
+};
+
+const FREESTYLE_SHEETS: Record<string, FreestyleSheet> = {
+  mfs: MFS_SHEET,
+  "elementary-fs": ELEMENTARY_FS,
+  "medium-fs": MEDIUM_FS,
+  "adv-medium-fs": ADVANCED_MEDIUM_FS,
+  "advanced-fs": ADVANCED_FS,
+  "int-i-fs": INTERMEDIATE_I_FS,
+  "g1-fs": GRADE_1_FS,
+  "g2-fs": GRADE_2_FS,
+  "g3-fs": GRADE_3_FS,
+  "g4-fs": GRADE_4_FS,
+  "gv-fs": GRADE_V_FS,
+};
+
+function AdminTestPreview({
+  item,
+  approved,
+  busy,
+  onToggle,
+  onClose,
+  onPrevious,
+  onNext,
+  hasPrevious,
+  hasNext,
+}: {
+  item: CatalogTest;
+  approved: boolean;
+  busy: boolean;
+  onToggle: (approved: boolean) => void;
+  onClose: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const setTest = ALL_SET_TESTS.find((test) => test.id === item.id);
+  const freestyle = FREESTYLE_SHEETS[item.id];
+  const floor = item.id === "mfs" ? MFS_FLOOR.movements : [];
+  const marks = setTest ? marksFor(setTest) : null;
+  const arena = setTest?.arena ?? freestyle?.arena ?? (floor.length ? MFS_FLOOR.arena : "");
+  const time = setTest?.time ?? freestyle?.time ?? (floor.length ? MFS_FLOOR.time : "");
+  const total = marks
+    ? String(marks.total)
+    : freestyle
+      ? String(freestyle.technicalTotal + freestyle.artisticTotal)
+      : "";
+  useEffect(() => {
+    scroller.current?.scrollTo(0, 0);
+  }, [item.id]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col bg-bg text-fg" role="dialog" aria-modal="true" aria-label={item.name}>
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-8">
+          <button type="button" onClick={onClose} className="min-h-11 self-start text-sm font-semibold text-accent">
+            Back to the list
+          </button>
+          <PreviewActions
+            approved={approved}
+            busy={busy}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            onToggle={onToggle}
+            onPrevious={onPrevious}
+            onNext={onNext}
+          />
+          <header>
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+              {approved ? "Published" : "Draft"}
+            </p>
+            <h2 className="font-display mt-1 text-2xl leading-tight font-medium">{item.name}</h2>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <Fact label="Level" value={item.levels.join(", ") || "—"} />
+              <Fact label="Arena" value={arena || "—"} />
+              <Fact label="Total marks" value={total || "—"} />
+              <Fact label="Riding time" value={time || "—"} />
+            </dl>
+          </header>
+          {setTest &&
+            setTest.movements.map((movement) => (
+              <MovementPreview key={movement.n} movement={movement} arena={setTest.arena} />
+            ))}
+          {floor.map((movement) => (
+            <MovementPreview key={`floor-${movement.n}`} movement={movement} arena={MFS_FLOOR.arena} />
+          ))}
+          {setTest && (
+            <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
+              <h3 className="font-display text-lg font-medium">Collectives</h3>
+              <ul className="mt-3 flex flex-col gap-2">
+                {(setTest.collectives ?? COLLECTIVES).map((mark) => (
+                  <li key={mark.name} className="rounded-lg bg-bg p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold">{mark.name}</p>
+                      <p className="shrink-0 text-xs font-semibold text-accent">Coefficient {mark.coeff}</p>
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{mark.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {freestyle && <FreestyleFacts sheet={freestyle} />}
+          {!setTest && !freestyle && (
+            <p className="text-sm leading-relaxed text-muted">
+              This name is in the registry, and the movement sheet is not loaded yet. You can still publish it for riders to select.
+            </p>
+          )}
+          <PreviewActions
+            approved={approved}
+            busy={busy}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            onToggle={onToggle}
+            onPrevious={onPrevious}
+            onNext={onNext}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-surface px-3 py-2">
+      <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">{label}</dt>
+      <dd className="mt-0.5 text-sm leading-snug">{value}</dd>
+    </div>
+  );
+}
+
+function MovementPreview({ movement, arena }: { movement: Movement; arena: string }) {
+  const letters = movement.steps.map((step) => step.at).filter(Boolean);
+  return (
+    <article className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-mono text-xs text-faint">Movement {movement.n}</p>
+        <p className="text-xs font-semibold text-accent">Coefficient {movement.coeff ?? 1}</p>
+      </div>
+      {letters.length > 0 && (
+        <p className="mt-2 text-sm font-semibold">{letters.join(" · ")}</p>
+      )}
+      <div className="mt-1 space-y-1">
+        {movement.steps.map((step, index) => (
+          <p key={index} className="text-sm leading-snug">
+            {step.at ? <span className="font-semibold">{step.at} </span> : null}
+            {step.do}
+          </p>
+        ))}
+      </div>
+      {movement.directive && (
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          <span className="font-medium text-fg">Directive: </span>
+          {movement.directive}
+        </p>
+      )}
+      <div className="mx-auto mt-3 max-w-[16rem]">
+        <TestArena movement={movement} arena={arena} />
+      </div>
+    </article>
+  );
+}
+
+function FreestyleFacts({ sheet }: { sheet: FreestyleSheet }) {
+  return (
+    <>
+      <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
+        <h3 className="font-display text-lg font-medium">Compulsory</h3>
+        <ol className="mt-3 flex flex-col gap-2">
+          {sheet.compulsory.map((move) => (
+            <li key={move.n} className="rounded-lg bg-bg p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <p>
+                  <span className="font-mono mr-2 text-xs text-faint">{move.n}</span>
+                  {move.move}
+                </p>
+                <p className="shrink-0 text-xs font-semibold text-accent">Coefficient {move.coeff}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
+        <h3 className="font-display text-lg font-medium">Permitted</h3>
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted">
+          {sheet.permitted.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <h3 className="font-display mt-4 text-lg font-medium">Not permitted</h3>
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted">
+          {sheet.notPermitted.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+function PreviewActions({
+  approved,
+  busy,
+  hasPrevious,
+  hasNext,
+  onToggle,
+  onPrevious,
+  onNext,
+}: {
+  approved: boolean;
+  busy: boolean;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onToggle: (approved: boolean) => void;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onToggle(!approved)}
+        className="min-h-11 cursor-pointer rounded-lg bg-accent px-4 text-sm font-semibold text-accent-fg disabled:opacity-50"
+      >
+        {busy ? "Saving…" : approved ? "Unapprove" : "Approve"}
+      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={!hasPrevious}
+          onClick={onPrevious}
+          className="min-h-11 cursor-pointer rounded-lg border border-line px-3 text-sm font-semibold disabled:opacity-40"
+        >
+          Previous test
+        </button>
+        <button
+          type="button"
+          disabled={!hasNext}
+          onClick={onNext}
+          className="min-h-11 cursor-pointer rounded-lg border border-line px-3 text-sm font-semibold disabled:opacity-40"
+        >
+          Next test
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PublicationBar({
   name,
   approved,
@@ -939,6 +1201,7 @@ function PublicationBar({
 export function TestCatalog() {
   const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     getPublishedTests()
@@ -946,6 +1209,9 @@ export function TestCatalog() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
   const approved = new Set(approvedIds ?? []);
+  const tests = catalogTests();
+  const openIndex = tests.findIndex((item) => item.id === openId);
+  const openTest = openIndex >= 0 ? tests[openIndex] : null;
 
   async function toggle(testId: string, next: boolean) {
     setBusyId(testId);
@@ -980,7 +1246,11 @@ export function TestCatalog() {
               key={item.id}
               className="flex items-center justify-between gap-3 rounded-lg bg-bg px-3 py-2"
             >
-              <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setOpenId(item.id)}
+                className="min-h-11 min-w-0 flex-1 cursor-pointer py-1 text-left"
+              >
                 <p className="text-sm font-semibold">
                   {item.name}{" "}
                   {!on && (
@@ -990,7 +1260,7 @@ export function TestCatalog() {
                   )}
                 </p>
                 <p className="truncate text-xs text-faint">{item.levels.join(" · ") || "Sheet"}</p>
-              </div>
+              </button>
               <button
                 type="button"
                 disabled={approvedIds === null || busyId === item.id}
@@ -1003,6 +1273,19 @@ export function TestCatalog() {
           );
         })}
       </ul>
+      {openTest && (
+        <AdminTestPreview
+          item={openTest}
+          approved={approved.has(openTest.id)}
+          busy={busyId === openTest.id}
+          onToggle={(next) => void toggle(openTest.id, next)}
+          onClose={() => setOpenId(null)}
+          hasPrevious={openIndex > 0}
+          hasNext={openIndex >= 0 && openIndex < tests.length - 1}
+          onPrevious={() => openIndex > 0 && setOpenId(tests[openIndex - 1].id)}
+          onNext={() => openIndex < tests.length - 1 && setOpenId(tests[openIndex + 1].id)}
+        />
+      )}
     </section>
   );
 }

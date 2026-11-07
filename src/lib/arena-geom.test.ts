@@ -33,10 +33,12 @@ import {
   halfTurnPath,
   haunchesTurn,
   linePath,
-  insetLoopPath,
-  loopPath,
+  loopOrVeePath,
+  samplePath,
+  serpentinePath,
   railParam,
   sameSideThroughX,
+  veePath,
   withArena,
   lateralWork,
   lateralWorkPoints,
@@ -89,48 +91,141 @@ test("the final half circles bend towards C before turning towards G", () => {
   }
 });
 
-function quadApexes(path: string) {
-  const tokens = path.match(/[MQ][^MQ]*/g) ?? [];
-  let x = 0;
-  let y = 0;
-  const mids: { x: number; y: number }[] = [];
-  for (const tok of tokens) {
-    const n = tok
-      .slice(1)
-      .trim()
-      .split(/[\s,]+/)
-      .map(Number);
-    if (tok.startsWith("M")) {
-      x = n[0];
-      y = n[1];
-    } else {
-      const [cx, cy, ex, ey] = n;
-      mids.push({ x: (x + 2 * cx + ex) / 4, y: (y + 2 * cy + ey) / 4 });
-      x = ex;
-      y = ey;
+function isStraightVee(path: string, from: string, to: string) {
+  assert.equal(/[QCA]/.test(path), false, `${from} ${to} is curved`);
+  const [sx, sy, mx, my, ex, ey] = values(path);
+  const at = (id: string, x: number, y: number) => {
+    const p = track(id);
+    assert.ok(
+      Math.abs(x - p.x) < 0.05 && Math.abs(y - p.y) < 0.05,
+      `${id} ${x},${y} vs ${p.x},${p.y}`,
+    );
+  };
+  at(from, sx, sy);
+  at("X", mx, my);
+  at(to, ex, ey);
+  assert.equal(values(path).length, 6, `${from} ${to} has an extra bend`);
+  assert.ok(Math.abs(mx - sx) > 40, `${from} ${to} point is not out at X`);
+}
+
+function arcCrownOf(path: string) {
+  const samples = samplePath(path, 24);
+  // The crown is the sample farthest from the chord between the ends.
+  const a = samples[0];
+  const b = samples[samples.length - 1];
+  let best = a;
+  let bestD = -1;
+  for (const p of samples) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const dist = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+    if (dist > bestD) {
+      best = p;
+      bestD = dist;
     }
   }
-  return mids;
+  return best;
 }
 
-function hitsX(path: string) {
-  return quadApexes(path).some(
-    (p) => Math.abs(p.x - track("X").x) < 0.05 && Math.abs(p.y - track("X").y) < 0.05,
-  );
-}
+test("opposite-hand half circles through X form an S", () => {
+  const towardC = (from: string, to: string, hand: "left" | "right") => {
+    const crown = arcCrownOf(halfArc(from, to, "C", hand));
+    return crown.y < track("X").y;
+  };
+  // B→X left stays toward C; X→E right flips toward A. The red line on 3B/5.
+  assert.equal(towardC("B", "X", "left"), true);
+  assert.equal(towardC("X", "E", "right"), false);
+  assert.equal(towardC("E", "X", "left"), false);
+  assert.equal(towardC("X", "B", "right"), true);
+  assert.equal(towardC("E", "X", "right"), true);
+  assert.equal(towardC("X", "B", "left"), false);
+  const sheets = [...SET_3_TESTS, ...SET_4_TESTS, ...SET_5_TESTS, ...SET_EVENTING_TESTS];
+  const found: string[] = [];
+  for (const t of sheets) {
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    withArena(size, () => {
+      for (const m of t.movements) {
+        const halves = m.draw.filter((d) => d.t === "half" && d.hand);
+        if (halves.length < 2) continue;
+        found.push(`${t.id}/${m.n}`);
+        const crowns = halves.map((d) => {
+          if (d.t !== "half" || !d.hand) return 0;
+          return arcCrownOf(halfArc(d.from, d.to, d.bulge, d.hand)).y - track("X").y;
+        });
+        assert.ok(crowns[0] * crowns[1] < 0, `${t.id}/${m.n} halves share a side`);
+        for (const p of crowns) assert.ok(Math.abs(p) > 8, `${t.id}/${m.n} arc is flat`);
+      }
+    });
+  }
+  assert.deepEqual(found, ["3b/5", "3b/10", "5c/4", "5c/10", "ev-a1/2", "ev-c3/5"]);
+});
 
-test("2C one-loop counter canter passes exactly through X", () => {
-  for (const [from, to] of [
-    ["K", "H"],
-    ["F", "M"],
+test("centre-line half circles already alternate left then right", () => {
+  withArena("40x20", () => {
+    const left = arcCrownOf(halfArc("A", "X", "A"));
+    const right = arcCrownOf(halfArc("X", "C", "C"));
+    assert.ok(left.x < track("X").x, "A to X left bulges to the left long side");
+    assert.ok(right.x > track("X").x, "X to C right bulges to the right long side");
+  });
+});
+
+test("serpentine loops are round, touch the long side, and cross the centre on a straight", () => {
+  for (const loops of [3, 4, 5]) {
+    for (const size of ["60x20", "40x20"] as const) {
+      withArena(size, () => {
+        const path = serpentinePath("C", "left", loops);
+        assert.equal(path.includes("Q"), false, `${size} ${loops}`);
+        const straights = path.match(/L (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g) ?? [];
+        assert.equal(straights.length, loops - 1, `${size} ${loops} crossings`);
+        for (const straight of straights) {
+          const [x, y] = straight.slice(2).split(" ").map(Number);
+          const prev = path
+            .slice(0, path.indexOf(straight))
+            .match(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)\s*$/);
+          assert.ok(prev);
+          const py = Number(prev[2]);
+          const px = Number(prev[1]);
+          assert.ok(Math.abs(y - py) < 0.05, "crossing is parallel to the short side");
+          assert.ok((px - CX) * (x - CX) < 0, "crossing goes over the centre line");
+        }
+        const samples = samplePath(path, 24);
+        const touch = Math.min(...samples.map((p) => p.x));
+        assert.ok(Math.abs(touch - LEFT) < 1, `${size} ${loops} touches the left, ${touch}`);
+        assert.ok(
+          samples.every(
+            (p) => p.x >= LEFT - 1 && p.x <= RIGHT + 1 && p.y >= TOP - 1 && p.y <= BOT + 1,
+          ),
+          `${size} ${loops} left the arena`,
+        );
+      });
+    }
+  }
+  const three = serpentinePath("C", "right");
+  const arc = three.match(/A (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/);
+  assert.ok(arc);
+  const rx = Number(arc[1]);
+  const ry = Number(arc[2]);
+  // Three loops of a 60m arena: about a 20m circle, drawn with the arena's scale.
+  assert.ok(Math.abs(rx / M_PX.x - 10) < 2.5, `horizontal radius ${rx / M_PX.x}m`);
+  assert.ok(Math.abs((ry * 2) / M_PX.y - 20) < 0.5, `loop length ${(ry * 2) / M_PX.y}m`);
+});
+
+test("2C counter canter and free walk are straight Vs through X", () => {
+  for (const [n, from, to] of [
+    [7, "K", "H"],
+    [12, "H", "K"],
+    [18, "F", "M"],
   ] as const) {
-    const [sx, sy, cx, cy, ex, ey] = values(loopPath(from, to));
-    assert.equal((sx + 2 * cx + ex) / 4, track("X").x);
-    assert.equal((sy + 2 * cy + ey) / 4, track("X").y);
+    const draw = SET_TESTS[2].movements[n - 1].draw.find((d) => d.t === "loop");
+    assert.ok(draw && draw.t === "loop");
+    assert.deepEqual([draw.from, draw.to], [from, to]);
+    assert.equal(draw.insetM, undefined);
+    isStraightVee(loopOrVeePath(draw.from, draw.to, draw.insetM), from, to);
   }
 });
 
-test("same-side H X K and M X F figures loop through X and leave the wall", () => {
+test("same-side H X K and M X F figures are a straight V whose point is X", () => {
   for (const [from, to] of [
     ["H", "K"],
     ["K", "H"],
@@ -138,16 +233,20 @@ test("same-side H X K and M X F figures loop through X and leave the wall", () =
     ["F", "M"],
   ] as const) {
     assert.equal(sameSideThroughX(from, to), true);
-    assert.ok(hitsX(loopPath(from, to)), `${from} ${to} loop`);
-    assert.ok(hitsX(linePath([from, "X", to])), `${from} ${to} line`);
-    const [sx, , cx] = values(loopPath(from, to));
-    assert.ok(Math.abs(cx - sx) > 20, `${from} ${to} bends in off the rail`);
+    const path = veePath(from, to);
+    isStraightVee(path, from, to);
+    assert.equal(loopOrVeePath(from, to), path);
+    assert.equal(linePath([from, "X", to]), path);
   }
   assert.equal(sameSideThroughX("H", "F"), false);
-  assert.equal(hitsX(linePath(["H", "X", "F"])), false);
+  const across = linePath(["H", "X", "F"]);
+  assert.equal(/[QCA]/.test(across), false);
+  assert.deepEqual(values(across).slice(2, 4), [track("X").x, track("X").y]);
+  assert.deepEqual(values(across).slice(-2), [track("F").x, track("F").y]);
   withArena("40x20", () => {
-    assert.ok(hitsX(loopPath("H", "K")));
-    assert.ok(hitsX(loopPath("M", "F")));
+    isStraightVee(veePath("H", "K"), "H", "K");
+    isStraightVee(veePath("M", "F"), "M", "F");
+    assert.equal(linePath(["M", "X", "F"]), veePath("M", "F"));
   });
 });
 
@@ -189,14 +288,16 @@ test("every H X K style movement reaches X, including 2C and Prelim 1C", () => {
                 (d.t === "diag" && sameSideThroughX(d.from, d.to)),
             );
             assert.ok(draw, `${t.id}/${m.n} has no loop for ${a} X ${b}`);
-            let path = "";
-            if (draw.t === "loop")
-              path = draw.insetM
-                ? insetLoopPath(draw.from, draw.to, draw.insetM)
-                : loopPath(draw.from, draw.to);
-            else if (draw.t === "line") path = linePath(draw.pts);
-            else if (draw.t === "diag") path = loopPath(draw.from, draw.to);
-            assert.ok(hitsX(path), `${t.id}/${m.n} ${a} X ${b} misses X`);
+            assert.equal(draw.t === "loop" ? draw.insetM : undefined, undefined);
+            const path =
+              draw.t === "loop"
+                ? loopOrVeePath(draw.from, draw.to, draw.insetM)
+                : draw.t === "line"
+                  ? linePath(draw.pts)
+                  : draw.t === "diag"
+                    ? veePath(draw.from, draw.to)
+                    : "";
+            isStraightVee(path, a, b);
           }
         }
       }
@@ -431,8 +532,20 @@ test("Medium 4B 20m half circle crosses X between B and E", () => {
   assert.deepEqual(TEST("4b", 16).draw[1], { t: "line", pts: ["E", "V", "K", "A"] });
 });
 test("Medium 4C half circles reach X and the correct track, continuing to FAK", () => {
-  assert.deepEqual(TEST("4c", 2).draw.at(-1), { t: "half", from: "E", to: "X", bulge: "C" });
-  assert.deepEqual(TEST("4c", 3).draw[0], { t: "half", from: "X", to: "B", bulge: "C" });
+  assert.deepEqual(TEST("4c", 2).draw.at(-1), {
+    t: "half",
+    from: "E",
+    to: "X",
+    bulge: "C",
+    hand: "left",
+  });
+  assert.deepEqual(TEST("4c", 3).draw[0], {
+    t: "half",
+    from: "X",
+    to: "B",
+    bulge: "A",
+    hand: "right",
+  });
   assert.deepEqual(TEST("4c", 3).draw[1], { t: "line", pts: ["B", "P", "F", "A", "K"] });
 });
 test("Medium 4C half passes lead into the correct R and S changes", () => {

@@ -6,7 +6,13 @@ const line = (pts: string[]): Draw => ({ t: "line", pts });
 const diag = (from: string, to: string): Draw => ({ t: "diag", from, to });
 const halfPass = (from: string, to: string): Draw => ({ t: "yield", from, to });
 const circle = (at: string, m: 10): Draw => ({ t: "circle", at, m });
-const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "half", from, to, bulge });
+const half = (from: string, to: string, bulge: "C" | "A", hand?: "left" | "right"): Draw => ({
+  t: "half",
+  from,
+  to,
+  bulge,
+  ...(hand ? { hand } : {}),
+});
 const arc = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "arc", from, to, bulge });
 const halt = (at: string): Draw => ({ t: "halt", at });
 const change = (at: string): Draw => ({ t: "change", at });
@@ -45,7 +51,7 @@ const mv2 = m(
     ["E X", "Half circle left 10m diameter"],
   ],
   "Regularity and quality of trot; angle, bend and balance. Shape, size bend and balance of half circle.",
-  [line(["C", "H", "S", "E"]), half("E", "X", "C")],
+  [line(["C", "H", "S", "E"]), half("E", "X", "C", "left")],
   1,
 );
 const mv3 = m(
@@ -56,7 +62,7 @@ const mv3 = m(
     ["F A K", "Collected trot"],
   ],
   "Shape, size, bend and balance of half circle. Angle, bend and balance. Straightness and quality of trot.",
-  [half("X", "B", "C"), line(["B", "P", "F", "A", "K"])],
+  [half("X", "B", "A", "right"), line(["B", "P", "F", "A", "K"])],
   1,
 );
 const mv4 = m(

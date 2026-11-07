@@ -15,6 +15,7 @@ import {
   lateralWork,
   lateralWorkPoints,
   linePath,
+  samplePath,
   serpentinePath,
   track,
 } from "./arena-geom.ts";
@@ -31,34 +32,6 @@ function insideArena(p: { x: number; y: number }) {
     return ((p.x - cx) / CORNER_RX) ** 2 + ((p.y - cy) / CORNER_RY) ** 2 <= 1.02;
   }
   return true;
-}
-
-function quadSamples(d: string) {
-  const cmds = d.match(/[MLQ](?: -?\d+(?:\.\d+)?){2,6}/g) ?? [];
-  const pts: { x: number; y: number }[] = [];
-  let x = 0;
-  let y = 0;
-  for (const cmd of cmds) {
-    const n = cmd.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-    if (cmd.startsWith("M") || cmd.startsWith("L")) {
-      x = n[0];
-      y = n[1];
-      pts.push({ x, y });
-    } else {
-      const [cx, cy, x1, y1] = n;
-      for (let i = 1; i <= 24; i++) {
-        const t = i / 24;
-        const u = 1 - t;
-        pts.push({
-          x: u * u * x + 2 * u * t * cx + t * t * x1,
-          y: u * u * y + 2 * u * t * cy + t * t * y1,
-        });
-      }
-      x = x1;
-      y = y1;
-    }
-  }
-  return pts;
 }
 
 function lineSamples(d: string) {
@@ -107,7 +80,7 @@ function drawSamples(d: Draw): { x: number; y: number }[] {
     case "circle":
       return ellipseSamples(d.at, d.m);
     case "serpentine":
-      return quadSamples(serpentinePath(d.from, d.first));
+      return samplePath(serpentinePath(d.from, d.first, d.loops, d.to));
     case "change": {
       if (!("at" in d)) {
         const a = track(d.from);
@@ -173,8 +146,8 @@ test("elementary paths, including serpentines and 10m circles, stay inside the a
     ["C", "left", LEFT],
     ["A", "left", LEFT],
   ] as const) {
-    const samples = quadSamples(serpentinePath(from, first));
-    const firstLoop = samples.slice(0, 24);
+    const samples = samplePath(serpentinePath(from, first));
+    const firstLoop = samples.slice(0, 16);
     const extreme =
       first === "left"
         ? Math.min(...firstLoop.map((p) => p.x))

@@ -45,7 +45,7 @@ const mv5 = mv(
     ["X E", "Half circle right 10m"],
   ],
   "Shape and size of half circles; supple change of bend on centre line; balance and quality of trot",
-  [half("B", "X", "C"), half("X", "E", "C")],
+  [half("B", "X", "C", "left"), half("X", "E", "A", "right")],
 );
 const mv6 = mv(
   6,
@@ -86,7 +86,7 @@ const mv10 = mv(
     ["X B", "Half circle left 10m"],
   ],
   "Shape and size of half circles; supple change of bend on centre line; balance and quality of trot",
-  [half("E", "X", "C"), half("X", "B", "C")],
+  [half("E", "X", "A", "right"), half("X", "B", "C", "left")],
 );
 const mv11 = mv(
   11,

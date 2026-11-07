@@ -116,7 +116,7 @@ export const TEST_5C: SetTest = {
         ["X B", "Half circle left 10m"],
       ],
       "Shape and size of half circles; supple change of bend on centre line; engagement and self carriage",
-      [half("E", "X", "C"), half("X", "B", "C")],
+      [half("E", "X", "A", "right"), half("X", "B", "C", "left")],
     ),
     lateral(halfPassLeft, "half-pass", "left", "B", "G"),
     mv(
@@ -155,7 +155,7 @@ export const TEST_5C: SetTest = {
         ["X E", "Half circle right 10m"],
       ],
       "Shape and size of half circles; supple change of bend on centre line; engagement and self carriage",
-      [half("B", "X", "C"), half("X", "E", "C")],
+      [half("B", "X", "C", "left"), half("X", "E", "A", "right")],
     ),
     lateral(halfPassRight, "half-pass", "right", "E", "G"),
     mv(

@@ -63,12 +63,12 @@ import {
   arcPath,
   lateralWorkPath,
   label,
-  insetLoopPath,
-  loopPath,
+  loopOrVeePath,
   halfPirouettePath,
   linePath,
   markerAt,
   sameSideThroughX,
+  veePath,
   markerPoint,
   pirouettePath,
   pointOn,
@@ -174,7 +174,13 @@ export function MovementPath({
         }
         if (d.t === "diag" && sameSideThroughX(d.from, d.to)) {
           return (
-            <path key={key} d={loopPath(d.from, d.to)} strokeWidth={width} strokeDasharray={dash} />
+            <path
+              key={key}
+              d={veePath(d.from, d.to)}
+              strokeWidth={width}
+              strokeDasharray={dash}
+              strokeLinejoin="miter"
+            />
           );
         }
         if (d.t === "diag" || d.t === "yield") {
@@ -193,12 +199,14 @@ export function MovementPath({
           );
         }
         if (d.t === "loop") {
+          const vee = !d.insetM && sameSideThroughX(d.from, d.to);
           return (
             <path
               key={key}
-              d={d.insetM ? insetLoopPath(d.from, d.to, d.insetM) : loopPath(d.from, d.to)}
+              d={loopOrVeePath(d.from, d.to, d.insetM)}
               strokeWidth={width}
               strokeDasharray={dash}
+              strokeLinejoin={vee ? "miter" : undefined}
             />
           );
         }
@@ -257,7 +265,7 @@ export function MovementPath({
         if (d.t === "half" || d.t === "return-half") {
           const dPath =
             d.t === "half"
-              ? halfArc(d.from, d.to, d.bulge)
+              ? halfArc(d.from, d.to, d.bulge, d.hand)
               : returningHalfArc(d.from, d.to, d.bulge);
           return <path key={key} d={dPath} strokeWidth={width} strokeDasharray={dash} />;
         }

@@ -228,7 +228,7 @@ export const TEST_G3B: SetTest = {
         ["", "centre line,"],
       ],
       "Quality of trot, equal bend, size and shape of loops, balance, smooth and fluent transitions to and from medium walk, quality of walk, suppleness, contact and poll.",
-      serpentine("C", "right"),
+      serpentine("C", "right", 4),
       { pace: "walk", coeff: 2 },
     ),
     mv(

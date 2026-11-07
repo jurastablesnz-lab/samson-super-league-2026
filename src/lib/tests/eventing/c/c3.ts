@@ -72,7 +72,7 @@ export const TEST_EV_C3: SetTest = {
         ["X E", "Half 10 metre circle right"],
       ],
       "Size, shape and the change of bend.",
-      [half("B", "X", "C"), half("X", "E", "C")],
+      [half("B", "X", "C", "left"), half("X", "E", "A", "right")],
       { pace: "trot" },
     ),
     mv(

@@ -376,8 +376,8 @@ function sampleRail(a: string, b: string): { x: number; y: number }[] {
 }
 
 /**
- * H with K, and M with F, are the two long sides. "H X K" leaves the wall,
- * bends through X, and comes back out. It is not a straight line along the rail.
+ * H with K, and M with F, are the two long sides. "H X K" leaves the wall on a
+ * straight line to X and comes back out on a straight line. The corner is X.
  */
 export function sameSideThroughX(a: string, b: string) {
   return (
@@ -388,6 +388,25 @@ export function sameSideThroughX(a: string, b: string) {
   );
 }
 
+/** Straight V through `via`. For H–X–K the point is exactly X, not a bow beside it. */
+export function veePath(from: string, to: string, via = "X"): string {
+  const a = track(from);
+  const p = track(via);
+  const b = track(to);
+  const f = (n: number) => n.toFixed(1);
+  return `M ${f(a.x)} ${f(a.y)} L ${f(p.x)} ${f(p.y)} L ${f(b.x)} ${f(b.y)}`;
+}
+
+/**
+ * A shallow inset stays a curve. A same-side line through X is the straight V.
+ * Anything else keeps the quadratic loop.
+ */
+export function loopOrVeePath(from: string, to: string, insetM?: number): string {
+  if (insetM) return insetLoopPath(from, to, insetM);
+  if (sameSideThroughX(from, to)) return veePath(from, to);
+  return loopPath(from, to);
+}
+
 /** SVG path for a polyline of letters, following rounded rails between fence letters. */
 export function linePath(ids: string[]): string {
   if (ids.length === 0) return "";
@@ -396,12 +415,6 @@ export function linePath(ids: string[]): string {
   for (let i = 1; i < ids.length; i++) {
     const a = ids[i - 1];
     const b = ids[i];
-    const c = ids[i + 1];
-    if (b === "X" && c && sameSideThroughX(a, c)) {
-      d += loopPath(a, c).replace(/^M\s+[-\d.]+\s+[-\d.]+/, "");
-      i += 1;
-      continue;
-    }
     if (isRail(a) && isRail(b)) {
       const samples = sampleRail(a, b);
       for (let j = 1; j < samples.length; j++) {
@@ -413,6 +426,89 @@ export function linePath(ids: string[]): string {
     }
   }
   return d;
+}
+
+/** Points along an SVG path of M, L, Q and A commands. Arcs are the real ellipse. */
+export function samplePath(d: string, steps = 16): { x: number; y: number }[] {
+  const tokens = d.match(/[MLQA][^MLQA]*/g) ?? [];
+  const pts: { x: number; y: number }[] = [];
+  let x = 0;
+  let y = 0;
+  for (const tok of tokens) {
+    const n = tok
+      .slice(1)
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    if (tok.startsWith("M") || tok.startsWith("L")) {
+      x = n[0];
+      y = n[1];
+      pts.push({ x, y });
+    } else if (tok.startsWith("Q")) {
+      const [cx, cy, x1, y1] = n;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const u = 1 - t;
+        pts.push({
+          x: u * u * x + 2 * u * t * cx + t * t * x1,
+          y: u * u * y + 2 * u * t * cy + t * t * y1,
+        });
+      }
+      x = x1;
+      y = y1;
+    } else {
+      const [rx, ry, , , sweep, x1, y1] = n;
+      const arc = ellipsePoints({ x, y }, { x: x1, y: y1 }, rx, ry, sweep as 0 | 1, steps);
+      pts.push(...arc);
+      x = x1;
+      y = y1;
+    }
+  }
+  return pts;
+}
+
+function ellipsePoints(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  rx: number,
+  ry: number,
+  sweep: 0 | 1,
+  steps: number,
+) {
+  const dx = (a.x - b.x) / 2;
+  const dy = (a.y - b.y) / 2;
+  let arx = rx;
+  let ary = ry;
+  const lam = (dx * dx) / (arx * arx) + (dy * dy) / (ary * ary);
+  if (lam > 1) {
+    const s = Math.sqrt(lam);
+    arx *= s;
+    ary *= s;
+  }
+  const sign = sweep === 0 ? -1 : 1;
+  const denom = arx * arx * dy * dy + ary * ary * dx * dx;
+  const root = Math.max(
+    0,
+    (arx * arx * ary * ary - arx * arx * dy * dy - ary * ary * dx * dx) / denom,
+  );
+  const coef = sign * Math.sqrt(root);
+  const cx = (a.x + b.x) / 2 + coef * ((arx * dy) / ary);
+  const cy = (a.y + b.y) / 2 + coef * -((ary * dx) / arx);
+  const ang = (ux: number, uy: number, vx: number, vy: number) => {
+    const dot = ux * vx + uy * vy;
+    const len = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+    let theta = Math.acos(Math.min(1, Math.max(-1, dot / len)));
+    if (ux * vy - uy * vx < 0) theta = -theta;
+    return theta;
+  };
+  const theta1 = ang(1, 0, (a.x - cx) / arx, (a.y - cy) / ary);
+  let dtheta = ang((a.x - cx) / arx, (a.y - cy) / ary, (b.x - cx) / arx, (b.y - cy) / ary);
+  if (sweep === 0 && dtheta > 0) dtheta -= Math.PI * 2;
+  if (sweep === 1 && dtheta < 0) dtheta += Math.PI * 2;
+  return Array.from({ length: steps }, (_, i) => {
+    const theta = theta1 + (dtheta * (i + 1)) / steps;
+    return { x: cx + arx * Math.cos(theta), y: cy + ary * Math.sin(theta) };
+  });
 }
 
 /** Midpoint of an SVG elliptical arc. large-arc is 0, matching the paths this file emits. */
@@ -458,31 +554,68 @@ function arcCrown(
   return { x: cx + arx * Math.cos(mid), y: cy + ary * Math.sin(mid) };
 }
 
-export function halfArc(from: string, to: string, bulge: "C" | "A"): string {
+/**
+ * Side the crown should sit for a left or right half circle.
+ * On the centre line the rider travels along the chord, so left is the rider's
+ * left (A to X left bulges toward the left long side). Between the long sides
+ * the half circle is entered along the track, so a left bend is the other way:
+ * B to X left bulges toward C, and X to E right bulges toward A.
+ */
+function handOffset(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  hand: "left" | "right",
+) {
+  const tx = b.x - a.x;
+  const ty = b.y - a.y;
+  const vertical = Math.abs(ty) >= Math.abs(tx);
+  let x = vertical ? ty : -ty;
+  let y = vertical ? -tx : tx;
+  if (hand === "right") {
+    x = -x;
+    y = -y;
+  }
+  return { x, y };
+}
+
+export function halfArc(
+  from: string,
+  to: string,
+  bulge: "C" | "A",
+  hand?: "left" | "right",
+): string {
   const a = track(from);
   const b = track(to);
   // Diameter is the whole chord, so a vertical half circle is the same size as a horizontal one.
   const metres = Math.hypot((b.x - a.x) / geom.mPx.x, (b.y - a.y) / geom.mPx.y);
   const rx = Math.max(8, (metres / 2) * geom.mPx.x);
   const ry = Math.max(8, (metres / 2) * geom.mPx.y);
-  // Historical mapping. On a left-to-right chord, sweep 1 actually bends toward C;
-  // the caller still names the end it wants, and we honour that when the other
-  // sweep would leave the arena.
-  let sweep: 0 | 1 = bulge === "A" ? 1 : 0;
-  const crown = arcCrown(a, b, rx, ry, sweep);
-  const outside =
-    crown.x < geom.left - 1 ||
-    crown.x > geom.right + 1 ||
-    crown.y < geom.top - 1 ||
-    crown.y > geom.bot + 1;
-  if (outside) {
-    const flipped = arcCrown(a, b, rx, ry, sweep === 0 ? 1 : 0);
-    const flippedOutside =
-      flipped.x < geom.left - 1 ||
-      flipped.x > geom.right + 1 ||
-      flipped.y < geom.top - 1 ||
-      flipped.y > geom.bot + 1;
-    if (!flippedOutside) sweep = sweep === 0 ? 1 : 0;
+  let sweep: 0 | 1;
+  if (hand) {
+    const want = handOffset(a, b, hand);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const score = (c: { x: number; y: number }) => (c.x - mid.x) * want.x + (c.y - mid.y) * want.y;
+    sweep = score(arcCrown(a, b, rx, ry, 1)) > score(arcCrown(a, b, rx, ry, 0)) ? 1 : 0;
+  } else {
+    // Historical mapping. On a left-to-right chord, sweep 1 actually bends toward C;
+    // the caller still names the end it wants, and we honour that when the other
+    // sweep would leave the arena.
+    sweep = bulge === "A" ? 1 : 0;
+    const crown = arcCrown(a, b, rx, ry, sweep);
+    const outside =
+      crown.x < geom.left - 1 ||
+      crown.x > geom.right + 1 ||
+      crown.y < geom.top - 1 ||
+      crown.y > geom.bot + 1;
+    if (outside) {
+      const flipped = arcCrown(a, b, rx, ry, sweep === 0 ? 1 : 0);
+      const flippedOutside =
+        flipped.x < geom.left - 1 ||
+        flipped.x > geom.right + 1 ||
+        flipped.y < geom.top - 1 ||
+        flipped.y > geom.bot + 1;
+      if (!flippedOutside) sweep = sweep === 0 ? 1 : 0;
+    }
   }
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 ${sweep} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }
@@ -503,7 +636,9 @@ export function loopPath(from: string, to: string, via = "X"): string {
 }
 
 /**
- * Three equal loops the full width of the arena, from C to A or A to C.
+ * Equal loops from C to A or A to C. Each loop is a round arc of the loop's
+ * own length (20m for three loops of a 60m arena) that touches one long side.
+ * Short straights, parallel to the short side, cross the centre line between loops.
  * `first` is the long side the opening loop touches.
  */
 export function serpentinePath(
@@ -516,16 +651,27 @@ export function serpentinePath(
   const y1 = to === "X" ? track("X").y : from === "C" ? geom.bot : geom.top;
   const span = (y1 - y0) / loops;
   const firstSign = first === "left" ? -1 : 1;
+  const halfW = geom.right - geom.cx;
+  // About 2m across, shorter when a loop has little width left.
+  const cross = Math.min(2 * geom.mPx.x, halfW * 0.28);
+  const f = (n: number) => n.toFixed(1);
   let d = "";
   for (let i = 0; i < loops; i++) {
     const startY = y0 + span * i;
     const endY = y0 + span * (i + 1);
-    const midY = (startY + endY) / 2;
     const sign = i % 2 === 0 ? firstSign : -firstSign;
-    const touchX = geom.cx + sign * (geom.right - geom.cx);
-    const controlX = 2 * touchX - geom.cx;
-    if (i === 0) d = `M ${geom.cx.toFixed(1)} ${startY.toFixed(1)}`;
-    d += ` Q ${controlX.toFixed(1)} ${midY.toFixed(1)} ${geom.cx.toFixed(1)} ${endY.toFixed(1)}`;
+    const touchX = geom.cx + sign * halfW;
+    const xStart = geom.cx + sign * (i === 0 ? 0 : cross);
+    const xEnd = geom.cx + sign * (i === loops - 1 ? 0 : cross);
+    const midX = (xStart + xEnd) / 2;
+    const rx = Math.max(8, Math.abs(touchX - midX));
+    const ry = Math.max(8, Math.abs(endY - startY) / 2);
+    const c0 = arcCrown({ x: xStart, y: startY }, { x: xEnd, y: endY }, rx, ry, 0);
+    const c1 = arcCrown({ x: xStart, y: startY }, { x: xEnd, y: endY }, rx, ry, 1);
+    const sweep = Math.abs(c0.x - touchX) <= Math.abs(c1.x - touchX) ? 0 : 1;
+    if (i === 0) d = `M ${f(xStart)} ${f(startY)}`;
+    else d += ` L ${f(xStart)} ${f(startY)}`;
+    d += ` A ${f(rx)} ${f(ry)} 0 0 ${sweep} ${f(xEnd)} ${f(endY)}`;
   }
   return d;
 }

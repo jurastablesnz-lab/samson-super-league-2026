@@ -16,8 +16,10 @@ import {
   circleCenter,
   insetLoopPath,
   linePath,
-  loopPath,
+  loopOrVeePath,
+  sameSideThroughX,
   track,
+  veePath,
   withArena,
 } from "./arena-geom.ts";
 
@@ -94,10 +96,14 @@ function drawSamples(d: Draw) {
     case "line":
       return lineSamples(linePath(d.pts));
     case "diag":
+      if (sameSideThroughX(d.from, d.to)) return lineSamples(veePath(d.from, d.to));
+      return segmentSamples(track(d.from), track(d.to));
     case "yield":
       return segmentSamples(track(d.from), track(d.to));
     case "loop":
-      return quadSamples(d.insetM ? insetLoopPath(d.from, d.to, d.insetM) : loopPath(d.from, d.to));
+      return d.insetM || !sameSideThroughX(d.from, d.to)
+        ? quadSamples(loopOrVeePath(d.from, d.to, d.insetM))
+        : lineSamples(loopOrVeePath(d.from, d.to, d.insetM));
     case "circle":
       return ellipseSamples(d.at, d.m, d.side);
     case "stretch":
@@ -182,11 +188,33 @@ test("5m loops apex halfway to the centre line and one-loops pass through X", ()
   }
   for (const [from, to] of [
     ["H", "K"],
+    ["K", "H"],
     ["M", "F"],
+    ["F", "M"],
   ] as const) {
-    const mid = quadSamples(loopPath(from, to))[12];
-    assert.ok(Math.abs(mid.x - track("X").x) < 0.05);
-    assert.ok(Math.abs(mid.y - track("X").y) < 0.05);
+    const path = veePath(from, to);
+    assert.equal(loopOrVeePath(from, to), path);
+    assert.equal(/[QCA]/.test(path), false);
+    const pts = [...path.matchAll(/[ML] (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((m) => ({
+      x: Number(m[1]),
+      y: Number(m[2]),
+    }));
+    assert.equal(pts.length, 3);
+    assert.ok(Math.abs(pts[1].x - track("X").x) < 0.05);
+    assert.ok(Math.abs(pts[1].y - track("X").y) < 0.05);
+    for (const p of lineSamples(path)) {
+      const on = [0, 1].some((i) => {
+        const a = pts[i];
+        const b = pts[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const cross = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+        const dot = (p.x - a.x) * dx + (p.y - a.y) * dy;
+        return cross < 0.05 && dot >= -0.05 && dot <= len * len + 0.05;
+      });
+      assert.ok(on, `${from} ${to} sample left the straight legs`);
+    }
   }
   const shallow = SET_1_TESTS[3].movements.filter((m) =>
     m.draw.some((d) => d.t === "loop" && d.insetM === 5),

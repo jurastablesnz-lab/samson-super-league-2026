@@ -15,12 +15,15 @@ import {
   arenaSizeOf,
   circleCenter,
   halfPirouettePath,
-  insetLoopPath,
+  loopOrVeePath,
   lateralWork,
   lateralWorkPoints,
   linePath,
+  sameSideThroughX,
+  samplePath,
   serpentinePath,
   track,
+  veePath,
   withArena,
 } from "./arena-geom.ts";
 
@@ -107,6 +110,8 @@ function samples(d: Draw): { x: number; y: number }[] {
       return pathSamples(linePath(d.pts));
     case "diag":
     case "yield": {
+      if (d.t === "diag" && sameSideThroughX(d.from, d.to))
+        return pathSamples(veePath(d.from, d.to));
       const a = track(d.from);
       const b = track(d.to);
       return [a, b, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }];
@@ -122,9 +127,9 @@ function samples(d: Draw): { x: number; y: number }[] {
     case "half":
       return [track(d.from), track(d.to)];
     case "loop":
-      return pathSamples(insetLoopPath(d.from, d.to, d.insetM ?? 10));
+      return pathSamples(loopOrVeePath(d.from, d.to, d.insetM));
     case "serpentine":
-      return pathSamples(serpentinePath(d.from, d.first, d.loops ?? 3, d.to));
+      return samplePath(serpentinePath(d.from, d.first, d.loops ?? 3, d.to));
     case "pirouette":
       if ("turn" in d && d.turn === "half")
         return pathSamples(halfPirouettePath(d.from, d.to, d.along, d.direction, d.diameterM ?? 3));

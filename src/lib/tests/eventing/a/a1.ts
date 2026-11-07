@@ -47,7 +47,7 @@ export const TEST_EV_A1: SetTest = {
         ["X E", "Half circle left 10 metres"],
       ],
       "Size, shape and the change of bend of the half circles.",
-      [half("B", "X", "A"), half("X", "E", "A")],
+      [half("B", "X", "A", "right"), half("X", "E", "C", "left")],
       { pace: "trot" },
     ),
     mv(

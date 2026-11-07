@@ -33,11 +33,17 @@ export const DRAW = "8:00";
 export const line = (pts: string[]): Draw => ({ t: "line", pts });
 export const diag = (from: string, to: string): Draw => ({ t: "diag", from, to });
 export const circle = (at: string): Draw => ({ t: "circle", at, m: 10 });
-export const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({
+export const half = (
+  from: string,
+  to: string,
+  bulge: "C" | "A",
+  hand?: "left" | "right",
+): Draw => ({
   t: "half",
   from,
   to,
   bulge,
+  ...(hand ? { hand } : {}),
 });
 export const halt = (at: string): Draw => ({ t: "halt", at });
 export const reinBack = (at: string): Draw => ({ t: "rein-back", at });

@@ -27,10 +27,11 @@ export const changeOn = (from: string, to: string, along: number): Draw => ({
   to,
   along,
 });
-export const serpentine = (from: "C" | "A", first: "left" | "right"): Draw => ({
+export const serpentine = (from: "C" | "A", first: "left" | "right", loops?: number): Draw => ({
   t: "serpentine",
   from,
   first,
+  ...(loops && loops !== 3 ? { loops } : {}),
 });
 export const halfPirouette = (
   from: string,

@@ -63,7 +63,9 @@ import {
 import { summariseSheet } from "@/lib/summarise-sheet";
 import { cn } from "@/lib/utils";
 import { BrandShell, inputCls, Kicker, Panel, PrimaryButton, Title } from "./beta-ui";
+import { PlanResults } from "./plan-results";
 import { fmtDay, fmtDuration, SetupWizard } from "./setup-wizard";
+import { TrainingTargets } from "./training-targets";
 
 type Tab = "today" | "season" | "tests" | "coach" | "log" | "setup";
 const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -383,7 +385,11 @@ function RiderApp({
 }
 
 /** Done ticks and packing ticks live in Postgres (plans.progress), per horse. */
-function useHorseProgress(horseId: string, log: HorseLog | null, onProgress: (p: Progress) => void) {
+function useHorseProgress(
+  horseId: string,
+  log: HorseLog | null,
+  onProgress: (p: Progress) => void,
+) {
   const [progress, setProgress] = useState<Progress>({ done: {}, pack: {} });
   const latest = useRef<Progress>(progress);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -403,7 +409,8 @@ function useHorseProgress(horseId: string, log: HorseLog | null, onProgress: (p:
       if (timer.current) clearTimeout(timer.current);
       const queued = pending.current;
       pending.current = null;
-      if (queued) void saveProgress({ data: { horseId: queued.horseId, progress: queued.progress } });
+      if (queued)
+        void saveProgress({ data: { horseId: queued.horseId, progress: queued.progress } });
     };
   }, []);
 
@@ -539,6 +546,7 @@ function TodayTab({
           {nextVisit.focus && <p className="mt-1 text-sm text-muted">{nextVisit.focus}</p>}
         </button>
       )}
+      <TrainingTargets horseId={horse.id} tests={plan.tests} />
       <Card>
         <Kicker>This week · {week.label}</Kicker>
         <h2 className="font-display mt-1 text-xl leading-snug font-medium">{week.headline}</h2>
@@ -608,6 +616,8 @@ function SeasonTab({
   const phase = phaseIn(plan.phases, TODAY);
   return (
     <div className="flex flex-col gap-4">
+      <TrainingTargets horseId={horse.id} tests={plan.tests} editor />
+      <PlanResults results={log && log.horseId === horse.id ? log.results : null} />
       <Card>
         <Kicker>Target competitions</Kicker>
         {plan.shows.length === 0 ? (
@@ -626,8 +636,19 @@ function SeasonTab({
                     {s.venue ? ` · ${s.venue}` : ""}
                   </p>
                   {s.entriesClose && (
-                    <p className="text-xs text-faint">
-                      Entries usually close {fmtDay(s.entriesClose)} — confirm on EVO Events
+                    <p
+                      className={cn(
+                        "text-xs",
+                        daysUntil(s.entriesClose) >= 0 && daysUntil(s.entriesClose) <= 7
+                          ? "font-semibold text-warn"
+                          : "text-faint",
+                      )}
+                    >
+                      {daysUntil(s.entriesClose) < 0
+                        ? `Entries closed ${fmtDay(s.entriesClose)}`
+                        : daysUntil(s.entriesClose) === 0
+                          ? "Entries close today"
+                          : `Entries close in ${daysUntil(s.entriesClose)} days · ${fmtDay(s.entriesClose)}`}
                     </p>
                   )}
                 </div>
@@ -738,7 +759,9 @@ function TestsTab({
               <span className="font-semibold">
                 {t}
                 {isAdmin && !isPublishedTest(t, approvedTestIds) && (
-                  <span className="ml-2 text-xs font-semibold tracking-wide text-warn uppercase">Draft</span>
+                  <span className="ml-2 text-xs font-semibold tracking-wide text-warn uppercase">
+                    Draft
+                  </span>
                 )}
               </span>
               <span className="text-xs text-muted">
@@ -750,7 +773,9 @@ function TestsTab({
               </span>
             </li>
           ))}
-          {shown.length === 0 && <li className="text-sm text-muted">No published tests on this horse yet.</li>}
+          {shown.length === 0 && (
+            <li className="text-sm text-muted">No published tests on this horse yet.</li>
+          )}
         </ul>
         <p className="mt-3 text-xs text-muted">
           Official test sheets are on the{" "}
@@ -765,6 +790,7 @@ function TestsTab({
           .
         </p>
       </Card>
+      <TrainingTargets horseId={record.horseId} tests={plan.tests} />
       <FreestyleCard record={record} />
     </div>
   );
@@ -1476,41 +1502,41 @@ function SheetsCard({
         {log.sheets
           .filter((x) => x.kind !== "video")
           .map((x) => (
-          <li key={x.id} className="rounded-lg bg-bg p-3 text-sm">
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-semibold">
-                {x.test}
-                {x.sheet?.percent != null && ` · ${x.sheet.percent}%`}
-                <span className="font-normal text-muted">
-                  {" "}
-                  · {[x.showName, fmtDay(x.date)].filter(Boolean).join(" · ")}
-                </span>
-              </p>
-              <button
-                type="button"
-                aria-label="Delete sheet"
-                className="cursor-pointer text-muted hover:text-danger"
-                onClick={() =>
-                  void deleteEntry({ data: { horseId: horse.id, kind: "sheet", id: x.id } }).then(
-                    setLog,
-                  )
-                }
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-            {x.sheet?.summary && <p className="mt-1 text-muted">{x.sheet.summary}</p>}
-            {x.sheet?.workOns?.length ? (
-              <ul className="mt-2 list-disc space-y-1 pl-4">
-                {x.sheet.workOns.map((w) => (
-                  <li key={w.title}>
-                    <span className="font-semibold">{w.title}</span> — {w.how}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </li>
-        ))}
+            <li key={x.id} className="rounded-lg bg-bg p-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold">
+                  {x.test}
+                  {x.sheet?.percent != null && ` · ${x.sheet.percent}%`}
+                  <span className="font-normal text-muted">
+                    {" "}
+                    · {[x.showName, fmtDay(x.date)].filter(Boolean).join(" · ")}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  aria-label="Delete sheet"
+                  className="cursor-pointer text-muted hover:text-danger"
+                  onClick={() =>
+                    void deleteEntry({ data: { horseId: horse.id, kind: "sheet", id: x.id } }).then(
+                      setLog,
+                    )
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              {x.sheet?.summary && <p className="mt-1 text-muted">{x.sheet.summary}</p>}
+              {x.sheet?.workOns?.length ? (
+                <ul className="mt-2 list-disc space-y-1 pl-4">
+                  {x.sheet.workOns.map((w) => (
+                    <li key={w.title}>
+                      <span className="font-semibold">{w.title}</span> — {w.how}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
       </ul>
     </Card>
   );

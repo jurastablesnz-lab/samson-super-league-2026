@@ -60,6 +60,13 @@ test("only a verified matching Google identity can claim, even with empty result
       "insert into coach_visits (id, user_id, horse_id, visit_date, end_date, title) values ('visit', $1, 'horse', '2026-12-01', '2026-12-01', 'Lesson')",
       [invite.userId],
     );
+    await pg.query(
+      "insert into competitions (id, name, start_date, end_date) values ('show', 'Taupō', '2026-11-01', '2026-11-02')",
+    );
+    await pg.query(
+      "insert into horse_competitions (horse_id, competition_id, user_id, tests) values ('horse', 'show', $1, '[\"2B\"]')",
+      [invite.userId],
+    );
     assert.equal(
       verifiedGoogle({
         id: "bad",
@@ -91,6 +98,9 @@ test("only a verified matching Google identity can claim, even with empty result
       { user_id: "rider" },
     ]);
     assert.deepEqual((await pg.query("select user_id from coach_visits")).rows, [
+      { user_id: "rider" },
+    ]);
+    assert.deepEqual((await pg.query("select user_id from horse_competitions")).rows, [
       { user_id: "rider" },
     ]);
     assert.equal(

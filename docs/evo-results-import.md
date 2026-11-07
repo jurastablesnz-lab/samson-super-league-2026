@@ -1,5 +1,21 @@
 # Importing EVO Events results (admin)
 
+## Beta results, one tap
+
+`/admin` → **Load beta results**. This reads `data/seed/master-results.csv` (the
+101 results for Susan’s Jura Samson ESNZ 219700, Nicole’s Galileo DHU ESNZ
+250297, and Shelley’s Astek Rhapsody ESNZ 236353). Horses match on ESNZ number
+only. Rows that are already pending, kept or rejected are skipped, so a rider’s
+review is left alone. New rows are saved as kept results and show on that
+horse’s plan (date, show, test, percentage, placing). Glamourbelle has no rows
+in the file. Nothing here signs in to EVO Events or scrapes it.
+
+Before tapping, each horse in **Admin → Riders** needs its ESNZ number. A horse
+that says “No ESNZ number” leaves its rows unmatched. Add the number in that
+rider’s Setup (or when you prepare the workspace), then tap again.
+
+## Upload a CSV
+
 `/admin` → **Import results · EVO Events CSV**. Upload the results CSV you download
 from EVO Events (one event per file is easiest). The file is parsed in the
 browser, matched on the server, and you see a preview before anything is saved.

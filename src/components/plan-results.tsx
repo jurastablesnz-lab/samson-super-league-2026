@@ -1,0 +1,58 @@
+import type { ResultRecord } from "@/lib/rider-types";
+import { fmtDay } from "./setup-wizard";
+import { Kicker } from "./beta-ui";
+
+function percentLabel(percent: number | null, status: string) {
+  if (percent == null) return status || "—";
+  return `${percent.toFixed(1)}%`;
+}
+
+function placeLabel(place: string) {
+  const text = place.trim();
+  if (!/^\d+$/.test(text)) return text;
+  const n = Number(text);
+  const mod = n % 100;
+  const suffix =
+    mod >= 11 && mod <= 13
+      ? "th"
+      : n % 10 === 1
+        ? "st"
+        : n % 10 === 2
+          ? "nd"
+          : n % 10 === 3
+            ? "rd"
+            : "th";
+  return `${n}${suffix}`;
+}
+
+/** Kept scores for one horse: date, show, test, percentage and placing. */
+export function PlanResults({ results }: { results: ResultRecord[] | null }) {
+  return (
+    <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5">
+      <Kicker>Results</Kicker>
+      {results == null && <p className="mt-2 text-sm text-muted">Loading…</p>}
+      {results?.length === 0 && (
+        <p className="mt-2 text-sm text-muted">No results for this horse yet.</p>
+      )}
+      {results && results.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {results.map((result) => (
+            <li key={result.id} className="rounded-lg bg-bg p-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 text-sm font-semibold">{result.test || "Test"}</p>
+                <p className="shrink-0 font-mono text-sm font-semibold tabular-nums text-good">
+                  {percentLabel(result.percent, result.status)}
+                </p>
+              </div>
+              <p className="mt-0.5 text-sm text-muted">{result.showName || "Show"}</p>
+              <p className="mt-0.5 text-xs text-faint">
+                {fmtDay(result.date) || "No date"}
+                {result.place.trim() ? ` · ${placeLabel(result.place)}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

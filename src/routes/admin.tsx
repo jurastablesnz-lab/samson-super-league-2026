@@ -9,7 +9,9 @@ import {
   type BetaStatus,
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
+import { CompetitionsAdmin } from "@/components/admin-competitions";
 import { EvoImportPanel } from "@/components/evo-import";
+import { SeedResultsPanel } from "@/components/seed-results-import";
 import { getAdminRiders } from "@/lib/rider-admin";
 import type { AdminRider } from "@/lib/admin-riders";
 import { RiderAdminPanels } from "@/components/admin-riders";
@@ -103,7 +105,9 @@ function AdminDashboard() {
 
       <RiderAdminPanels riders={riders} onPrepared={load} />
       <TestCatalog />
+      <SeedResultsPanel />
       <EvoImportPanel />
+      <CompetitionsAdmin />
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => (

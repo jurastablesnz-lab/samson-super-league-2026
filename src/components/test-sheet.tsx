@@ -22,6 +22,7 @@ import {
   GRADE_V_PURPOSE,
   INTERMEDIATE_I_FS,
   SET_7_TESTS,
+  SET_EVENTING_TESTS,
   SET_G1_TESTS,
   SET_G2_TESTS,
   SET_G3_TESTS,
@@ -92,7 +93,7 @@ function ptsTo(d: Draw): string[] {
     case "half-turn":
       return [d.at, d.side];
     case "serpentine":
-      return [d.from, d.from === "C" ? "A" : "C"];
+      return [d.from, d.to === "X" ? "X" : d.from === "C" ? "A" : "C"];
     case "zigzag":
       return [d.from, d.to];
     case "pirouette":
@@ -297,7 +298,7 @@ export function MovementPath({
           return (
             <path
               key={key}
-              d={serpentinePath(d.from, d.first)}
+              d={serpentinePath(d.from, d.first, d.loops ?? 3, d.to)}
               strokeWidth={width}
               strokeDasharray={dash}
             />
@@ -895,6 +896,7 @@ const ALL_SET_TESTS = [
   ...SET_G3_TESTS,
   ...SET_G4_TESTS,
   ...SET_7_TESTS,
+  ...SET_EVENTING_TESTS,
 ];
 
 const MORE_FREESTYLES: Record<string, Parameters<typeof FreestyleTable>[0]["sheet"]> = {

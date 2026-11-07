@@ -16,7 +16,7 @@ export type Draw =
   | {
       t: "circle";
       at: string;
-      m: 8 | 10 | 15 | 20;
+      m: 8 | 10 | 12 | 15 | 20;
       side?: "left" | "right";
       /** 10m circle on the same centre as the 20m circle, spanning the quarterlines. */
       betweenQuarterlines?: boolean;
@@ -31,7 +31,7 @@ export type Draw =
   | { t: "change"; from: string; to: string; along: number }
   | { t: "arc"; from: string; to: string; bulge: "C" | "A" }
   | { t: "half-turn"; at: "G"; side: "H" | "M" }
-  | { t: "serpentine"; from: "C" | "A"; first: "left" | "right" }
+  | { t: "serpentine"; from: "C" | "A"; first: "left" | "right"; loops?: number; to?: "X" }
   | { t: "zigzag"; from: string; to: string; legs: number; sideM: number; start: "left" | "right" }
   | { t: "rein-back"; at: string }
   | { t: "pirouette"; at: string; direction: "left" | "right" }

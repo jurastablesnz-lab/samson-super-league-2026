@@ -22,6 +22,7 @@ import {
   SET_5_TESTS,
   SET_6_TESTS,
   SET_7_TESTS,
+  SET_EVENTING_TESTS,
   SET_G1_TESTS,
   SET_G2_TESTS,
   SET_G3_TESTS,
@@ -66,6 +67,7 @@ function diagramTests(): CatalogTest[] {
       ...SET_G3_TESTS,
       ...SET_G4_TESTS,
       ...SET_7_TESTS,
+      ...SET_EVENTING_TESTS,
     ].map((test) => ({
       id: test.id,
       name: test.name,

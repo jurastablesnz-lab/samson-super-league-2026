@@ -487,13 +487,18 @@ export function loopPath(from: string, to: string, via = "X"): string {
  * Three equal loops the full width of the arena, from C to A or A to C.
  * `first` is the long side the opening loop touches.
  */
-export function serpentinePath(from: "C" | "A", first: "left" | "right"): string {
+export function serpentinePath(
+  from: "C" | "A",
+  first: "left" | "right",
+  loops = 3,
+  to?: "X",
+): string {
   const y0 = from === "C" ? geom.top : geom.bot;
-  const y1 = from === "C" ? geom.bot : geom.top;
-  const span = (y1 - y0) / 3;
+  const y1 = to === "X" ? track("X").y : from === "C" ? geom.bot : geom.top;
+  const span = (y1 - y0) / loops;
   const firstSign = first === "left" ? -1 : 1;
   let d = "";
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < loops; i++) {
     const startY = y0 + span * i;
     const endY = y0 + span * (i + 1);
     const midY = (startY + endY) / 2;

@@ -78,6 +78,14 @@ export { SET_G2_TESTS, GRADE_2_FS } from "./tests/para-grade-2/index.ts";
 export { SET_G3_TESTS, GRADE_3_FS } from "./tests/para-grade-3/index.ts";
 export { SET_G4_TESTS, GRADE_4_FS } from "./tests/para-grade-4/index.ts";
 export { SET_7_TESTS, INTERMEDIATE_I_FS, TEST_PSG, TEST_INT_I } from "./tests/level-7/index.ts";
+export {
+  SET_EVENTING_TESTS,
+  SET_EV_L_TESTS,
+  SET_EV_A_TESTS,
+  SET_EV_B_TESTS,
+  SET_EV_C_TESTS,
+  SET_EV_D_TESTS,
+} from "./tests/eventing/index.ts";
 export type TestTabId =
   | "2a"
   | "2b"

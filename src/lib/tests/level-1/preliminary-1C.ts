@@ -97,7 +97,7 @@ export const TEST_1C: SetTest = {
         ["H C", "Medium walk"],
       ],
       "Regularity and quality of walks; reach, overtrack and ground cover of free walk allowing complete freedom to stretch the neck forward and downward; straightness; willing, calm transitions",
-      [diag("K", "H"), line(["H", "C"])],
+      [loop("K", "H"), line(["H", "C"])],
       { pace: "walk", coeff: 2 },
     ),
     mv(

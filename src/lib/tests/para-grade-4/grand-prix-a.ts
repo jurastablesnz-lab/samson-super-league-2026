@@ -203,7 +203,7 @@ export const TEST_G4A: SetTest = {
         ["", "changing rein."],
       ],
       "Regularity and quality of canter, bend, size and shape of loop, fluency and balance. Collection and carrying power.",
-      line(["F", "X", "M"]),
+      { t: "loop", from: "F", to: "M" },
       { coeff: 2 },
     ),
     mv(
@@ -253,7 +253,7 @@ export const TEST_G4A: SetTest = {
         ["", "changing rein."],
       ],
       "Regularity and quality of canter, bend, size and shape of loop, fluency and balance. Collection and carrying power.",
-      line(["K", "X", "H"]),
+      { t: "loop", from: "K", to: "H" },
       { coeff: 2 },
     ),
     mv(

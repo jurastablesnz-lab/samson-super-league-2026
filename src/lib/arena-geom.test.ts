@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SET_0_TESTS, SET_TESTS, SET_4_TESTS, marksFor } from "./esnz-tests.ts";
-import type { Draw } from "./esnz-tests.ts";
+import {
+  SET_0_TESTS,
+  SET_1_TESTS,
+  SET_3_TESTS,
+  SET_4_TESTS,
+  SET_5_TESTS,
+  SET_6_TESTS,
+  SET_7_TESTS,
+  SET_EVENTING_TESTS,
+  SET_G1_TESTS,
+  SET_G2_TESTS,
+  SET_G3_TESTS,
+  SET_G4_TESTS,
+  SET_GV_TESTS,
+  SET_TESTS,
+  marksFor,
+} from "./esnz-tests.ts";
+import type { Draw, SetTest } from "./esnz-tests.ts";
 import {
   BOT,
   TOP,
@@ -17,16 +33,17 @@ import {
   halfTurnPath,
   haunchesTurn,
   linePath,
+  insetLoopPath,
   loopPath,
   railParam,
+  sameSideThroughX,
+  withArena,
   lateralWork,
-  lateralWorkPath,
   lateralWorkPoints,
   returningHalfArc,
   track,
   arenaLetters,
   arenaSizeOf,
-  withArena,
 } from "./arena-geom.ts";
 
 function values(path: string) {
@@ -72,6 +89,36 @@ test("the final half circles bend towards C before turning towards G", () => {
   }
 });
 
+function quadApexes(path: string) {
+  const tokens = path.match(/[MQ][^MQ]*/g) ?? [];
+  let x = 0;
+  let y = 0;
+  const mids: { x: number; y: number }[] = [];
+  for (const tok of tokens) {
+    const n = tok
+      .slice(1)
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    if (tok.startsWith("M")) {
+      x = n[0];
+      y = n[1];
+    } else {
+      const [cx, cy, ex, ey] = n;
+      mids.push({ x: (x + 2 * cx + ex) / 4, y: (y + 2 * cy + ey) / 4 });
+      x = ex;
+      y = ey;
+    }
+  }
+  return mids;
+}
+
+function hitsX(path: string) {
+  return quadApexes(path).some(
+    (p) => Math.abs(p.x - track("X").x) < 0.05 && Math.abs(p.y - track("X").y) < 0.05,
+  );
+}
+
 test("2C one-loop counter canter passes exactly through X", () => {
   for (const [from, to] of [
     ["K", "H"],
@@ -81,6 +128,96 @@ test("2C one-loop counter canter passes exactly through X", () => {
     assert.equal((sx + 2 * cx + ex) / 4, track("X").x);
     assert.equal((sy + 2 * cy + ey) / 4, track("X").y);
   }
+});
+
+test("same-side H X K and M X F figures loop through X and leave the wall", () => {
+  for (const [from, to] of [
+    ["H", "K"],
+    ["K", "H"],
+    ["M", "F"],
+    ["F", "M"],
+  ] as const) {
+    assert.equal(sameSideThroughX(from, to), true);
+    assert.ok(hitsX(loopPath(from, to)), `${from} ${to} loop`);
+    assert.ok(hitsX(linePath([from, "X", to])), `${from} ${to} line`);
+    const [sx, , cx] = values(loopPath(from, to));
+    assert.ok(Math.abs(cx - sx) > 20, `${from} ${to} bends in off the rail`);
+  }
+  assert.equal(sameSideThroughX("H", "F"), false);
+  assert.equal(hitsX(linePath(["H", "X", "F"])), false);
+  withArena("40x20", () => {
+    assert.ok(hitsX(loopPath("H", "K")));
+    assert.ok(hitsX(loopPath("M", "F")));
+  });
+});
+
+test("every H X K style movement reaches X, including 2C and Prelim 1C", () => {
+  const sheets: SetTest[] = [
+    ...SET_0_TESTS,
+    ...SET_1_TESTS,
+    ...SET_TESTS,
+    ...SET_3_TESTS,
+    ...SET_4_TESTS,
+    ...SET_5_TESTS,
+    ...SET_6_TESTS,
+    ...SET_7_TESTS,
+    ...SET_G1_TESTS,
+    ...SET_G2_TESTS,
+    ...SET_G3_TESTS,
+    ...SET_G4_TESTS,
+    ...SET_GV_TESTS,
+    ...SET_EVENTING_TESTS,
+  ];
+  const found: string[] = [];
+  for (const t of sheets) {
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    withArena(size, () => {
+      for (const m of t.movements) {
+        for (const step of m.steps) {
+          const letters = step.at
+            .split(/[\s&]+/)
+            .map((tok) => tok.replace(/[^A-Z]/g, ""))
+            .filter((tok) => tok.length === 1);
+          for (let i = 0; i < letters.length - 2; i++) {
+            const [a, mid, b] = [letters[i], letters[i + 1], letters[i + 2]];
+            if (mid !== "X" || !sameSideThroughX(a, b)) continue;
+            found.push(`${t.id}/${m.n}`);
+            const draw = m.draw.find(
+              (d: Draw) =>
+                (d.t === "loop" && sameSideThroughX(d.from, d.to)) ||
+                (d.t === "line" && d.pts.includes(a) && d.pts.includes("X") && d.pts.includes(b)) ||
+                (d.t === "diag" && sameSideThroughX(d.from, d.to)),
+            );
+            assert.ok(draw, `${t.id}/${m.n} has no loop for ${a} X ${b}`);
+            let path = "";
+            if (draw.t === "loop")
+              path = draw.insetM
+                ? insetLoopPath(draw.from, draw.to, draw.insetM)
+                : loopPath(draw.from, draw.to);
+            else if (draw.t === "line") path = linePath(draw.pts);
+            else if (draw.t === "diag") path = loopPath(draw.from, draw.to);
+            assert.ok(hitsX(path), `${t.id}/${m.n} ${a} X ${b} misses X`);
+          }
+        }
+      }
+    });
+  }
+  assert.deepEqual(found, [
+    "1c/2",
+    "1c/7",
+    "1c/8",
+    "2c/7",
+    "2c/12",
+    "2c/18",
+    "g4a/17",
+    "g4a/22",
+    "g4b/22",
+    "g4b/27",
+    "ev-a2/2",
+    "ev-a2/9",
+    "ev-b4/11",
+    "ev-b4/14",
+  ]);
 });
 
 test("diagonal continuations follow the specified same side", () => {

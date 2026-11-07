@@ -68,6 +68,7 @@ import {
   halfPirouettePath,
   linePath,
   markerAt,
+  sameSideThroughX,
   markerPoint,
   pirouettePath,
   pointOn,
@@ -171,6 +172,11 @@ export function MovementPath({
         if (d.t === "line") {
           return <path key={key} d={linePath(d.pts)} strokeWidth={width} strokeDasharray={dash} />;
         }
+        if (d.t === "diag" && sameSideThroughX(d.from, d.to)) {
+          return (
+            <path key={key} d={loopPath(d.from, d.to)} strokeWidth={width} strokeDasharray={dash} />
+          );
+        }
         if (d.t === "diag" || d.t === "yield") {
           const a = track(d.from);
           const b = track(d.to);
@@ -192,6 +198,7 @@ export function MovementPath({
               key={key}
               d={d.insetM ? insetLoopPath(d.from, d.to, d.insetM) : loopPath(d.from, d.to)}
               strokeWidth={width}
+              strokeDasharray={dash}
             />
           );
         }
@@ -971,10 +978,19 @@ function AdminTestPreview({
   }, [item.id]);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg text-fg" role="dialog" aria-modal="true" aria-label={item.name}>
+    <div
+      className="fixed inset-0 z-40 flex flex-col bg-bg text-fg"
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.name}
+    >
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-8">
-          <button type="button" onClick={onClose} className="min-h-11 self-start text-sm font-semibold text-accent">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 self-start text-sm font-semibold text-accent"
+          >
             Back to the list
           </button>
           <PreviewActions
@@ -1003,7 +1019,11 @@ function AdminTestPreview({
               <MovementPreview key={movement.n} movement={movement} arena={setTest.arena} />
             ))}
           {floor.map((movement) => (
-            <MovementPreview key={`floor-${movement.n}`} movement={movement} arena={MFS_FLOOR.arena} />
+            <MovementPreview
+              key={`floor-${movement.n}`}
+              movement={movement}
+              arena={MFS_FLOOR.arena}
+            />
           ))}
           {setTest && (
             <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
@@ -1013,7 +1033,9 @@ function AdminTestPreview({
                   <li key={mark.name} className="rounded-lg bg-bg p-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-semibold">{mark.name}</p>
-                      <p className="shrink-0 text-xs font-semibold text-accent">Coefficient {mark.coeff}</p>
+                      <p className="shrink-0 text-xs font-semibold text-accent">
+                        Coefficient {mark.coeff}
+                      </p>
                     </div>
                     <p className="mt-1 text-sm leading-relaxed text-muted">{mark.detail}</p>
                   </li>
@@ -1024,7 +1046,8 @@ function AdminTestPreview({
           {freestyle && <FreestyleFacts sheet={freestyle} />}
           {!setTest && !freestyle && (
             <p className="text-sm leading-relaxed text-muted">
-              This name is in the registry, and the movement sheet is not loaded yet. You can still publish it for riders to select.
+              This name is in the registry, and the movement sheet is not loaded yet. You can still
+              publish it for riders to select.
             </p>
           )}
           <PreviewActions
@@ -1059,9 +1082,7 @@ function MovementPreview({ movement, arena }: { movement: Movement; arena: strin
         <p className="font-mono text-xs text-faint">Movement {movement.n}</p>
         <p className="text-xs font-semibold text-accent">Coefficient {movement.coeff ?? 1}</p>
       </div>
-      {letters.length > 0 && (
-        <p className="mt-2 text-sm font-semibold">{letters.join(" · ")}</p>
-      )}
+      {letters.length > 0 && <p className="mt-2 text-sm font-semibold">{letters.join(" · ")}</p>}
       <div className="mt-1 space-y-1">
         {movement.steps.map((step, index) => (
           <p key={index} className="text-sm leading-snug">
@@ -1096,7 +1117,9 @@ function FreestyleFacts({ sheet }: { sheet: FreestyleSheet }) {
                   <span className="font-mono mr-2 text-xs text-faint">{move.n}</span>
                   {move.move}
                 </p>
-                <p className="shrink-0 text-xs font-semibold text-accent">Coefficient {move.coeff}</p>
+                <p className="shrink-0 text-xs font-semibold text-accent">
+                  Coefficient {move.coeff}
+                </p>
               </div>
             </li>
           ))}

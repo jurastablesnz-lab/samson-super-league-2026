@@ -200,7 +200,7 @@ test("5m loops apex halfway to the centre line and one-loops pass through X", ()
   );
   assert.deepEqual(
     throughX.map((m) => m.n),
-    [2, 8],
+    [2, 7, 8],
   );
 });
 

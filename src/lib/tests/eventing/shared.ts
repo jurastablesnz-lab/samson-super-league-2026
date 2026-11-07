@@ -77,11 +77,11 @@ export const changeOn = (from: string, to: string, alongAt: number): Draw => ({
   to,
   along: alongAt,
 });
-export const loop = (from: string, to: string, insetM = 10): Draw => ({
+export const loop = (from: string, to: string, insetM?: number): Draw => ({
   t: "loop",
   from,
   to,
-  insetM,
+  ...(insetM ? { insetM } : {}),
 });
 export const serpentine = (
   from: "C" | "A",

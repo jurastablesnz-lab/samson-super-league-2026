@@ -375,6 +375,19 @@ function sampleRail(a: string, b: string): { x: number; y: number }[] {
   return pts;
 }
 
+/**
+ * H with K, and M with F, are the two long sides. "H X K" leaves the wall,
+ * bends through X, and comes back out. It is not a straight line along the rail.
+ */
+export function sameSideThroughX(a: string, b: string) {
+  return (
+    (a === "H" && b === "K") ||
+    (a === "K" && b === "H") ||
+    (a === "M" && b === "F") ||
+    (a === "F" && b === "M")
+  );
+}
+
 /** SVG path for a polyline of letters, following rounded rails between fence letters. */
 export function linePath(ids: string[]): string {
   if (ids.length === 0) return "";
@@ -383,6 +396,12 @@ export function linePath(ids: string[]): string {
   for (let i = 1; i < ids.length; i++) {
     const a = ids[i - 1];
     const b = ids[i];
+    const c = ids[i + 1];
+    if (b === "X" && c && sameSideThroughX(a, c)) {
+      d += loopPath(a, c).replace(/^M\s+[-\d.]+\s+[-\d.]+/, "");
+      i += 1;
+      continue;
+    }
     if (isRail(a) && isRail(b)) {
       const samples = sampleRail(a, b);
       for (let j = 1; j < samples.length; j++) {

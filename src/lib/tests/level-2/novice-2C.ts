@@ -172,7 +172,7 @@ export const TEST_2C: SetTest = {
       directive:
         "Regularity and quality of walks; reach, over track and ground cover of free walk allowing complete freedom to stretch the neck forward and downward into a light contact; straightness; clear, balanced transitions",
       draw: [
-        { t: "diag", from: "H", to: "K" },
+        { t: "loop", from: "H", to: "K" },
         { t: "line", pts: ["K", "A"] },
       ],
     },

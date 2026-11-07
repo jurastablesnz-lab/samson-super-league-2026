@@ -123,7 +123,7 @@ export const TEST_EV_B4: SetTest = {
       11,
       [["H X K", "10 metre loop"]],
       "Size of the loop; regularity of canter.",
-      [line(along("C", "H", "left", arena)), loop("H", "K", 10)],
+      [line(along("C", "H", "left", arena)), loop("H", "K")],
       {
         pace: "canter",
       },
@@ -158,7 +158,7 @@ export const TEST_EV_B4: SetTest = {
         ["C", "Working trot"],
       ],
       "Size of the loop; willing transition to trot.",
-      [loop("K", "H", 10)],
+      [loop("K", "H")],
       { pace: "trot" },
     ),
     mv(

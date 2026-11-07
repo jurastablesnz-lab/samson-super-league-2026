@@ -233,7 +233,7 @@ export const TEST_G4B: SetTest = {
         ["K A", "Collected canter"],
       ],
       "Regularity and quality of canter, bend, size and shape of the loop, fluency and balance, collection and carrying power.",
-      [line(["H", "X", "K"]), line(["K", "A"])],
+      [{ t: "loop", from: "H", to: "K" }, line(["K", "A"])],
       { pace: "canter", coeff: 2 },
     ),
     mv(
@@ -283,7 +283,7 @@ export const TEST_G4B: SetTest = {
         ["F A", "Collected canter"],
       ],
       "Regularity and quality of canter, bend, size and shape of the loop, fluency and balance, collection and carrying power.",
-      [line(["M", "X", "F"]), line(["F", "A"])],
+      [{ t: "loop", from: "M", to: "F" }, line(["F", "A"])],
       { pace: "canter", coeff: 2 },
     ),
     mv(

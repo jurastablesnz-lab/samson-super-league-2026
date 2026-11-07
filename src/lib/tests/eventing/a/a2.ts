@@ -47,7 +47,7 @@ export const TEST_EV_A2: SetTest = {
         ["F A K", "Working trot"],
       ],
       "Size of the loop; regularity; bend through the corners.",
-      [loop("M", "F", 10), line(along("F", "K", "right", arena))],
+      [loop("M", "F"), line(along("F", "K", "right", arena))],
       { pace: "trot" },
     ),
     mv(
@@ -122,7 +122,7 @@ export const TEST_EV_A2: SetTest = {
         ["M C H", "Working trot"],
       ],
       "Willing transition; size of the loop; regularity.",
-      [loop("F", "M", 10), line(along("M", "H", "left", arena))],
+      [loop("F", "M"), line(along("M", "H", "left", arena))],
       { pace: "trot" },
     ),
     mv(

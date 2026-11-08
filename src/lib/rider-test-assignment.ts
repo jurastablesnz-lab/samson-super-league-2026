@@ -1,5 +1,4 @@
 import type { Sql } from "./db.ts";
-import { assertTestsAssignable } from "./test-approvals.server.ts";
 import { generatePlan, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
 
 export type RiderTestAssignment = { horseId: string; test: string; action: "add" | "remove" };
@@ -31,7 +30,12 @@ export async function assignRiderTest(sql: Sql, input: RiderTestAssignment) {
   const config = sanitisePlanConfig(horse.config, { horseName: horse.name, level: horse.level });
   if (!testsForLevel(horse.level).includes(test))
     throw new Error("Choose a test for this horse's level");
-  if (action === "add") await assertTestsAssignable(sql, horse.user_id, [test]);
+  if (action === "add") {
+    // Loaded only when an admin saves a test. A static import would pull the
+    // server module into the admin page, which the browser loads as a chunk.
+    const { assertTestsAssignable } = await import("./test-approvals.server.ts");
+    await assertTestsAssignable(sql, horse.user_id, [test]);
+  }
   const tests =
     action === "add"
       ? [...new Set([...config.tests, test])]

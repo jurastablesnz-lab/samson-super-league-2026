@@ -30,7 +30,7 @@ const halfPassLeft = mv(
     ["S H", "Collected trot"],
   ],
   "Regularity and quality of trot. Uniform bend, collection, balance, fluency, crossing of legs.",
-  [{ ...half("V", "L", "A"), travel: "A" }, { t: "yield", from: "L", to: "S" }, line(["S", "H"])],
+  [half("V", "L", "A", "A"), { t: "yield", from: "L", to: "S" }, line(["S", "H"])],
   { coeff: 2 },
 );
 const shoulderRight = mv(

@@ -37,14 +37,18 @@ export const half = (
   from: string,
   to: string,
   bulge: "C" | "A",
-  hand?: "left" | "right",
-): Draw => ({
-  t: "half",
-  from,
-  to,
-  bulge,
-  ...(hand ? { hand } : {}),
-});
+  hand?: "left" | "right" | { hand?: "left" | "right"; travel?: "A" | "C" },
+): Draw => {
+  const extra = typeof hand === "object" ? hand : { hand };
+  return {
+    t: "half",
+    from,
+    to,
+    bulge,
+    ...(extra.hand ? { hand: extra.hand } : {}),
+    ...(extra.travel ? { travel: extra.travel } : {}),
+  };
+};
 export const halt = (at: string): Draw => ({ t: "halt", at });
 export const reinBack = (at: string): Draw => ({ t: "rein-back", at });
 export const change = (at: string): Draw => ({ t: "change", at });

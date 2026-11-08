@@ -10,6 +10,8 @@ import { nitro } from "nitro/vite";
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
+// @ts-expect-error JS module alongside the TS vite config
+import { ASSET_CACHE_CONTROL } from "./scripts/asset-cache.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
@@ -175,6 +177,14 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // Set before Nitro's build step. It only fills this header when
+            // empty, and the empty default is a year-long immutable cache that
+            // also sticks to missing chunks.
+            routeRules: {
+              "/assets/**": {
+                headers: { "cache-control": ASSET_CACHE_CONTROL },
+              },
+            },
           }),
         ]
       : []),

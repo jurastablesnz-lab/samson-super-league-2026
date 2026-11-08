@@ -20,11 +20,12 @@ export const LEAVE = "Leave arena at A in walk on a long rein";
 export const line = (pts: string[]): Draw => ({ t: "line", pts });
 export const diag = (from: string, to: string): Draw => ({ t: "diag", from, to });
 export const circle = (at: string, m: 8 | 10 | 20 = 10): Draw => ({ t: "circle", at, m });
-export const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({
+export const half = (from: string, to: string, bulge: "C" | "A", travel?: "A" | "C"): Draw => ({
   t: "half",
   from,
   to,
   bulge,
+  ...(travel ? { travel } : {}),
 });
 export const halt = (at: string): Draw => ({ t: "halt", at });
 export const reinBack = (at: string): Draw => ({ t: "rein-back", at });

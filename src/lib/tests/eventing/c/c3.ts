@@ -98,7 +98,7 @@ export const TEST_EV_C3: SetTest = {
       8,
       [["", "Rein back 4–5 steps. Proceed medium walk"]],
       "The rein-back is straight, and the walk that follows is regular.",
-      [reinBack("C"), line(along("C", "M", "right", arena))],
+      [reinBack("C", 5), line(along("C", "M", "right", arena))],
       { pace: "walk" },
     ),
     mv(

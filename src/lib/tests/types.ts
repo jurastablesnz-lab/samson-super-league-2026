@@ -41,7 +41,7 @@ export type Draw =
   | { t: "half-turn"; at: "G"; side: "H" | "M" }
   | { t: "serpentine"; from: "C" | "A"; first: "left" | "right"; loops?: number; to?: "X" }
   | { t: "zigzag"; from: string; to: string; legs: number; sideM: number; start: "left" | "right" }
-  | { t: "rein-back"; at: string }
+  | { t: "rein-back"; at: string; steps?: number }
   | { t: "pirouette"; at: string; direction: "left" | "right" }
   | {
       t: "pirouette";

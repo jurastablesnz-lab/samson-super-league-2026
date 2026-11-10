@@ -691,6 +691,32 @@ export function halfArc(
   return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 ${sweep} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
 }
 
+/**
+ * Rein-back steps. Each mark is a short stroke perpendicular to the line of travel,
+ * spaced along that line. `along` is the direction the horse is backing:
+ * "y" on the centre line (the strokes are horizontal), "x" on a line such as M–G–H.
+ */
+export function reinBackPath(at: string, steps = 4, along: "x" | "y" = "y"): string {
+  const p = track(at);
+  const n = Math.max(1, Math.round(steps));
+  const gap = 3.4;
+  const half = 4.2;
+  const span = (n - 1) * gap;
+  const f = (n: number) => n.toFixed(1);
+  const marks: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = -span / 2 + i * gap;
+    if (along === "y") {
+      const y = p.y + t;
+      marks.push(`M ${f(p.x - half)} ${f(y)} L ${f(p.x + half)} ${f(y)}`);
+    } else {
+      const x = p.x + t;
+      marks.push(`M ${f(x)} ${f(p.y - half)} L ${f(x)} ${f(p.y + half)}`);
+    }
+  }
+  return marks.join(" ");
+}
+
 /** Half circle from E/B to X, then the straight return to H/M. */
 export function returningHalfArc(
   from: string,

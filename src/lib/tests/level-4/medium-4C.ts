@@ -16,7 +16,7 @@ const half = (from: string, to: string, bulge: "C" | "A", hand?: "left" | "right
 const arc = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "arc", from, to, bulge });
 const halt = (at: string): Draw => ({ t: "halt", at });
 const change = (at: string): Draw => ({ t: "change", at });
-const reinBack = (at: string): Draw => ({ t: "rein-back", at });
+const reinBack = (at: string, steps = 4): Draw => ({ t: "rein-back", at, steps });
 function m(
   n: number,
   steps: [string, string][],
@@ -141,7 +141,7 @@ const mv11 = m(
     ["H", "Track right"],
   ],
   "Well defined transitions. Regularity; suppleness of the back; activity. Immobility; willing steps back with correct rhythm and count; straightness",
-  [line(["R", "M", "C", "G"]), halt("G"), reinBack("G"), line(["G", "H"])],
+  [line(["R", "M", "G"]), halt("G"), reinBack("G", 4), line(["G", "H"])],
   1,
   "walk",
 );
@@ -149,7 +149,7 @@ const mv12 = m(
   12,
   [["R M(G) H", "The medium walks"]],
   "Regularity and quality of walk",
-  line(["R", "M", "C", "G", "H"]),
+  line(["R", "M", "G", "H"]),
   2,
   "walk",
 );

@@ -133,7 +133,7 @@ export const TEST_EV_C4: SetTest = {
       10,
       [["A", "Halt. Rein back 5 steps"]],
       "The halt and the rein-back are straight.",
-      [halt("A"), reinBack("A")],
+      [halt("A"), reinBack("A", 5)],
       {
         pace: "walk",
       },

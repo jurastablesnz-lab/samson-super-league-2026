@@ -74,6 +74,7 @@ import {
   pointOn,
   quarterTurnPath,
   approachTravel,
+  reinBackPath,
   returningHalfArc,
   serpentinePath,
   track,
@@ -216,17 +217,19 @@ export function MovementPath({
             <path key={key} d={halfTurnPath(d.side)} strokeWidth={width} strokeDasharray={dash} />
           );
         if (d.t === "rein-back") {
-          const p = track(d.at);
-          const dir = d.at === "A" ? -1 : 1;
-          const y = p.y + dir * 16;
-          const tip = y - dir * 5;
-          return (
-            <path
-              key={key}
-              d={`M ${p.x} ${p.y} L ${p.x} ${y} L ${p.x - 4} ${tip} M ${p.x} ${y} L ${p.x + 4} ${tip}`}
-              strokeWidth={width}
-            />
-          );
+          let along: "x" | "y" = "y";
+          for (const other of draw) {
+            if (other.t !== "line") continue;
+            const at = other.pts.indexOf(d.at);
+            if (at < 0) continue;
+            const neighbor = other.pts[at - 1] ?? other.pts[at + 1];
+            if (!neighbor) continue;
+            const here = track(d.at);
+            const next = track(neighbor);
+            along = Math.abs(next.x - here.x) >= Math.abs(next.y - here.y) ? "x" : "y";
+            break;
+          }
+          return <path key={key} d={reinBackPath(d.at, d.steps ?? 4, along)} strokeWidth={width} />;
         }
         if (d.t === "pirouette") {
           if ("turn" in d && d.turn === "full") {

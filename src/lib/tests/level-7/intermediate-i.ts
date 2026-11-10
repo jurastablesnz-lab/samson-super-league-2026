@@ -101,7 +101,7 @@ export const TEST_INT_I: SetTest = {
       6,
       [["C", "Halt, immobility. Rein back 5 steps and immediately proceed in collected trot"]],
       "Quality of halt and transitions. Throughness, fluency, straightness. Accuracy in the number of diagonal steps.",
-      [halt("C"), reinBack("C")],
+      [halt("C"), reinBack("C", 5)],
     ),
     halfPass(passLeft, "left", "H", "X"),
     mv(

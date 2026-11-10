@@ -128,7 +128,7 @@ export const TEST_5A: SetTest = {
         ["", "Proceed in medium walk"],
       ],
       "Quality of shortened walk strides; tempo and regularity; activity of hind legs; bend and fluency in turn",
-      [line(["M", "C", "H", "G"]), turn("H")],
+      [line(["M", "G"]), turn("H")],
       { pace: "walk" },
     ),
     mv(
@@ -146,7 +146,7 @@ export const TEST_5A: SetTest = {
       11,
       [["", "(Medium walk) RMG(H)G(M)GHC"]],
       "Regularity and quality of the walk",
-      [line(["R", "M", "C", "H", "G"]), turn("H"), turn("M"), line(["G", "H", "C"])],
+      [line(["R", "M", "G"]), turn("H"), turn("M"), line(["G", "H", "C"])],
       { pace: "walk", coeff: 2 },
     ),
     mv(

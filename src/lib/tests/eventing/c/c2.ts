@@ -118,7 +118,7 @@ export const TEST_EV_C2: SetTest = {
         ["", "Proceed at medium walk"],
       ],
       "The halt and the rein-back are straight.",
-      [halt("A"), reinBack("A")],
+      [halt("A"), reinBack("A", 5)],
       { pace: "walk" },
     ),
     mv(

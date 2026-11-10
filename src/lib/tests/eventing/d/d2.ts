@@ -219,7 +219,7 @@ export const TEST_EV_D2: SetTest = {
         ["C", "Track left"],
       ],
       "The rein-back is straight, and the trot that follows is collected.",
-      [reinBack("I"), line(["I", "C"]), line(along("C", "H", "left", arena))],
+      [reinBack("I", 5), line(["I", "C"]), line(along("C", "H", "left", arena))],
       { pace: "trot" },
     ),
     mv(

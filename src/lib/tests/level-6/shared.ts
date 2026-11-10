@@ -40,7 +40,7 @@ export const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({
   bulge,
 });
 export const halt = (at: string): Draw => ({ t: "halt", at });
-export const reinBack = (at: string): Draw => ({ t: "rein-back", at });
+export const reinBack = (at: string, steps = 4): Draw => ({ t: "rein-back", at, steps });
 export const change = (at: string): Draw => ({ t: "change", at });
 export const changeOn = (from: string, to: string, along: number): Draw => ({
   t: "change",

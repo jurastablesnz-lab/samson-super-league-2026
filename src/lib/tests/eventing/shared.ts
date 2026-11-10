@@ -76,7 +76,7 @@ export const half = (
   ...(hand ? { hand } : {}),
 });
 export const halt = (at: string): Draw => ({ t: "halt", at });
-export const reinBack = (at: string): Draw => ({ t: "rein-back", at });
+export const reinBack = (at: string, steps = 4): Draw => ({ t: "rein-back", at, steps });
 export const changeOn = (from: string, to: string, alongAt: number): Draw => ({
   t: "change",
   from,

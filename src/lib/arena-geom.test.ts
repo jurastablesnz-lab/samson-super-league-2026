@@ -33,6 +33,7 @@ import {
   approachTravel,
   arcPath,
   halfArc,
+  reinBackPath,
   halfTurnPath,
   haunchesTurn,
   linePath,
@@ -818,7 +819,23 @@ test("Medium circle endpoints, extended canter and walking turns have exact geom
         if (d.t === "yield") assert.ok(d.to === "X" || (isRail(d.to) && track(d.to).x !== CX));
   assert.equal(TEST("4b", 4).draw.at(-1)?.t, "half-turn");
   assert.equal(TEST("4b", 5).draw.at(-1)?.t, "half-turn");
-  assert.equal(TEST("4c", 11).draw.find((d) => d.t === "rein-back")?.t, "rein-back");
+  assert.deepEqual(TEST("4c", 11).draw, [
+    { t: "line", pts: ["R", "M", "G"] },
+    { t: "halt", at: "G" },
+    { t: "rein-back", at: "G", steps: 4 },
+    { t: "line", pts: ["G", "H"] },
+  ]);
+  const walk = linePath(["R", "M", "G"]);
+  assert.equal(walk.includes(`${track("C").x.toFixed(1)} ${track("C").y.toFixed(1)}`), false);
+  const marks = reinBackPath("G", 4, "x").match(/M /g) ?? [];
+  assert.equal(marks.length, 4);
+  const centreMarks = reinBackPath("A", 4, "y").match(/M /g) ?? [];
+  assert.equal(centreMarks.length, 4);
+  assert.deepEqual(TEST("4c", 12).draw, [{ t: "line", pts: ["R", "M", "G", "H"] }]);
+  assert.deepEqual(SET_5_TESTS.find((t) => t.id === "5a")!.movements[8].draw[0], {
+    t: "line",
+    pts: ["M", "G"],
+  });
   for (const at of ["E", "B"] as const) {
     const c = circleCenter(at, 5);
     assert.equal(Math.abs(c.x - CX), 5 * M_PX.x);

@@ -45,6 +45,7 @@ import {
   lateralWorkPoints,
   returningHalfArc,
   track,
+  trackThenDiagonal,
   arenaLetters,
   arenaSizeOf,
 } from "./arena-geom.ts";
@@ -614,6 +615,68 @@ test("Medium 4C half passes lead into the correct R and S changes", () => {
   ]);
   assert.equal(TEST("4c", 19).draw.at(-1)?.t, "change");
 });
+test("H S P rides the track to S before the diagonal, and the same rule covers the other three-letter routes", () => {
+  assert.equal(trackThenDiagonal("H", "S", "P"), true);
+  assert.equal(trackThenDiagonal("M", "R", "V"), true);
+  assert.equal(trackThenDiagonal("K", "V", "R"), true);
+  assert.equal(trackThenDiagonal("F", "P", "S"), true);
+  assert.equal(trackThenDiagonal("H", "P", "F"), false);
+  assert.equal(trackThenDiagonal("H", "X", "F"), false);
+  const sheets = [
+    ...SET_0_TESTS,
+    ...SET_1_TESTS,
+    ...SET_TESTS,
+    ...SET_3_TESTS,
+    ...SET_4_TESTS,
+    ...SET_5_TESTS,
+    ...SET_6_TESTS,
+    ...SET_7_TESTS,
+    ...SET_G1_TESTS,
+    ...SET_G2_TESTS,
+    ...SET_G3_TESTS,
+    ...SET_G4_TESTS,
+    ...SET_GV_TESTS,
+    ...SET_EVENTING_TESTS,
+  ];
+  const found: string[] = [];
+  for (const t of sheets) {
+    for (const m of t.movements) {
+      for (const step of m.steps) {
+        const letters = step.at.split(/[^A-Z]+/).filter((tok) => tok.length === 1);
+        for (let i = 0; i < letters.length - 2; i++) {
+          const [a, b, c] = [letters[i], letters[i + 1], letters[i + 2]];
+          if (!trackThenDiagonal(a, b, c)) continue;
+          found.push(`${t.id}/${m.n}`);
+          const trackLeg = m.draw.some(
+            (d) => d.t === "line" && d.pts.includes(a) && d.pts.includes(b),
+          );
+          const cross = m.draw.some((d) => d.t === "diag" && d.from === b && d.to === c);
+          const skipped = m.draw.some((d) => d.t === "diag" && d.from === a && d.to === c);
+          assert.equal(trackLeg, true, `${t.id}/${m.n} misses the ${a}-${b} track`);
+          assert.equal(cross, true, `${t.id}/${m.n} misses the ${b}-${c} diagonal`);
+          assert.equal(skipped, false, `${t.id}/${m.n} still cuts ${a} straight to ${c}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(found, ["4b/7"]);
+  assert.deepEqual(TEST("4b", 7).draw, [
+    { t: "line", pts: ["H", "S"] },
+    { t: "diag", from: "S", to: "P" },
+    { t: "line", pts: ["P", "F"] },
+  ]);
+  const along = linePath(["H", "S"]);
+  const xs = [...along.matchAll(/[ML] (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)].map((m) => +m[1]);
+  assert.ok(
+    xs.every((x) => Math.abs(x - LEFT) < 1),
+    "H to S stays on the left track",
+  );
+  assert.deepEqual(TEST("4b", 9).draw, [
+    { t: "diag", from: "H", to: "P" },
+    { t: "line", pts: ["P", "F"] },
+  ]);
+});
+
 test("Medium 4B final turns and changes are on the correct centre markers", () => {
   assert.deepEqual(TEST("4b", 10).draw, [{ t: "line", pts: ["F", "A", "D", "L"] }]);
   assert.deepEqual(TEST("4b", 14).draw.at(-1), { t: "line", pts: ["F", "A", "K", "V", "L"] });

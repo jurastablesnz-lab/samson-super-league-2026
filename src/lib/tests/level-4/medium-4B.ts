@@ -95,7 +95,7 @@ const mv7 = m(
     ["P F", "Medium walk"],
   ],
   "Regularity, suppleness of back, activity, overtrack and freedom of shoulder. Stretching to the bit; clear transitions",
-  [diag("H", "P"), line(["P", "F"])],
+  [line(["H", "S"]), diag("S", "P"), line(["P", "F"])],
   2,
   "free",
 );

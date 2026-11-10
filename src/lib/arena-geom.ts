@@ -44,6 +44,27 @@ const Y: Record<string, number> = {
 const LEFTS = new Set(["H", "S", "E", "V", "K"]);
 const RIGHTS = new Set(["M", "R", "B", "P", "F"]);
 
+/** Long side, C toward A. Neighbours are one letter apart on the track. */
+const LEFT_DOWN = ["H", "S", "E", "V", "K"] as const;
+const RIGHT_DOWN = ["M", "R", "B", "P", "F"] as const;
+
+/**
+ * H S P, M R V, K V R, F P S: the first two letters are neighbours on one
+ * long side, and the third is on the other. Ride the track between the first
+ * two, then the straight line across. It is not one diagonal from the first
+ * letter to the third.
+ */
+export function trackThenDiagonal(a: string, b: string, c: string): boolean {
+  const neighbours = (rail: readonly string[]) => {
+    const i = rail.indexOf(a);
+    const j = rail.indexOf(b);
+    return i >= 0 && j >= 0 && Math.abs(i - j) === 1;
+  };
+  if (neighbours(LEFT_DOWN)) return (RIGHT_DOWN as readonly string[]).includes(c);
+  if (neighbours(RIGHT_DOWN)) return (LEFT_DOWN as readonly string[]).includes(c);
+  return false;
+}
+
 /** Letters that sit on the fence. Centre-line markers are not on the rail. */
 const RAIL = new Set([
   "A",

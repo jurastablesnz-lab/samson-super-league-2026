@@ -48,7 +48,7 @@ export const TEST_EV_A4: SetTest = {
       "Regularity; size and bend of the half circle.",
       [
         line(along("H", "E", "left", arena)),
-        half("E", "B", "A"),
+        half("E", "B", "A", "left"),
         line(along("B", "R", "left", arena)),
       ],
       { pace: "trot" },
@@ -89,7 +89,7 @@ export const TEST_EV_A4: SetTest = {
         ["B P", "Working trot"],
       ],
       "Size and bend of the half circle.",
-      [half("E", "B", "C"), line(along("B", "P", "right", arena))],
+      [half("E", "B", "C", "right"), line(along("B", "P", "right", arena))],
       { pace: "trot" },
     ),
     mv(

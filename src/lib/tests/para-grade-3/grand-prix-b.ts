@@ -122,7 +122,7 @@ export const TEST_G3B: SetTest = {
         ["E", "Medium walk"],
       ],
       "Regularity, maintenance of rhythm and activity, relaxation, stretching forward downward of neck, lengthening of steps and frame without giving up contact.",
-      [half("B", "E", "A"), line(["E"])],
+      [half("B", "E", "A", "left"), line(["E"])],
       { pace: "free" },
     ),
     mv(

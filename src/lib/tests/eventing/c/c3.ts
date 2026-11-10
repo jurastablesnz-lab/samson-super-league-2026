@@ -117,7 +117,7 @@ export const TEST_EV_C3: SetTest = {
         ["B R", "Medium walk"],
       ],
       "Size of the half circle; regularity of the walk.",
-      [half("E", "B", "A"), line(along("B", "R", "left", arena))],
+      [half("E", "B", "A", "left"), line(along("B", "R", "left", arena))],
       { pace: "walk" },
     ),
     mv(

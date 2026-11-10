@@ -612,6 +612,35 @@ function handOffset(
   return { x, y };
 }
 
+/**
+ * A 20m half circle from B to E or E to B. The hand is the rein.
+ * Left at B is already going toward C, so the arc stays on the C side.
+ * Left at E is already going toward A, so the arc stays on the A side.
+ * Right is the other side.
+ */
+export function acrossHalfSide(
+  from: string,
+  to: string,
+  hand: "left" | "right",
+): "A" | "C" | undefined {
+  const across = (from === "B" && to === "E") || (from === "E" && to === "B");
+  if (!across) return undefined;
+  if (from === "B") return hand === "left" ? "C" : "A";
+  return hand === "left" ? "A" : "C";
+}
+
+function sweepTowardEnd(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  rx: number,
+  ry: number,
+  end: "A" | "C",
+): 0 | 1 {
+  const midY = (a.y + b.y) / 2;
+  const score = (c: { y: number }) => (end === "A" ? 1 : -1) * (c.y - midY);
+  return score(arcCrown(a, b, rx, ry, 1)) > score(arcCrown(a, b, rx, ry, 0)) ? 1 : 0;
+}
+
 export function halfArc(
   from: string,
   to: string,
@@ -626,12 +655,13 @@ export function halfArc(
   const rx = Math.max(8, (metres / 2) * geom.mPx.x);
   const ry = Math.max(8, (metres / 2) * geom.mPx.y);
   const ontoCentre = CENTRE_LETTERS.has(to) && Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
+  const across = hand ? acrossHalfSide(from, to, hand) : undefined;
   let sweep: 0 | 1;
-  if (travel && ontoCentre) {
+  if (across) {
+    sweep = sweepTowardEnd(a, b, rx, ry, across);
+  } else if (travel && ontoCentre) {
     // The horse keeps going the way it was already travelling. Toward A is below the line.
-    const midY = (a.y + b.y) / 2;
-    const score = (c: { y: number }) => (travel === "A" ? 1 : -1) * (c.y - midY);
-    sweep = score(arcCrown(a, b, rx, ry, 1)) > score(arcCrown(a, b, rx, ry, 0)) ? 1 : 0;
+    sweep = sweepTowardEnd(a, b, rx, ry, travel);
   } else if (hand) {
     const want = handOffset(a, b, hand);
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };

@@ -49,7 +49,7 @@ export const TEST_G2A: SetTest = {
         ["", "(20m Ø)"],
       ],
       "Smooth and fluent transition. Regularity, bend and size of half circle.",
-      [line(["H"]), line(["H", "E"]), half("E", "B", "A")],
+      [line(["H"]), line(["H", "E"]), half("E", "B", "A", "left")],
     ),
     mv(
       3,
@@ -116,7 +116,7 @@ export const TEST_G2A: SetTest = {
         ["", "(20m Ø)"],
       ],
       "Smooth and fluent transition. Regularity, bend and size of half circle.",
-      [line(["M"]), half("B", "E", "A")],
+      [line(["M"]), half("B", "E", "A", "right")],
     ),
     mv(
       9,

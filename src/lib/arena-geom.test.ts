@@ -29,7 +29,9 @@ import {
   CX,
   CORNER_RX,
   CORNER_RY,
+  acrossHalfSide,
   approachTravel,
+  arcPath,
   halfArc,
   halfTurnPath,
   haunchesTurn,
@@ -580,9 +582,87 @@ test("Medium 4 yields reach the side and every track segment is sampled", () => 
           }
         }
 });
-test("Medium 4B 20m half circle crosses X between B and E", () => {
-  assert.deepEqual(TEST("4b", 16).draw[0], { t: "arc", from: "B", to: "E", bulge: "C" });
+test("Medium 4B movement 16 is a left half circle from B to E via C", () => {
+  assert.deepEqual(TEST("4b", 16).draw[0], {
+    t: "half",
+    from: "B",
+    to: "E",
+    bulge: "C",
+    hand: "left",
+  });
+  assert.equal(acrossHalfSide("B", "E", "left"), "C");
+  assert.equal(acrossHalfSide("B", "E", "right"), "A");
+  assert.equal(acrossHalfSide("E", "B", "left"), "A");
+  assert.equal(acrossHalfSide("E", "B", "right"), "C");
+  const crown = arcCrownOf(halfArc("B", "E", "C", "left"));
+  assert.ok(crown.y < track("X").y, "left from B to E bulges toward C");
   assert.deepEqual(TEST("4b", 16).draw[1], { t: "line", pts: ["E", "V", "K", "A"] });
+  // Movement 15 finishes P to B, which is toward C. The old arc renderer
+  // still put bulge C on the A side; the hand, not that approach, chooses the side.
+  const arrived = approachTravel("P", "B");
+  assert.equal(arrived, "C");
+});
+
+test("every B-E and E-B half circle follows its hand, and the earlier centre-line fixes stay", () => {
+  const sheets = [
+    ...SET_0_TESTS,
+    ...SET_1_TESTS,
+    ...SET_TESTS,
+    ...SET_3_TESTS,
+    ...SET_4_TESTS,
+    ...SET_5_TESTS,
+    ...SET_6_TESTS,
+    ...SET_7_TESTS,
+    ...SET_G1_TESTS,
+    ...SET_G2_TESTS,
+    ...SET_G3_TESTS,
+    ...SET_G4_TESTS,
+    ...SET_GV_TESTS,
+    ...SET_EVENTING_TESTS,
+  ];
+  const side = (y: number) => (y < track("X").y - 2 ? "C" : "A");
+  const changed: string[] = [];
+  for (const t of sheets) {
+    const size = t.arenaSize ?? arenaSizeOf(t.arena);
+    withArena(size, () => {
+      for (const m of t.movements) {
+        for (const d of m.draw) {
+          const across =
+            (d.t === "half" || d.t === "arc") &&
+            ((d.from === "B" && d.to === "E") || (d.from === "E" && d.to === "B"));
+          if (!across || (d.t !== "half" && d.t !== "arc")) continue;
+          assert.equal(d.t, "half", `${t.id}/${m.n} is still an arc`);
+          assert.ok(d.t === "half" && d.hand, `${t.id}/${m.n} has no hand`);
+          if (d.t !== "half" || !d.hand) continue;
+          const wanted = acrossHalfSide(d.from, d.to, d.hand);
+          const now = side(arcCrownOf(halfArc(d.from, d.to, d.bulge, d.hand)).y);
+          assert.equal(now, wanted, `${t.id}/${m.n}`);
+          const before = side(arcCrownOf(halfArc(d.from, d.to, d.bulge)).y);
+          if (before !== now) changed.push(`${t.id}/${m.n}`);
+          if (t.id === "4b" && m.n === 16 && side(arcCrownOf(arcPath("B", "E", "C")).y) !== now)
+            changed.push(`${t.id}/${m.n}`);
+        }
+      }
+    });
+  }
+  assert.deepEqual(changed, [
+    "4b/16",
+    "g1a/14",
+    "g2a/2",
+    "g2b/20",
+    "g3b/9",
+    "g4b/15",
+    "ev-a2/7",
+    "ev-a4/2",
+    "ev-a4/6",
+    "ev-a5/15",
+    "ev-c3/10",
+  ]);
+  const novice = SET_TESTS.find((t) => t.id === "2c")!.movements[21];
+  const halt = novice.draw.find((d) => d.t === "half");
+  assert.ok(halt && halt.t === "half");
+  const travel = approachTravel("R", "B");
+  assert.equal(side(arcCrownOf(halfArc(halt.from, halt.to, halt.bulge, halt.hand, travel)).y), "A");
 });
 test("Medium 4C half circles reach X and the correct track, continuing to FAK", () => {
   assert.deepEqual(TEST("4c", 2).draw.at(-1), {

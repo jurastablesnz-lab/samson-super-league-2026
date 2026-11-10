@@ -235,7 +235,7 @@ export const TEST_G2B: SetTest = {
         ["B", "Medium walk."],
       ],
       "Regularity, maintenance of rhythm and activity, relaxation, stretching forward downward of neck, lengthening of steps and frame without giving up contact.",
-      [half("E", "B", "A"), line(["B"])],
+      [half("E", "B", "A", "left"), line(["B"])],
       { pace: "free" },
     ),
     mv(

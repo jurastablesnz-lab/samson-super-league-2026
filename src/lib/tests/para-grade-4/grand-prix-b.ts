@@ -159,7 +159,7 @@ export const TEST_G4B: SetTest = {
         ["B R", "in Extended walk Medium walk"],
       ],
       "Regularity, suppleness of . back, activity, freedom of shoulder, stretching to the bit to the bit. Differentiation from medium walk. Transitions.",
-      [half("E", "B", "A"), line(["B", "R"])],
+      [half("E", "B", "A", "left"), line(["B", "R"])],
       { pace: "free" },
     ),
     mv(

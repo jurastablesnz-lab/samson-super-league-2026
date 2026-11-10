@@ -100,7 +100,7 @@ export const TEST_EV_A2: SetTest = {
       [
         line(along("K", "F", "left", arena)),
         line(along("F", "B", "left", arena)),
-        half("B", "E", "A"),
+        half("B", "E", "A", "left"),
       ],
       { pace: "free" },
     ),

@@ -6,8 +6,13 @@ const line = (pts: string[]): Draw => ({ t: "line", pts });
 const diag = (from: string, to: string): Draw => ({ t: "diag", from, to });
 const halfPass = (from: string, to: string): Draw => ({ t: "yield", from, to });
 const circle = (at: string, m: 10): Draw => ({ t: "circle", at, m });
-const half = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "half", from, to, bulge });
-const arc = (from: string, to: string, bulge: "C" | "A"): Draw => ({ t: "arc", from, to, bulge });
+const half = (from: string, to: string, bulge: "C" | "A", hand?: "left" | "right"): Draw => ({
+  t: "half",
+  from,
+  to,
+  bulge,
+  ...(hand ? { hand } : {}),
+});
 const halt = (at: string): Draw => ({ t: "halt", at });
 const change = (at: string): Draw => ({ t: "change", at });
 const turn = (side: "H" | "M"): Draw => ({ t: "half-turn", at: "G", side });
@@ -191,7 +196,7 @@ const mv16 = m(
     ["E V K A", "Collected canter"],
   ],
   "Clear release of reins maintaining self carriage; engagement and collection; shape, size and bend on circle",
-  [arc("B", "E", "C"), line(["E", "V", "K", "A"])],
+  [half("B", "E", "C", "left"), line(["E", "V", "K", "A"])],
   1,
   "canter",
 );

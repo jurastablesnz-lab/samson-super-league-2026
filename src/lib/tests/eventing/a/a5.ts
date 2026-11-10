@@ -156,7 +156,7 @@ export const TEST_EV_A5: SetTest = {
         ["E K A", "Working trot"],
       ],
       "Size of the half circle; the stretch forward and downward; willing return.",
-      [half("B", "E", "A"), line(along("E", "A", "left", arena))],
+      [half("B", "E", "A", "left"), line(along("E", "A", "left", arena))],
       { pace: "free" },
     ),
     mv(

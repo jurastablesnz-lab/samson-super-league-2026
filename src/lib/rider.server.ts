@@ -141,6 +141,12 @@ export async function loadWorkspace(userId: string): Promise<Workspace> {
     ? parseHorseList(app[0].horse_list, app[0].horses)
     : [];
   const approvedTestIds = await publishedTestIds(sql);
+  try {
+    const { backfillDressageTests } = await import("./seed-results.server.ts");
+    await backfillDressageTests(sql);
+  } catch {
+    // Naming blank scores is optional. The screen still infers a test while drawing.
+  }
   return {
     userId: user.id,
     isOwner: user.isAdmin,

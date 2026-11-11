@@ -211,3 +211,64 @@ export async function importSeedResultsForHorse(
     where id = ${importId}`;
   return { imported, skipped: rows.length - imported };
 }
+
+type BlankTestRow = {
+  horse_id: string;
+  client_id: string;
+  test: string;
+  place: string;
+  percent: number | string | null;
+  ride_date: string | Date | null;
+};
+
+function missingDressageColumn(err: unknown) {
+  const code =
+    err && typeof err === "object" && "code" in err ? String((err as { code: unknown }).code) : "";
+  const message = err instanceof Error ? err.message : String(err);
+  return code === "42703" || /dressage_test/i.test(message);
+}
+
+/**
+ * Fill dressage_test where it is still blank. A value Susan already chose is
+ * left alone. Safe to run again. If migration 0011 has not been applied yet,
+ * this does nothing and the screen still infers the test while drawing.
+ */
+export async function backfillDressageTests(sql: Sql, horseId?: string): Promise<number> {
+  let rows: BlankTestRow[];
+  try {
+    rows = horseId
+      ? await sql<BlankTestRow>`
+          select horse_id, client_id, test, place, percent, ride_date::text as ride_date
+          from results
+          where horse_id = ${horseId} and btrim(coalesce(dressage_test, '')) = ''`
+      : await sql<BlankTestRow>`
+          select horse_id, client_id, test, place, percent, ride_date::text as ride_date
+          from results
+          where btrim(coalesce(dressage_test, '')) = ''`;
+  } catch (err) {
+    if (missingDressageColumn(err)) return 0;
+    throw err;
+  }
+  let filled = 0;
+  for (const row of rows) {
+    const test = inferDressageTest({
+      date: row.ride_date,
+      percent: row.percent,
+      place: row.place,
+      test: row.test,
+    });
+    if (!test) continue;
+    try {
+      const updated = await sql<{ client_id: string }>`
+        update results set dressage_test = ${test}
+        where horse_id = ${row.horse_id} and client_id = ${row.client_id}
+          and btrim(coalesce(dressage_test, '')) = ''
+        returning client_id`;
+      if (updated.length) filled += 1;
+    } catch (err) {
+      if (missingDressageColumn(err)) return filled;
+      throw err;
+    }
+  }
+  return filled;
+}

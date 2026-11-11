@@ -17,8 +17,13 @@ import type {
 
 const day = (v: string | Date | null | undefined) => {
   if (v == null) return "";
-  if (typeof v === "string") return v.slice(0, 10);
-  return v.toISOString().slice(0, 10);
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    const month = String(v.getMonth() + 1).padStart(2, "0");
+    const date = String(v.getDate()).padStart(2, "0");
+    return `${v.getFullYear()}-${month}-${date}`;
+  }
+  const match = String(v).match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : "";
 };
 const dateOrNull = (v: unknown) =>
   typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
@@ -142,6 +147,12 @@ export async function readHorseLog(sql: Sql, userId: string, horseId: string): P
     await importSeedResultsForHorse(sql, userId, horseId);
   } catch {
     // A missing seed file must not hide scores the rider already saved.
+  }
+  try {
+    const { backfillDressageTests } = await import("./seed-results.server.ts");
+    await backfillDressageTests(sql, horseId);
+  } catch {
+    // An unmigrated dressage_test column must not hide scores. The screen still infers.
   }
   const results = (
     await sql<ResultRow>`select * from results where horse_id = ${horseId} and user_id = ${userId}

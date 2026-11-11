@@ -78,20 +78,42 @@ function percentsClose(a: number, b: number) {
   return Math.abs(a - b) < 0.051;
 }
 
+function asPercent(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Calendar day. A DATE parsed as local midnight must not shift back via UTC. */
+export function calendarDay(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${value.getFullYear()}-${month}-${day}`;
+  }
+  const match = String(value ?? "").match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : "";
+}
+
 /** Named test, or the one recorded result with the same date, percentage and placing. */
 export function inferDressageTest(row: {
-  date: string;
-  percent: number | null;
-  place: string;
-  test: string;
+  date: unknown;
+  percent: unknown;
+  place: unknown;
+  test: unknown;
 }): string | null {
-  const named = canonicalTest(row.test);
+  const named = canonicalTest(String(row.test ?? ""));
   if (named) return named;
-  if (!row.date || row.percent == null || !Number.isFinite(row.percent)) return null;
-  const place = placeNumber(row.place);
+  const date = calendarDay(row.date);
+  const percent = asPercent(row.percent);
+  if (!date || percent == null) return null;
+  const place = placeNumber(String(row.place ?? ""));
   const hits = OFFICIAL_SCORES.filter((score) => {
-    if (score.date !== row.date.slice(0, 10)) return false;
-    if (!percentsClose(score.percent, row.percent as number)) return false;
+    if (score.date !== date) return false;
+    if (!percentsClose(score.percent, percent)) return false;
     const officialPlace = placeNumber(score.place ?? "");
     if (place && officialPlace && place !== officialPlace) return false;
     return true;

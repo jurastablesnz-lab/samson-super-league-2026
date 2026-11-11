@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { evoDedupeKey, parseEvoResultsCsv } from "./evo-csv.ts";
+import { readHorseLog } from "./rider-horse.server.ts";
+import { inferDressageTest } from "./dressage-test.ts";
 import {
   importSeedResults,
   importSeedResultsForHorse,
   readShippedSeedCsv,
+  seedDressageTest,
   seedTestLabel,
 } from "./seed-results.server.ts";
 import { asSql, database } from "./test-database.ts";
@@ -40,6 +43,61 @@ test("the shipped file has the three beta horses and 101 results", async () => {
   assert.ok(novice.length > bop.length);
   assert.ok(novice.some((row) => row.date !== "2026-10-24"));
   assert.equal(seedTestLabel(parsed.rows[0]), "Level 7 · 701");
+});
+
+test("the shipped Samson rows match the recorded tests, except four that stay blank", async () => {
+  const text = await readShippedSeedCsv();
+  const samson = parseEvoResultsCsv(text).rows.filter((row) => row.esnz === "219700");
+  const named = samson.filter((row) => seedDressageTest(row));
+  const blank = samson.filter((row) => !seedDressageTest(row));
+  assert.equal(samson.length, 24);
+  assert.equal(named.length, 20);
+  assert.equal(blank.length, 4);
+  assert.deepEqual(blank.map((row) => `${row.date} ${row.className}`).sort(), [
+    "2023-05-07 11",
+    "2026-10-24 201",
+    "2026-10-24 203",
+    "2026-10-24 204",
+  ]);
+  const twoC = named.find((row) => row.date === "2025-10-04" && row.className === "201");
+  assert.equal(seedDressageTest(twoC!), "2C");
+  assert.equal(
+    inferDressageTest({
+      date: "2025-10-04",
+      percent: "65.5",
+      place: "5",
+      test: "Novice (L2) · 201",
+    }),
+    "2C",
+  );
+});
+
+test("opening a horse names rows that were imported with a blank test and keeps a chosen one", async () => {
+  const pg = await database();
+  try {
+    const sql = asSql(pg);
+    await users(pg);
+    await pg.query(
+      "insert into horses (id, user_id, name, level, esnz_number) values ('sammy', 'susan', 'Jura Samson', 'Level 2', '219700')",
+    );
+    await pg.query(
+      `insert into results (user_id, horse_id, client_id, source, show_name, ride_date, test, dressage_test, level, percent, place, status, review_status)
+       values
+        ('susan', 'sammy', 'old-2c', 'evo_csv', 'DCD 2025', '2025-10-04', 'Novice (L2) · 201', '', 'Novice (L2)', 65.5, '5', 'ok', 'kept'),
+        ('susan', 'sammy', 'old-bop', 'evo_csv', 'Bay of Plenty', '2026-10-24', 'Novice (L2) · 201', '', 'Novice (L2)', 64.6, '3', 'ok', 'kept'),
+        ('susan', 'sammy', 'chosen', 'evo_csv', 'Wairarapa', '2025-08-31', 'Novice (L2) · 203', 'MFS', 'Novice (L2)', 61, '4', 'ok', 'kept')`,
+    );
+    const log = await readHorseLog(sql, "susan", "sammy");
+    const byId = new Map(log.results.map((row) => [row.id, row.dressageTest]));
+    assert.equal(byId.get("old-2c"), "2C");
+    assert.equal(byId.get("old-bop"), "");
+    assert.equal(byId.get("chosen"), "MFS");
+    const again = await readHorseLog(sql, "susan", "sammy");
+    assert.equal(again.results.find((row) => row.id === "old-2c")?.dressageTest, "2C");
+    assert.equal(again.results.find((row) => row.id === "chosen")?.dressageTest, "MFS");
+  } finally {
+    await pg.close();
+  }
 });
 
 test("saving a horse with an ESNZ number loads its shipped rows, and a second save adds nothing", async () => {

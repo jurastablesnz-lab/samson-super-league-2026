@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { evoDedupeKey, parseEvoResultsCsv } from "./evo-csv.ts";
-import { importSeedResults, readShippedSeedCsv, seedTestLabel } from "./seed-results.server.ts";
+import {
+  importSeedResults,
+  importSeedResultsForHorse,
+  readShippedSeedCsv,
+  seedTestLabel,
+} from "./seed-results.server.ts";
 import { asSql, database } from "./test-database.ts";
 
 const ONE = `Horse,ESNZ,Rider,Event,Date,Class,Level,Percent,Place,Status,Judges
@@ -35,6 +40,44 @@ test("the shipped file has the three beta horses and 101 results", async () => {
   assert.ok(novice.length > bop.length);
   assert.ok(novice.some((row) => row.date !== "2026-10-24"));
   assert.equal(seedTestLabel(parsed.rows[0]), "Level 7 · 701");
+});
+
+test("saving a horse with an ESNZ number loads its shipped rows, and a second save adds nothing", async () => {
+  const pg = await database();
+  try {
+    const sql = asSql(pg);
+    await users(pg);
+    await pg.query(
+      `insert into horses (id, user_id, name, esnz_number) values
+        ('sammy', 'susan', 'Jura Samson', '219700'),
+        ('blank', 'susan', 'No number', null),
+        ('other', 'nicole', 'Other', '250297')`,
+    );
+    const first = await importSeedResultsForHorse(sql, "susan", "sammy");
+    assert.equal(first.imported, 24);
+    assert.equal(first.skipped, 0);
+    const kept = await pg.query<{ n: number; test: string }>(
+      `select count(*)::int as n, max(test) as test from results
+       where horse_id = 'sammy' and review_status = 'kept' and ride_date = '2026-10-24' and test like '%201'`,
+    );
+    assert.equal(kept.rows[0].n, 1);
+    assert.match(kept.rows[0].test, /201/);
+    const again = await importSeedResultsForHorse(sql, "susan", "sammy");
+    assert.equal(again.imported, 0);
+    assert.equal(again.skipped, 24);
+    assert.deepEqual(await importSeedResultsForHorse(sql, "susan", "blank"), {
+      imported: 0,
+      skipped: 0,
+    });
+    const nicole = await importSeedResultsForHorse(sql, "nicole", "other");
+    assert.equal(nicole.imported, 18);
+    const crossed = await pg.query<{ n: number }>(
+      "select count(*)::int as n from results where horse_id = 'other' and test like '%201'",
+    );
+    assert.equal(crossed.rows[0].n, 0);
+  } finally {
+    await pg.close();
+  }
 });
 
 test("import matches ESNZ only, skips duplicates and a pending review, and reports unmatched rows", async () => {

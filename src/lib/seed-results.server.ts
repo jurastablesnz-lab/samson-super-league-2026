@@ -139,3 +139,63 @@ export async function importShippedSeedResults(
 ): Promise<SeedImportReport> {
   return importSeedResults(sql, uploadedBy, await readShippedSeedCsv());
 }
+
+let shippedRows: EvoRow[] | null = null;
+
+async function rowsInShippedFile(): Promise<EvoRow[]> {
+  if (!shippedRows) shippedRows = parseEvoResultsCsv(await readShippedSeedCsv()).rows;
+  return shippedRows;
+}
+
+/**
+ * Copy shipped rows for this horse's ESNZ number onto that horse.
+ * The same dedupe key as the admin import means a second save adds nothing.
+ * This does not contact EVO Events.
+ */
+export async function importSeedResultsForHorse(
+  sql: Sql,
+  userId: string,
+  horseId: string,
+): Promise<{ imported: number; skipped: number }> {
+  const [horse] = await sql<{ esnz_number: string | null }>`
+    select esnz_number from horses
+    where id = ${horseId} and user_id = ${userId} and not archived`;
+  const esnz = normaliseEsnz(horse?.esnz_number ?? "");
+  if (!esnz) return { imported: 0, skipped: 0 };
+  const rows = (await rowsInShippedFile()).filter((row) => normaliseEsnz(row.esnz) === esnz);
+  if (!rows.length) return { imported: 0, skipped: 0 };
+  const existing = await sql<{ dedupe_key: string | null }>`
+    select dedupe_key from results where horse_id = ${horseId} and dedupe_key is not null`;
+  const have = new Set(existing.map((row) => row.dedupe_key));
+  const missing = rows.filter((row) => !have.has(evoDedupeKey(row)));
+  if (!missing.length) return { imported: 0, skipped: rows.length };
+
+  const audit = await sql<{ id: number }>`
+    insert into result_imports (uploaded_by, file_name, row_count)
+    values (${userId.slice(0, 200)}, 'master-results.csv', ${missing.length})
+    returning id`;
+  const importId = Number(audit[0].id);
+  let imported = 0;
+  for (const row of missing) {
+    const inserted = await sql<{ id: number }>`
+      insert into results (
+        user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, level,
+        percent, place, status, judges, notes, dedupe_key, import_id, raw, review_status, rider_name
+      ) values (
+        ${userId}, ${horseId}, ${`seed-${importId}-${row.line}`}, 'evo_csv', 'past',
+        ${row.event.slice(0, 200)}, ${row.date || null}, ${seedTestLabel(row)}, ${row.level.slice(0, 40)},
+        ${row.percent}, ${row.place.slice(0, 20)}, ${row.status}, ${judgesOf(row)}, '',
+        ${evoDedupeKey(row)}, ${importId}, ${JSON.stringify(row.raw ?? {})}::jsonb, 'kept',
+        ${row.rider.slice(0, 120)}
+      )
+      on conflict do nothing
+      returning id`;
+    if (inserted.length) imported += 1;
+  }
+  await sql`
+    update result_imports
+    set matched_count = ${missing.length}, inserted_count = ${imported},
+      summary = ${JSON.stringify({ imported, skipped: missing.length - imported, horseId, auto: true })}::jsonb
+    where id = ${importId}`;
+  return { imported, skipped: rows.length - imported };
+}

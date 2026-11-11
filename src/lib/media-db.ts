@@ -12,6 +12,60 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "0 MB";
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** Null when the file fits. Otherwise a message that names the size and the free space. */
+export function storageShortfall(
+  bytes: number,
+  estimate: { quota?: number; usage?: number } | null | undefined,
+): string | null {
+  const quota = estimate?.quota;
+  const usage = estimate?.usage;
+  if (quota == null || usage == null || quota <= 0) return null;
+  const free = Math.max(0, quota - usage);
+  if (bytes <= free) return null;
+  return `This video is ${formatBytes(bytes)}. This browser has about ${formatBytes(free)} free for videos on this site (limit ${formatBytes(quota)}). It was not saved.`;
+}
+
+/**
+ * Ask the browser to keep this site's storage, then store the file as a Blob.
+ * The File is handed to IndexedDB directly. It is not read into a string.
+ */
+export async function storeVideoFile(id: string, file: Blob): Promise<void> {
+  const storage = globalThis.navigator?.storage;
+  try {
+    await storage?.persist?.();
+  } catch {
+    // Persistence is optional. The file can still be saved for this visit.
+  }
+  let estimate: { quota?: number; usage?: number } | undefined;
+  try {
+    estimate = await storage?.estimate?.();
+  } catch {
+    estimate = undefined;
+  }
+  const short = storageShortfall(file.size, estimate);
+  if (short) throw new Error(short);
+  try {
+    await putMediaBlob(id, file);
+  } catch (err) {
+    const name =
+      err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
+    if (name === "QuotaExceededError") {
+      throw new Error(
+        storageShortfall(file.size, estimate) ??
+          `This video is ${formatBytes(file.size)} and the browser ran out of space for this site. It was not saved.`,
+      );
+    }
+    throw err instanceof Error ? err : new Error("Could not save the video.");
+  }
+}
+
 export async function putMediaBlob(id: string, blob: Blob) {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {

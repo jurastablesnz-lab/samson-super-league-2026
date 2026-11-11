@@ -3,7 +3,13 @@ import { Camera, Check, ImagePlus, Share2, Trash2, Video, X } from "lucide-react
 import { format, parseISO } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { compressSheetPhoto, deleteMediaBlob, getMediaBlob, putMediaBlob } from "@/lib/media-db";
+import {
+  compressSheetPhoto,
+  deleteMediaBlob,
+  getMediaBlob,
+  putMediaBlob,
+  storeVideoFile,
+} from "@/lib/media-db";
 import { summariseSheet } from "@/lib/summarise-sheet";
 import { SHOWS, TEST_OPTIONS, TODAY } from "@/lib/season";
 import { usePlan, type ReviewItem, type SheetRead } from "@/lib/store";
@@ -153,14 +159,10 @@ export function FilmBoard() {
       setError("That file is not a video.");
       return;
     }
-    if (file.size > 180 * 1024 * 1024) {
-      setError("That clip is too big for this phone. Trim it in Photos first.");
-      return;
-    }
     setBusy(true);
     const id = `v-${Date.now()}`;
     try {
-      await putMediaBlob(id, file);
+      await storeVideoFile(id, file);
       addReview({
         id,
         kind: "video",
@@ -171,8 +173,9 @@ export function FilmBoard() {
         mime: file.type || "video/mp4",
       });
       setNote("");
-    } catch {
-      setError("This phone would not store that clip. Trim it and try again.");
+    } catch (err) {
+      await deleteMediaBlob(id).catch(() => undefined);
+      setError(err instanceof Error ? err.message : "Could not save the video.");
     } finally {
       setBusy(false);
     }

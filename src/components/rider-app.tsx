@@ -950,7 +950,7 @@ function LogTab({
     );
   return (
     <div className="flex flex-col gap-4">
-      <EvoSelfImportPanel horseId={horse.id} onImported={setLog} />
+      <PlanResults results={log.results} />
       <EvoReviewPanel
         pending={log.pendingEvoResults}
         horseId={horse.id}
@@ -1174,6 +1174,7 @@ function LogTab({
         </ul>
       </Card>
 
+      <EvoSelfImportPanel horseId={horse.id} onImported={setLog} />
       <SheetsCard plan={plan} horse={horse} log={log} setLog={setLog} />
     </div>
   );
@@ -1232,10 +1233,10 @@ function EvoSelfImportPanel({
   const riders = [...new Set(rows.map((row) => row.rider.trim()).filter(Boolean))];
   return (
     <Card>
-      <Kicker>Bring in my EVO results</Kicker>
+      <Kicker>Optional · paste an EVO table</Kicker>
       <p className="mt-2 text-sm text-muted">
-        Copy your horse's results table from EVO Events and paste it here. You'll choose which
-        scores to keep.
+        Scores that match the ESNZ number are already loaded. Paste a copied EVO table only if
+        something is missing. You'll choose which extra scores to keep.
       </p>
       <textarea
         value={text}
@@ -1488,8 +1489,9 @@ function SheetsCard({
 
   return (
     <Card>
-      <Kicker>Judge sheets</Kicker>
+      <Kicker>Optional · judge sheet photo</Kicker>
       <p className="mt-2 text-sm text-muted">
+        A photo is a second way to add a test. It does not replace scores already saved.
         Photograph the sheet (up to {MAX_SHEET_PHOTOS} pages). We read it and save the summary to
         your account; the photos stay on this device.
       </p>

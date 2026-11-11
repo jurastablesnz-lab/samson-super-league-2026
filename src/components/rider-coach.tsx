@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Share2, Trash2, Video } from "lucide-react";
-import { deleteMediaBlob, getMediaBlob, putMediaBlob } from "@/lib/media-db";
+import { deleteMediaBlob, getMediaBlob, storeVideoFile } from "@/lib/media-db";
 import { deleteCoachVisit, deleteEntry, saveCoachVisit, saveSheet } from "@/lib/rider";
 import type { CoachVisitRecord, HorseLog, HorseRecord, SheetRecord } from "@/lib/rider-types";
 import type { GeneratedPlan } from "@/lib/plan-builder";
@@ -359,14 +359,10 @@ function Videos({
       setError("That file is not a video.");
       return;
     }
-    if (file.size > 180 * 1024 * 1024) {
-      setError("That clip is too big for this phone. Trim it in Photos first.");
-      return;
-    }
     setBusy(true);
     const id = `v-${globalThis.crypto.randomUUID()}`;
     try {
-      await putMediaBlob(id, file);
+      await storeVideoFile(id, file);
       const saved = await saveSheet({
         data: {
           horseId: horse.id,

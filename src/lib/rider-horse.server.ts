@@ -135,6 +135,12 @@ const toCoach = (r: CoachRow): CoachVisitRecord => ({
 /** One horse's log. Refuses another rider's horse before reading anything. */
 export async function readHorseLog(sql: Sql, userId: string, horseId: string): Promise<HorseLog> {
   await ownedHorse(sql, userId, horseId);
+  try {
+    const { importSeedResultsForHorse } = await import("./seed-results.server.ts");
+    await importSeedResultsForHorse(sql, userId, horseId);
+  } catch {
+    // A missing seed file must not hide scores the rider already saved.
+  }
   const results = (
     await sql<ResultRow>`select * from results where horse_id = ${horseId} and user_id = ${userId}
       and review_status = 'kept' order by ride_date desc nulls last, id desc`

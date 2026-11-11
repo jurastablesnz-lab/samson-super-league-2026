@@ -214,7 +214,11 @@ export function SetupWizard({
                   ))}
                 </select>
               </Field>
-              <Field label="ESNZ registration number" optional hint="Used to match your EVO Events results.">
+              <Field
+                label="ESNZ registration number"
+                optional
+                hint="Saving a number that matches the results shipped with the app loads those scores. Jura Samson is 219700."
+              >
                 <input
                   className={inputCls}
                   maxLength={20}

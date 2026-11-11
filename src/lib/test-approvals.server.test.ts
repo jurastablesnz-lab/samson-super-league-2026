@@ -22,15 +22,15 @@ async function user(pg: PGlite, id: string, email: string, provider = "google") 
   );
 }
 
-test("seeded approvals are Novice 2A–2C and Medium 4A, and only a Google admin can change them", async () => {
+test("seeded approvals are Novice 2A–2C, Medium 4A and the Level 2 freestyle", async () => {
   const pg = await database();
   const saved = process.env.BETA_ADMIN_EMAILS;
   process.env.BETA_ADMIN_EMAILS = "admin@example.com,password-admin@example.com";
   try {
     const sql = asSql(pg);
-    assert.deepEqual(await publishedTestIds(sql), [...SEEDED_APPROVED_TEST_IDS]);
+    assert.deepEqual(await publishedTestIds(sql), [...SEEDED_APPROVED_TEST_IDS].sort());
     const seeded = await listTestApprovals(sql);
-    assert.equal(seeded.length, 4);
+    assert.equal(seeded.length, SEEDED_APPROVED_TEST_IDS.length);
     assert.ok(seeded.every((row) => row.approvedBy === "susan@manawa.tech" && row.approvedAt));
 
     await user(pg, "admin", "admin@example.com");
@@ -52,17 +52,20 @@ test("seeded approvals are Novice 2A–2C and Medium 4A, and only a Google admin
       assignRiderTest(sql, { horseId: "horse", test: "4B", action: "add" }),
       /not published/,
     );
-    assert.deepEqual(await setTestApproval(sql, "admin", "4b", true), [
-      ...SEEDED_APPROVED_TEST_IDS,
-      "4b",
-    ]);
+    assert.deepEqual(
+      [...(await setTestApproval(sql, "admin", "4b", true))].sort(),
+      [...SEEDED_APPROVED_TEST_IDS, "4b"].sort(),
+    );
     const approved = await listTestApprovals(sql);
     assert.equal(approved.find((row) => row.testId === "4b")?.approvedBy, "admin");
     assert.deepEqual(await assignRiderTest(sql, { horseId: "horse", test: "4B", action: "add" }), {
       horseId: "horse",
       tests: ["4A", "4B"],
     });
-    assert.deepEqual(await setTestApproval(sql, "admin", "4b", false), [...SEEDED_APPROVED_TEST_IDS]);
+    assert.deepEqual(
+      [...(await setTestApproval(sql, "admin", "4b", false))].sort(),
+      [...SEEDED_APPROVED_TEST_IDS].sort(),
+    );
     await assert.rejects(setTestApproval(sql, "admin", "not-a-test", true), /Unknown test/);
     await assert.rejects(
       assignRiderTest(sql, { horseId: "horse", test: "4C", action: "add" }),

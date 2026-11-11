@@ -39,6 +39,17 @@ export const saveSetup = createServerFn({ method: "POST" })
     return save(context.userId, data.horses, !data.archiveMissing);
   });
 
+export const saveHorseFloorPlan = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; floorPlan: unknown }) => ({
+    horseId: str(input?.horseId),
+    floorPlan: input?.floorPlan ?? null,
+  }))
+  .handler(async ({ context, data }): Promise<Workspace> => {
+    const { saveHorseFloorPlan: save } = await import("./rider.server");
+    return save(context.userId, data.horseId, data.floorPlan);
+  });
+
 export const getHorseLog = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { horseId: string }) => ({ horseId: str(input?.horseId) }))
@@ -57,8 +68,9 @@ export const saveResult = createServerFn({ method: "POST" })
     return { horseId: str(input?.horseId), result: input?.result ?? {} };
   })
   .handler(async ({ context, data }) => {
-    const { requireAccess, ownedHorse, upsertResult, loadHorseLog } =
-      await import("./rider.server");
+    const { requireAccess, ownedHorse, upsertResult, loadHorseLog } = await import(
+      "./rider.server"
+    );
     const { getSql } = await import("./db");
     await requireAccess(context.userId);
     const sql = await getSql();

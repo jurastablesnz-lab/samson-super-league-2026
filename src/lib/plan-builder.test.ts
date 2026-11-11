@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeWhen, generatePlan, phasesFor, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
+import {
+  describeWhen,
+  floorPlanKind,
+  generatePlan,
+  phasesFor,
+  sanitiseFloorPlan,
+  sanitisePlanConfig,
+  testsForLevel,
+} from "./plan-builder.ts";
 import { differenceInDays } from "date-fns";
 import { WEEKS, PHASES } from "./season.ts";
 
@@ -88,5 +96,39 @@ test("sanitisePlanConfig drops junk and keeps known goals", () => {
   assert.equal(c.shows.length, 1);
   assert.equal(c.shows[0].end, "2027-01-01");
   assert.equal(c.horseName, "Rua");
+  assert.equal(c.floorPlan, null);
   assert.ok(testsForLevel("Level 4").includes("4B"));
+});
+
+test("a floor plan is a PDF or image kept on the device, and junk is dropped", () => {
+  assert.equal(floorPlanKind({ type: "application/pdf", name: "plan.pdf" }), "pdf");
+  assert.equal(floorPlanKind({ type: "", name: "plan.PDF" }), "pdf");
+  assert.equal(floorPlanKind({ type: "image/jpeg", name: "sheet.jpg" }), "image");
+  assert.equal(floorPlanKind({ type: "audio/mpeg", name: "music.mp3" }), null);
+  const kept = sanitiseFloorPlan({
+    mediaId: "floorplan-1",
+    fileName: "susan-l2.pdf",
+    mime: "application/pdf",
+    size: 1200,
+    storedOn: "device",
+    uploadedAt: "2026-11-11T00:00:00.000Z",
+  });
+  assert.equal(kept?.mime, "application/pdf");
+  assert.equal(
+    sanitiseFloorPlan({ mediaId: "/audio/secret.mp3", fileName: "x.pdf", mime: "application/pdf" }),
+    null,
+  );
+  const config = sanitisePlanConfig(
+    {
+      horseName: "Jura Samson",
+      level: "Level 2",
+      tests: ["2A"],
+      floorPlan: kept,
+      extra: "nope",
+    },
+    { horseName: "Jura Samson", level: "Level 2" },
+  );
+  assert.deepEqual(config.floorPlan, kept);
+  const again = sanitisePlanConfig(config, { horseName: "Jura Samson", level: "Level 2" });
+  assert.deepEqual(again.floorPlan, kept);
 });

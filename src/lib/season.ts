@@ -633,7 +633,7 @@ export const TESTS: TestSheet[] = [
     role: "The optional extra",
     time: "Zilco L2 MFS · finish 4:00–4:30",
     purpose:
-      "Music from A. Last Super 5 outing it was an elimination — only take it to a show when the file and the floorplan are both quiet.",
+      "Music from A. Ride this floorplan with the file until the timing feels settled.",
     keys: [
       {
         move: "Time window",

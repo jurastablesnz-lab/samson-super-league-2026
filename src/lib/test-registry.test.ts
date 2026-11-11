@@ -6,20 +6,30 @@ import {
   isPublishedTest,
   testIdForName,
   testsForLevelPublished,
+  visibleDiagramIds,
 } from "./test-registry.ts";
 
 const approved = new Set(SEEDED_APPROVED_TEST_IDS);
 
 test("Susan’s signed-off tests are the only seeded publications", () => {
-  assert.deepEqual([...approved], ["2a", "2b", "2c", "4a"]);
-  for (const name of ["Novice 2A", "2A", "2B", "2B Super 5", "2C", "Medium 4A", "4A"]) {
+  assert.deepEqual([...approved], ["2a", "2b", "2c", "4a", "mfs"]);
+  for (const name of [
+    "Novice 2A",
+    "2A",
+    "2B",
+    "2B Super 5",
+    "2C",
+    "Medium 4A",
+    "4A",
+    "Level 2 musical freestyle",
+    "L2 MFS",
+  ]) {
     assert.equal(isPublishedTest(name, approved), true, name);
   }
   for (const name of [
     "4B",
     "Medium 4B",
     "4C",
-    "Level 2 musical freestyle",
     "Level 4 musical freestyle",
     "Training 1",
     "3A",
@@ -29,8 +39,34 @@ test("Susan’s signed-off tests are the only seeded publications", () => {
   }
 });
 
+test("a Level 2 horse sees 2A, 2B, 2C and the musical freestyle sheet", () => {
+  assert.deepEqual(
+    visibleDiagramIds({ level: "Level 2", tests: ["2A", "2B", "2C"], approvedIds: approved }),
+    ["2a", "2b", "2c", "mfs"],
+  );
+  assert.equal(
+    visibleDiagramIds({ level: "Level 2", approvedIds: approved }).includes("4a"),
+    false,
+  );
+  assert.deepEqual(
+    visibleDiagramIds({
+      level: "Level 2",
+      tests: ["2B", "Level 2 musical freestyle"],
+      approvedIds: [],
+      isAdmin: true,
+    }),
+    ["2a", "2b", "2c", "mfs"],
+  );
+});
+
 test("riders only see published names, and new registry tests start unpublished", () => {
-  assert.deepEqual(testsForLevelPublished("Level 2", approved), ["2A", "2B", "2C", "2B Super 5"]);
+  assert.deepEqual(testsForLevelPublished("Level 2", approved), [
+    "2A",
+    "2B",
+    "2C",
+    "2B Super 5",
+    "Level 2 musical freestyle",
+  ]);
   assert.deepEqual(testsForLevelPublished("Level 4", approved), ["4A"]);
   assert.deepEqual(testsForLevelPublished("Level 1", approved), []);
   assert.ok(testsForLevelPublished("Level 4", approved, true).includes("4B"));

@@ -7,8 +7,7 @@ export const MFS_SHEET = {
   time: "Finish between 4:00 and 4:30",
   bridle: "Ordinary snaffle",
   arena: "60 × 20",
-  purpose:
-    "Music from A. Last Super 5 outing it was an elimination — only take it to a show when the file and the floorplan are both quiet.",
+  purpose: "Music from A. Ride this floorplan with the file until the timing feels settled.",
   technicalTotal: 120,
   artisticTotal: 120,
   compulsory: [

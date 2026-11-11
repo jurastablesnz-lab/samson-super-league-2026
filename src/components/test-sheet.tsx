@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { getPublishedTests, setTestPublished } from "@/lib/test-publication";
-import { catalogTests, type CatalogTest } from "@/lib/test-registry";
+import { catalogTests, visibleDiagramIds, type CatalogTest } from "@/lib/test-registry";
 import { Button } from "@/components/ui/button";
 import { FreestyleCard } from "@/components/freestyle-player";
 import { cn } from "@/lib/utils";
@@ -1333,7 +1333,16 @@ export function TestCatalog() {
   );
 }
 
-export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
+export function TestsPanel({
+  isAdmin = false,
+  horseLevel,
+  horseTests,
+}: {
+  isAdmin?: boolean;
+  /** When set, the tabs are this horse's level sheets plus any extra tests on the plan. */
+  horseLevel?: string;
+  horseTests?: string[];
+}) {
   const [active, setActive] = useState("2b");
   const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1344,18 +1353,21 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
   const approved = useMemo(() => new Set(approvedIds ?? []), [approvedIds]);
-  const diagrams = catalogTests().filter((item) => item.viewId);
-  const visible = diagrams.filter(
-    (item) => isAdmin || (approvedIds !== null && approved.has(item.id)),
+  const scoped = horseLevel != null || horseTests != null;
+  const visibleIds = useMemo(
+    () =>
+      visibleDiagramIds({
+        ...(scoped ? { level: horseLevel, tests: horseTests } : {}),
+        approvedIds: approvedIds ?? [],
+        isAdmin,
+      }),
+    [scoped, horseLevel, horseTests, approvedIds, isAdmin],
   );
+  const diagrams = catalogTests().filter((item) => item.viewId);
+  const visible = diagrams.filter((item) => item.viewId && visibleIds.includes(item.viewId));
   useEffect(() => {
-    const shown = catalogTests().filter(
-      (item) =>
-        item.viewId && (isAdmin || (approvedIds !== null && new Set(approvedIds).has(item.id))),
-    );
-    if (!shown.some((item) => item.viewId === active) && shown[0]?.viewId)
-      setActive(shown[0].viewId);
-  }, [active, approvedIds, isAdmin]);
+    if (!visibleIds.includes(active) && visibleIds[0]) setActive(visibleIds[0]);
+  }, [active, visibleIds]);
   const test = ALL_SET_TESTS.find((item) => item.id === active);
   const activeMeta = diagrams.find((item) => item.viewId === active);
   const others = catalogTests().filter((item) => !item.viewId);
@@ -1461,7 +1473,7 @@ export function TestsPanel({ isAdmin = false }: { isAdmin?: boolean }) {
         <FreestyleTable sheet={MORE_FREESTYLES[active]} />
       )}
 
-      {isAdmin && approvedIds !== null && others.length > 0 && (
+      {isAdmin && !scoped && approvedIds !== null && others.length > 0 && (
         <section className="rounded-xl bg-surface p-4 shadow-[var(--shadow-card)]">
           <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
             Other tests

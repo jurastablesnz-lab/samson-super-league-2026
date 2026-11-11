@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { Check, Music, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { COMPETITION_LEVELS, MAX_HORSES } from "@/lib/beta";
+import { FloorPlanPicker } from "@/components/floor-plan";
 import { putMediaBlob } from "@/lib/media-db";
 import {
   GOALS,
   describeWhen,
+  type FloorPlanRef,
   type FreestyleRef,
   type GoalId,
   type PlanConfig,
@@ -29,6 +31,7 @@ export type WizardHorse = {
   goals: GoalId[];
   goalNote: string;
   freestyle: FreestyleRef | null;
+  floorPlan: FloorPlanRef | null;
 };
 
 /** Public show calendar offered in the wizard (dates only — confirm on EVO Events). */
@@ -62,6 +65,7 @@ export function wizardHorsesFrom(ws: Workspace): WizardHorse[] {
         goals: c?.goals ?? [],
         goalNote: c?.goalNote ?? "",
         freestyle: c?.freestyle ?? ws.plans[h.id]?.freestyle ?? null,
+        floorPlan: c?.floorPlan ?? null,
       };
     });
   }
@@ -76,6 +80,7 @@ export function wizardHorsesFrom(ws: Workspace): WizardHorse[] {
     goals: [],
     goalNote: "",
     freestyle: null,
+    floorPlan: null,
   }));
 }
 
@@ -148,6 +153,7 @@ export function SetupWizard({
               goals: h.goals,
               goalNote: h.goalNote,
               freestyle: h.freestyle,
+              floorPlan: h.floorPlan,
             },
           })),
         },
@@ -224,7 +230,18 @@ export function SetupWizard({
               onClick={() =>
                 setHorses((l) => [
                   ...l,
-                  { name: "", level: "", esnzNumber: "", notes: "", tests: [], shows: [], goals: [], goalNote: "", freestyle: null },
+                  {
+                    name: "",
+                    level: "",
+                    esnzNumber: "",
+                    notes: "",
+                    tests: [],
+                    shows: [],
+                    goals: [],
+                    goalNote: "",
+                    freestyle: null,
+                    floorPlan: null,
+                  },
                 ])
               }
               className="w-full cursor-pointer rounded-lg border border-dashed border-accent/60 px-3 py-2.5 text-sm font-semibold text-accent"
@@ -274,6 +291,11 @@ export function SetupWizard({
               {x.freestyle && (
                 <p>
                   <span className="font-semibold">Freestyle music:</span> {x.freestyle.fileName}
+                </p>
+              )}
+              {x.floorPlan && (
+                <p>
+                  <span className="font-semibold">Floor plan:</span> {x.floorPlan.fileName}
                 </p>
               )}
             </Panel>
@@ -601,7 +623,7 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
             {busy ? "Saving…" : "Choose an audio file"}
             <input
               type="file"
-              accept="audio/*,.mp3,.m4a,.wav"
+              accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -612,6 +634,7 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           </label>
         )}
         {err && <p className="text-xs text-danger">{err}</p>}
+        <FloorPlanPicker plan={horse.floorPlan} onChange={(floorPlan) => onChange({ floorPlan })} />
       </Panel>
     </>
   );

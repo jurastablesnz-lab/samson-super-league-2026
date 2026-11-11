@@ -27,6 +27,13 @@ test("the shipped file has the three beta horses and 101 results", async () => {
   assert.equal(counts.get("219700"), 24);
   assert.equal(counts.get("250297"), 18);
   assert.equal(counts.get("236353"), 59);
+  const samson = parsed.rows.filter((row) => row.esnz === "219700");
+  const bop = samson.filter((row) => row.date === "2026-10-24" && /bay of plenty/i.test(row.event));
+  assert.deepEqual(bop.map((row) => row.className).sort(), ["201", "203", "204"]);
+  assert.ok(bop.every((row) => row.level === "Novice (L2)" && row.horse === "Jura Samson"));
+  const novice = samson.filter((row) => row.level === "Novice (L2)");
+  assert.ok(novice.length > bop.length);
+  assert.ok(novice.some((row) => row.date !== "2026-10-24"));
   assert.equal(seedTestLabel(parsed.rows[0]), "Level 7 · 701");
 });
 

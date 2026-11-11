@@ -19,7 +19,7 @@ export const MFS_FLOOR = {
   time: "Finish between 4:00 and 4:30",
   arena: "60 × 20",
   purpose:
-    "Your floorplan. Walk it from the caller until the letters are boring. Last Super 5 outing it was an elimination — only take it when the file and this floorplan are both quiet.",
+    "Your floorplan. Walk it from the caller until the letters are familiar, then ride it with the music.",
   movements: [
     m(
       1,

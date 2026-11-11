@@ -88,6 +88,45 @@ export type FreestyleRef = {
   uploadedAt: string;
 };
 
+/** A rider's own floor-plan PDF or photo. The file stays in IndexedDB on this device. */
+export type FloorPlanRef = {
+  mediaId: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  storedOn: "device";
+  uploadedAt: string;
+};
+
+/** PDF or image. Anything else is refused so the floor-plan slot cannot hold an arbitrary file. */
+export function floorPlanKind(file: { type?: string; name?: string }): "pdf" | "image" | null {
+  const type = (file.type ?? "").toLowerCase();
+  const name = file.name ?? "";
+  if (type === "application/pdf" || /\.pdf$/i.test(name)) return "pdf";
+  if (type.startsWith("image/") || /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name)) return "image";
+  return null;
+}
+
+export function sanitiseFloorPlan(raw: unknown): FloorPlanRef | null {
+  if (!raw || typeof raw !== "object") return null;
+  const f = raw as Record<string, unknown>;
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const mediaId = text(f.mediaId, 120);
+  const fileName = text(f.fileName, 200);
+  if (!mediaId || !fileName || mediaId.startsWith("/") || mediaId.includes("..")) return null;
+  const kind = floorPlanKind({ type: text(f.mime, 80), name: fileName });
+  if (!kind) return null;
+  const given = text(f.mime, 80).toLowerCase();
+  return {
+    mediaId,
+    fileName,
+    mime: kind === "pdf" ? "application/pdf" : given.startsWith("image/") ? given : "image/jpeg",
+    size: Math.max(0, Math.min(20_000_000, Math.round(Number(f.size) || 0))),
+    storedOn: "device",
+    uploadedAt: text(f.uploadedAt, 40) || new Date().toISOString(),
+  };
+}
+
 export type PlanConfig = {
   horseName: string;
   level: string;
@@ -98,6 +137,8 @@ export type PlanConfig = {
   /** First day of the plan (defaults to today in NZ). */
   startDate?: string;
   freestyle?: FreestyleRef | null;
+  /** Rider's PDF or photo of the freestyle floor plan. The bytes stay on the device. */
+  floorPlan?: FloorPlanRef | null;
 };
 
 export type GeneratedPlan = {
@@ -464,6 +505,7 @@ export function sanitisePlanConfig(raw: unknown, fallback: { horseName: string; 
       uploadedAt: str(f.uploadedAt, 40) || new Date().toISOString(),
     };
   }
+  const floorPlan = sanitiseFloorPlan(r.floorPlan);
   return {
     horseName: str(r.horseName, 80) || fallback.horseName,
     level: str(r.level, 60) || fallback.level || "Level 2",
@@ -473,5 +515,6 @@ export function sanitisePlanConfig(raw: unknown, fallback: { horseName: string; 
     goalNote: str(r.goalNote, 500) || undefined,
     startDate: day(r.startDate) || undefined,
     freestyle,
+    floorPlan,
   };
 }

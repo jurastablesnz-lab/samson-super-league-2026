@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { FloorPlanPicker } from "@/components/floor-plan";
 import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
 import { TestsPanel } from "@/components/test-sheet";
@@ -32,6 +33,7 @@ import {
   rejectEvoResults,
   saveNote,
   saveProgress,
+  saveHorseFloorPlan,
   saveResult,
   saveSheet,
 } from "@/lib/rider";
@@ -145,6 +147,7 @@ export function RiderHome({ storageKey }: { storageKey: string }) {
       horses={planned}
       storageKey={storageKey}
       onEditSetup={() => setEditing(true)}
+      onWorkspace={setWs}
     />
   );
 }
@@ -164,11 +167,13 @@ function RiderApp({
   horses,
   storageKey,
   onEditSetup,
+  onWorkspace,
 }: {
   ws: Workspace;
   horses: HorseRecord[];
   storageKey: string;
   onEditSetup: () => void;
+  onWorkspace: (ws: Workspace) => void;
 }) {
   const [tab, setTab] = useState<Tab>("today");
   const [horseId, setHorseId] = useState(horses[0].id);
@@ -311,6 +316,7 @@ function RiderApp({
             record={record}
             isAdmin={ws.isOwner}
             approvedTestIds={ws.approvedTestIds}
+            onWorkspace={onWorkspace}
           />
         )}
         {tab === "coach" && (
@@ -741,16 +747,37 @@ function TestsTab({
   record,
   isAdmin,
   approvedTestIds,
+  onWorkspace,
 }: {
   plan: GeneratedPlan;
   record: PlanRecord;
   isAdmin: boolean;
   approvedTestIds: string[];
+  onWorkspace: (ws: Workspace) => void;
 }) {
   const shown = plan.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
+  const floorPlan = record.config.floorPlan ?? null;
+  const showFloor =
+    plan.level === "Level 2" ||
+    plan.tests.some((test) => /freestyle|mfs/i.test(test)) ||
+    !!floorPlan;
   return (
     <div className="flex flex-col gap-4">
-      <TestsPanel isAdmin={isAdmin} />
+      <TestsPanel isAdmin={isAdmin} horseLevel={plan.level} horseTests={plan.tests} />
+      {showFloor && (
+        <Card>
+          <FloorPlanPicker
+            plan={floorPlan}
+            onChange={async (next) => {
+              onWorkspace(
+                await saveHorseFloorPlan({
+                  data: { horseId: record.horseId, floorPlan: next },
+                }),
+              );
+            }}
+          />
+        </Card>
+      )}
       <Card>
         <Kicker>Your tests</Kicker>
         <ul className="mt-3 flex flex-col gap-2">

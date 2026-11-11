@@ -41,7 +41,7 @@ export type CatalogTest = {
 };
 
 /** ESNZ tests Susan has signed off. Everything else starts as a draft. */
-export const SEEDED_APPROVED_TEST_IDS = ["2a", "2b", "2c", "4a"] as const;
+export const SEEDED_APPROVED_TEST_IDS = ["2a", "2b", "2c", "4a", "mfs"] as const;
 
 function slug(name: string) {
   return name
@@ -206,6 +206,33 @@ export function testIdForName(name: string): string {
       test.aliases.some((alias) => alias.toLowerCase() === key),
   );
   return hit?.id ?? slug(name);
+}
+
+/**
+ * Diagram tabs for one horse. A level's own sheets (2A, 2B, 2C, MFS at Level 2)
+ * plus any extra test the horse has been given. Drafts stay hidden unless the
+ * viewer is an admin.
+ */
+export function visibleDiagramIds(opts: {
+  level?: string;
+  tests?: string[];
+  approvedIds: Iterable<string>;
+  isAdmin?: boolean;
+}): string[] {
+  const approved = new Set(opts.approvedIds);
+  const scoped = opts.level != null || opts.tests != null;
+  const levelIds = new Set(
+    (opts.level ? (TESTS_BY_LEVEL[opts.level] ?? []) : []).map((name) => testIdForName(name)),
+  );
+  const selected = new Set((opts.tests ?? []).map((name) => testIdForName(name)));
+  const ids: string[] = [];
+  for (const item of catalogTests()) {
+    if (!item.viewId) continue;
+    if (!opts.isAdmin && !approved.has(item.id)) continue;
+    if (scoped && !levelIds.has(item.id) && !selected.has(item.id)) continue;
+    if (!ids.includes(item.viewId)) ids.push(item.viewId);
+  }
+  return ids;
 }
 
 export function isPublishedTest(nameOrId: string, approvedIds: Iterable<string>): boolean {

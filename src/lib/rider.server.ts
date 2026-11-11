@@ -45,7 +45,14 @@ const s = (v: unknown, max = 500) =>
 const json = (v: unknown) => (typeof v === "string" ? (JSON.parse(v) as unknown) : v);
 const newId = () => globalThis.crypto.randomUUID();
 
-export { ownedHorse, readHorseLog, upsertSheet, writeProgress, saveCoachVisitFor, deleteCoachVisitFor };
+export {
+  ownedHorse,
+  readHorseLog,
+  upsertSheet,
+  writeProgress,
+  saveCoachVisitFor,
+  deleteCoachVisitFor,
+};
 
 /** Loads the user and refuses anyone without beta access. */
 export async function requireAccess(userId: string): Promise<UserInfo> {
@@ -225,6 +232,33 @@ export async function saveSetup(
   }
   await sql`update riders set setup_completed_at = coalesce(setup_completed_at, now()), updated_at = now()
     where user_id = ${user.id}`;
+  return loadWorkspace(userId);
+}
+
+/** Attach or clear this horse's freestyle floor plan. The file itself stays in IndexedDB. */
+export async function saveHorseFloorPlan(
+  userId: string,
+  horseId: string,
+  floorPlan: unknown,
+): Promise<Workspace> {
+  const user = await requireAccess(userId);
+  const sql = await getSql();
+  const id = s(horseId, 100);
+  const [horse] = await sql<{ name: string; level: string; config: unknown }>`
+    select h.name, h.level, p.config
+    from horses h
+    join plans p on p.horse_id = h.id and p.user_id = h.user_id
+    where h.id = ${id} and h.user_id = ${user.id} and not h.archived`;
+  if (!horse) throw new Error("Horse not found");
+  const existing = typeof horse.config === "string" ? json(horse.config) : horse.config;
+  const base =
+    existing && typeof existing === "object" ? (existing as Record<string, unknown>) : {};
+  const config = sanitisePlanConfig(
+    { ...base, floorPlan: floorPlan ?? null },
+    { horseName: horse.name, level: horse.level },
+  );
+  await sql`update plans set config = ${JSON.stringify(config)}::jsonb, updated_at = now()
+    where horse_id = ${id} and user_id = ${user.id}`;
   return loadWorkspace(userId);
 }
 

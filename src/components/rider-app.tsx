@@ -21,6 +21,7 @@ import { CoachTab } from "@/components/rider-coach";
 import { TestsPanel } from "@/components/test-sheet";
 import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
+import { resolveRide } from "@/lib/result-summary";
 import type { EvoRow } from "@/lib/evo-csv";
 import { parseEvoResultsPaste, type EvoPasteResult } from "@/lib/evo-paste";
 import {
@@ -1049,23 +1050,20 @@ function LogTab({
         {err && <p className="mt-2 text-sm text-danger">{err}</p>}
         <ul className="mt-4 flex flex-col gap-2">
           {log.results.length === 0 && <li className="text-sm text-muted">No scores yet.</li>}
-          {log.results.map((r) => (
+          {log.results.map((r) => {
+            const ride = resolveRide(r);
+            return (
             <li
               key={r.id}
               className="flex items-start justify-between gap-3 rounded-lg bg-bg p-3 text-sm"
             >
               <div className="min-w-0">
                 <p className="font-semibold">
-                  {r.test || "Test"} · {r.percent != null ? `${r.percent.toFixed(2)}%` : r.status}
+                  {ride.family ?? "Test?"} · {r.percent != null ? `${r.percent.toFixed(1)}%` : r.status}
                   {r.place && <span className="font-normal text-muted"> · {r.place}</span>}
                 </p>
                 <p className="text-xs text-muted">
                   {[r.showName, fmtDay(r.date)].filter(Boolean).join(" · ")}
-                  {r.source === "evo_csv" && (
-                    <span className="ml-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-accent">
-                      EVO import
-                    </span>
-                  )}
                 </p>
                 {r.notes && <p className="mt-1 text-xs text-faint">{r.notes}</p>}
               </div>
@@ -1084,7 +1082,8 @@ function LogTab({
                 </button>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       </Card>
 

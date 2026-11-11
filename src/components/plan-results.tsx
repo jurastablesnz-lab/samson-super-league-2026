@@ -29,44 +29,76 @@ function placeLabel(place: string) {
   return `${n}${suffix}`;
 }
 
-function RideLine({ ride }: { ride: RideView }) {
+function Summary({ group }: { group: TestGroup }) {
   return (
-    <li className="text-sm">
-      <span className="font-semibold tabular-nums">{percentLabel(ride.percent, ride.status)}</span>
-      <span className="text-muted">
-        {" "}
-        · {fmtDay(ride.date) || "No date"} · {ride.showName || "Show"}
-        {ride.place.trim() ? ` · ${placeLabel(ride.place)}` : ""}
-        {ride.classNo ? ` · class ${ride.classNo}` : ""}
-        {ride.detail ? ` · ${ride.detail}` : ""}
-      </span>
-    </li>
-  );
-}
-
-function GroupBlock({ group }: { group: TestGroup }) {
-  return (
-    <div className="rounded-lg bg-bg p-3">
+    <div className="rounded-lg bg-bg px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold">{group.label}</p>
-        <p className="font-mono text-xs text-muted tabular-nums">
-          {group.count
-            ? `Best ${group.best!.toFixed(1)}% · Worst ${group.worst!.toFixed(1)}% · Avg ${group.average!.toFixed(1)}% · ${group.count} ride${group.count === 1 ? "" : "s"}`
-            : "No rides yet"}
+        <p className="text-base font-semibold">{group.label}</p>
+        <p className="text-xs text-muted">
+          {group.count ? `${group.count} ride${group.count === 1 ? "" : "s"}` : "No rides yet"}
         </p>
       </div>
-      {group.rides.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-1">
-          {group.rides.map((ride) => (
-            <RideLine key={ride.id} ride={ride} />
-          ))}
-        </ul>
+      {group.count > 0 && (
+        <p className="mt-1 flex flex-wrap gap-x-3 text-sm tabular-nums">
+          <span className="font-semibold text-good">Best {group.best!.toFixed(1)}%</span>
+          <span className="text-muted">Worst {group.worst!.toFixed(1)}%</span>
+          <span className="text-muted">Avg {group.average!.toFixed(1)}%</span>
+        </p>
       )}
     </div>
   );
 }
 
-/** Kept scores by dressage test, with other levels and untagged classes kept apart. */
+function RideRow({
+  ride,
+  busy,
+  onAssign,
+}: {
+  ride: RideView;
+  busy: boolean;
+  onAssign?: (test: string) => void;
+}) {
+  const known = ride.family;
+  return (
+    <li className="rounded-lg bg-bg px-3 py-2.5">
+      <div className="flex items-baseline gap-3">
+        <span className="w-16 shrink-0 text-base font-semibold">{known ?? "Test?"}</span>
+        <span className="text-base font-semibold tabular-nums">
+          {percentLabel(ride.percent, ride.status)}
+        </span>
+        {ride.place.trim() ? (
+          <span className="text-sm text-muted">{placeLabel(ride.place)}</span>
+        ) : null}
+      </div>
+      {!known && onAssign && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {testsForRide(ride.level).map((test) => (
+            <button
+              key={test}
+              type="button"
+              disabled={busy}
+              onClick={() => onAssign(test)}
+              className="min-h-11 cursor-pointer rounded-lg bg-accent px-3 text-sm font-semibold text-accent-fg disabled:opacity-50"
+            >
+              {test}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="mt-1 text-sm text-muted">{ride.showName || "Show"}</p>
+      <p className="text-xs text-faint">{fmtDay(ride.date) || "No date"}</p>
+    </li>
+  );
+}
+
+function ridesFor(groups: TestGroup[], unassigned: RideView[], section: string) {
+  return [
+    ...groups.flatMap((group) => group.rides),
+    ...unassigned.filter((ride) => ride.section === section),
+  ].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+}
+
+/** Level 2 summary first, then each ride as test, score, place, show and date. */
 export function PlanResults({
   results,
   horseId,
@@ -81,6 +113,16 @@ export function PlanResults({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const board = results ? groupResults(results, horseLevel) : null;
+  const primaryRides = board
+    ? [
+        ...ridesFor(board.primary.groups, board.unassigned, board.primary.section),
+        ...board.unassigned.filter(
+          (ride) =>
+            ride.section !== board.primary.section &&
+            !board.others.some((section) => section.section === ride.section),
+        ),
+      ].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+    : [];
 
   async function assign(ride: RideView, test: string) {
     if (!horseId || !test) return;
@@ -108,56 +150,49 @@ export function PlanResults({
       {board && (
         <div className="mt-3 flex flex-col gap-2">
           {board.primary.groups.map((group) => (
-            <GroupBlock key={group.label} group={group} />
+            <Summary key={group.label} group={group} />
           ))}
         </div>
       )}
-      {board?.others.map((section) => (
-        <div key={section.section} className="mt-4">
-          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            {section.section}
-          </p>
-          <div className="mt-2 flex flex-col gap-2">
-            {section.groups.map((group) => (
-              <GroupBlock key={group.label} group={group} />
-            ))}
-          </div>
-        </div>
-      ))}
-      {board && board.unassigned.length > 0 && (
-        <div className="mt-4">
-          <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Unassigned
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            These classes don’t say which test they were. Choose the test and the summary updates.
-          </p>
-          <ul className="mt-2 flex flex-col gap-2">
-            {board.unassigned.map((ride) => (
-              <li key={ride.id} className="rounded-lg bg-bg p-3">
-                <RideLine ride={ride} />
-                <p className="mt-1 text-xs text-faint">{ride.level}</p>
-                <label className="mt-2 block text-xs font-semibold text-muted">
-                  Test
-                  <select
-                    className="mt-1 w-full rounded-lg border border-line bg-surface px-2 py-2 text-sm text-fg"
-                    defaultValue=""
-                    disabled={busyId === ride.id}
-                    onChange={(event) => void assign(ride, event.target.value)}
-                  >
-                    <option value="">Choose…</option>
-                    {testsForRide(ride.level).map((test) => (
-                      <option key={test} value={test}>
-                        {test}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {primaryRides.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {primaryRides.map((ride) => (
+            <RideRow
+              key={ride.id}
+              ride={ride}
+              busy={busyId === ride.id}
+              onAssign={horseId ? (test) => void assign(ride, test) : undefined}
+            />
+          ))}
+        </ul>
       )}
+      {board?.others.map((section) => {
+        const rides = ridesFor(section.groups, board.unassigned, section.section);
+        return (
+          <div key={section.section} className="mt-5">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+              {section.section}
+            </p>
+            <div className="mt-2 flex flex-col gap-2">
+              {section.groups.map((group) => (
+                <Summary key={group.label} group={group} />
+              ))}
+            </div>
+            {rides.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-2">
+                {rides.map((ride) => (
+                  <RideRow
+                    key={ride.id}
+                    ride={ride}
+                    busy={busyId === ride.id}
+                    onAssign={horseId ? (test) => void assign(ride, test) : undefined}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </section>
   );

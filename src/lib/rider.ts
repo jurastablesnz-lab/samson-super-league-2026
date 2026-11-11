@@ -105,6 +105,18 @@ export const deleteEntry = createServerFn({ method: "POST" })
     return loadHorseLog(context.userId, data.horseId);
   });
 
+export const setResultTest = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId: string; resultId: string; test: string }) => ({
+    horseId: str(input?.horseId),
+    resultId: str(input?.resultId, 120),
+    test: str(input?.test, 40),
+  }))
+  .handler(async ({ context, data }): Promise<HorseLog> => {
+    const { setResultDressageTest } = await import("./rider.server");
+    return setResultDressageTest(context.userId, data.horseId, data.resultId, data.test);
+  });
+
 export const saveNote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { horseId: string; note: Partial<NoteRecord> }) => {

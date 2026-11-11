@@ -33,6 +33,8 @@ export type ResultRecord = {
   showName: string;
   date: string;
   test: string;
+  /** Dressage test when known (2A, 2B, 2C, MFS). Empty until it is tagged or matched. */
+  dressageTest: string;
   level: string;
   percent: number | null;
   place: string;

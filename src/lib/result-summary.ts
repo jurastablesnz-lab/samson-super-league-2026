@@ -1,56 +1,111 @@
-/** Best, worst and average for kept scores, grouped by class or test name. */
+import {
+  classLabel,
+  horseSection,
+  inferDressageTest,
+  pickerTests,
+  sectionForLevel,
+  testFamily,
+  TESTS_BY_SECTION,
+} from "./dressage-test.ts";
 
-export type ScoreInput = {
+export type ScoreRow = {
+  id: string;
+  date: string;
+  showName: string;
   test: string;
   level: string;
   percent: number | null;
+  place: string;
   status: string;
+  dressageTest?: string;
 };
 
-export type TestScoreSummary = {
-  key: string;
+export type RideView = ScoreRow & {
+  resolved: string | null;
+  family: string | null;
+  section: string;
+  classNo: string;
+  detail: string;
+};
+
+export type TestGroup = {
   label: string;
-  level: string;
   count: number;
-  best: number;
-  worst: number;
-  average: number;
+  best: number | null;
+  worst: number | null;
+  average: number | null;
+  rides: RideView[];
 };
 
-function groupOf(test: string, level: string): { key: string; label: string; level: string } {
-  const named = test.match(/·\s*(\d+)\s*$/)?.[1] ?? (/^\d+$/.test(test.trim()) ? test.trim() : "");
-  const levelLabel = level.trim();
-  if (named) return { key: `${levelLabel}|${named}`, label: named, level: levelLabel };
-  const label = test.trim() || "Test";
-  return { key: `${levelLabel}|${label}`, label, level: levelLabel };
+export type ResultBoard = {
+  primary: { section: string; groups: TestGroup[] };
+  others: { section: string; groups: TestGroup[] }[];
+  unassigned: RideView[];
+};
+
+export function resolveRide(row: ScoreRow): RideView {
+  const tagged = row.dressageTest?.trim() ?? "";
+  const resolved = tagged || inferDressageTest(row);
+  return {
+    ...row,
+    resolved,
+    family: resolved ? testFamily(resolved) : null,
+    section: sectionForLevel(row.level),
+    classNo: classLabel(row.test),
+    detail: /super\s*5/i.test(resolved ?? "") ? "Super 5" : "",
+  };
 }
 
-export function summariseKeptScores(results: ScoreInput[]): TestScoreSummary[] {
-  const groups = new Map<string, TestScoreSummary & { total: number }>();
-  for (const result of results) {
-    if (result.status !== "ok" || result.percent == null || !Number.isFinite(result.percent))
-      continue;
-    const group = groupOf(result.test, result.level);
-    const current = groups.get(group.key) ?? {
-      ...group,
-      count: 0,
-      best: result.percent,
-      worst: result.percent,
-      average: 0,
-      total: 0,
+function summarise(label: string, rides: RideView[]): TestGroup {
+  const scored = rides.filter((ride) => ride.status === "ok" && ride.percent != null);
+  const percents = scored.map((ride) => ride.percent as number);
+  const total = percents.reduce((sum, n) => sum + n, 0);
+  return {
+    label,
+    count: scored.length,
+    best: percents.length ? Math.max(...percents) : null,
+    worst: percents.length ? Math.min(...percents) : null,
+    average: percents.length ? total / percents.length : null,
+    rides: [...rides].sort((a, b) => b.date.localeCompare(a.date)),
+  };
+}
+
+export function groupResults(rows: ScoreRow[], horseLevel: string): ResultBoard {
+  const rides = rows.map(resolveRide);
+  const primaryName = horseSection(horseLevel || "Level 2");
+  const labels = TESTS_BY_SECTION[primaryName] ?? TESTS_BY_SECTION["Level 2"];
+  const assigned = rides.filter((ride) => ride.family);
+  const unassigned = rides
+    .filter((ride) => !ride.family)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const primary = labels.map((label) =>
+    summarise(
+      label,
+      assigned.filter((ride) => ride.section === primaryName && ride.family === label),
+    ),
+  );
+
+  const otherNames = [...new Set(assigned.map((ride) => ride.section))].filter(
+    (name) => name !== primaryName,
+  );
+  const others = otherNames.sort().map((section) => {
+    const inSection = assigned.filter((ride) => ride.section === section);
+    const names = [...new Set(inSection.map((ride) => ride.family as string))];
+    return {
+      section,
+      groups: names.sort().map((label) =>
+        summarise(
+          label,
+          inSection.filter((ride) => ride.family === label),
+        ),
+      ),
     };
-    current.count += 1;
-    current.total += result.percent;
-    current.best = Math.max(current.best, result.percent);
-    current.worst = Math.min(current.worst, result.percent);
-    current.average = current.total / current.count;
-    groups.set(group.key, current);
-  }
-  return [...groups.values()]
-    .map(({ total: _total, ...summary }) => summary)
-    .sort(
-      (a, b) =>
-        a.level.localeCompare(b.level) ||
-        a.label.localeCompare(b.label, undefined, { numeric: true }),
-    );
+  });
+
+  return { primary: { section: primaryName, groups: primary }, others, unassigned };
+}
+
+export function testsForRide(level: string): string[] {
+  return pickerTests(level);
 }

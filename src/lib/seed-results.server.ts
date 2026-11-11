@@ -7,6 +7,7 @@
  * the horse's plan. This does not contact EVO Events.
  */
 import type { Sql } from "./db.ts";
+import { inferDressageTest } from "./dressage-test.ts";
 import {
   evoDedupeKey,
   normaliseEsnz,
@@ -20,7 +21,7 @@ export type { SeedImportReport, SeedUnmatchedRow };
 
 type HorseHit = { id: string; userId: string; name: string };
 
-/** Level plus class number, so the plan can show the test without a separate column. */
+/** Level plus class number. The dressage test, when known, is stored separately. */
 export function seedTestLabel(row: EvoRow): string {
   const level = row.level.trim();
   const klass = (row.className || row.test).trim();
@@ -28,6 +29,17 @@ export function seedTestLabel(row: EvoRow): string {
     return `${level} · ${klass}`.slice(0, 80);
   }
   return (level || klass).slice(0, 80);
+}
+
+export function seedDressageTest(row: EvoRow): string {
+  return (
+    inferDressageTest({
+      date: row.date,
+      percent: row.percent,
+      place: row.place,
+      test: seedTestLabel(row),
+    }) ?? ""
+  );
 }
 
 function judgesOf(row: EvoRow): string {
@@ -109,11 +121,11 @@ export async function importSeedResults(
     const hit = hits[0];
     const inserted = await sql<{ id: number }>`
       insert into results (
-        user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, level,
+        user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, dressage_test, level,
         percent, place, status, judges, notes, dedupe_key, import_id, raw, review_status, rider_name
       ) values (
         ${hit.userId}, ${hit.id}, ${`seed-${importId}-${row.line}`}, 'evo_csv', 'past',
-        ${row.event.slice(0, 200)}, ${row.date || null}, ${seedTestLabel(row)}, ${row.level.slice(0, 40)},
+        ${row.event.slice(0, 200)}, ${row.date || null}, ${seedTestLabel(row)}, ${seedDressageTest(row)}, ${row.level.slice(0, 40)},
         ${row.percent}, ${row.place.slice(0, 20)}, ${row.status}, ${judgesOf(row)}, '',
         ${evoDedupeKey(row)}, ${importId}, ${JSON.stringify(row.raw ?? {})}::jsonb, 'kept',
         ${row.rider.slice(0, 120)}
@@ -179,11 +191,11 @@ export async function importSeedResultsForHorse(
   for (const row of missing) {
     const inserted = await sql<{ id: number }>`
       insert into results (
-        user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, level,
+        user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, dressage_test, level,
         percent, place, status, judges, notes, dedupe_key, import_id, raw, review_status, rider_name
       ) values (
         ${userId}, ${horseId}, ${`seed-${importId}-${row.line}`}, 'evo_csv', 'past',
-        ${row.event.slice(0, 200)}, ${row.date || null}, ${seedTestLabel(row)}, ${row.level.slice(0, 40)},
+        ${row.event.slice(0, 200)}, ${row.date || null}, ${seedTestLabel(row)}, ${seedDressageTest(row)}, ${row.level.slice(0, 40)},
         ${row.percent}, ${row.place.slice(0, 20)}, ${row.status}, ${judgesOf(row)}, '',
         ${evoDedupeKey(row)}, ${importId}, ${JSON.stringify(row.raw ?? {})}::jsonb, 'kept',
         ${row.rider.slice(0, 120)}

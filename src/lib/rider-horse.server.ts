@@ -46,6 +46,7 @@ type ResultRow = {
   show_name: string;
   ride_date: string | Date | null;
   test: string;
+  dressage_test: string;
   level: string;
   percent: number | null;
   place: string;
@@ -73,6 +74,7 @@ const toResult = (r: ResultRow): ResultRecord => ({
   showName: r.show_name,
   date: day(r.ride_date),
   test: r.test,
+  dressageTest: r.dressage_test ?? "",
   level: r.level,
   percent: r.percent == null ? null : Number(r.percent),
   place: r.place,

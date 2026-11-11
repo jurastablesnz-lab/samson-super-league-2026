@@ -307,6 +307,7 @@ function RiderApp({
             log={log}
             horse={horse}
             onProgress={rememberProgress}
+            onLog={adoptLog}
           />
         )}
         {tab === "tests" && (
@@ -604,11 +605,13 @@ function SeasonTab({
   log,
   horse,
   onProgress,
+  onLog,
 }: {
   plan: GeneratedPlan;
   log: HorseLog | null;
   horse: HorseRecord;
   onProgress: (p: Progress) => void;
+  onLog: (log: HorseLog) => void;
 }) {
   const { done, toggleDone } = useHorseProgress(horse.id, log, onProgress);
   const current = weekIn(plan.weeks, TODAY);
@@ -623,7 +626,12 @@ function SeasonTab({
   return (
     <div className="flex flex-col gap-4">
       <TrainingTargets horseId={horse.id} tests={plan.tests} editor />
-      <PlanResults results={log && log.horseId === horse.id ? log.results : null} />
+      <PlanResults
+        results={log && log.horseId === horse.id ? log.results : null}
+        horseId={horse.id}
+        horseLevel={horse.level || plan.level}
+        onUpdated={onLog}
+      />
       <Card>
         <Kicker>Target competitions</Kicker>
         {plan.shows.length === 0 ? (
@@ -950,7 +958,12 @@ function LogTab({
     );
   return (
     <div className="flex flex-col gap-4">
-      <PlanResults results={log.results} />
+      <PlanResults
+        results={log.results}
+        horseId={horse.id}
+        horseLevel={horse.level || plan.level}
+        onUpdated={setLog}
+      />
       <EvoReviewPanel
         pending={log.pendingEvoResults}
         horseId={horse.id}

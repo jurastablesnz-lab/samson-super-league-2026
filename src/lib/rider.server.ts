@@ -307,15 +307,36 @@ export async function upsertResult(
   source: ResultRecord["source"],
 ) {
   const pct = r.percent == null || !Number.isFinite(Number(r.percent)) ? null : Number(r.percent);
-  await sql`insert into results (user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, level,
+  const { canonicalTest } = await import("./dressage-test.ts");
+  const named = canonicalTest(s(r.dressageTest || r.test, 80));
+  await sql`insert into results (user_id, horse_id, client_id, source, show_id, show_name, ride_date, test, dressage_test, level,
       percent, place, status, judges, notes, event_url)
     values (${userId}, ${horseId}, ${s(r.id, 120) || newId()}, ${source}, ${s(r.showId, 60)}, ${s(r.showName, 120)},
-      ${dateOrNull(r.date)}, ${s(r.test, 80)}, ${s(r.level, 20)}, ${pct}, ${s(r.place, 20)}, ${s(r.status, 10) || "ok"},
+      ${dateOrNull(r.date)}, ${s(r.test, 80)}, ${named ?? ""}, ${s(r.level, 20)}, ${pct}, ${s(r.place, 20)}, ${s(r.status, 10) || "ok"},
       ${s(r.judges, 300)}, ${s(r.notes, 2000)}, ${s(r.eventUrl, 300)})
     on conflict (horse_id, client_id) do update set show_id = excluded.show_id, show_name = excluded.show_name,
-      ride_date = excluded.ride_date, test = excluded.test, level = excluded.level, percent = excluded.percent,
+      ride_date = excluded.ride_date, test = excluded.test, dressage_test = excluded.dressage_test, level = excluded.level, percent = excluded.percent,
       place = excluded.place, status = excluded.status, judges = excluded.judges, notes = excluded.notes,
       event_url = excluded.event_url`;
+}
+
+export async function setResultDressageTest(
+  userId: string,
+  horseId: string,
+  resultId: string,
+  test: string,
+) {
+  await requireAccess(userId);
+  const sql = await getSql();
+  await ownedHorse(sql, userId, horseId);
+  const { isAllowedTest } = await import("./dressage-test.ts");
+  if (!isAllowedTest(test)) throw new Error("Choose a test from the list");
+  const updated = await sql<{ client_id: string }>`
+    update results set dressage_test = ${test}
+    where horse_id = ${horseId} and user_id = ${userId} and client_id = ${resultId}
+    returning client_id`;
+  if (!updated.length) throw new Error("Result not found");
+  return loadHorseLog(userId, horseId);
 }
 
 export async function upsertNote(

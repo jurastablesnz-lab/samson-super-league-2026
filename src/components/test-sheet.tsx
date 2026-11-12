@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { getPublishedTests, setTestPublished } from "@/lib/test-publication";
-import { catalogTests, visibleDiagramIds, type CatalogTest } from "@/lib/test-registry";
+import { ArenaCaller } from "@/components/arena-caller";
+import { catalogTests, testIdForName, visibleDiagramIds, type CatalogTest } from "@/lib/test-registry";
 import { Button } from "@/components/ui/button";
 import { FreestyleCard } from "@/components/freestyle-player";
 import { cn } from "@/lib/utils";
@@ -668,6 +669,52 @@ function MovementList({
   );
 }
 
+function OpenCaller({
+  title,
+  movements,
+  arena,
+  size,
+}: {
+  title: string;
+  movements: Movement[];
+  arena?: string;
+  size?: ArenaSize;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!movements.length) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="min-h-12 w-full rounded-xl bg-accent text-base font-semibold text-accent-fg"
+        onClick={() => setOpen(true)}
+      >
+        Ride with the caller
+      </button>
+      {open && (
+        <ArenaCaller title={title} movements={movements} onClose={() => setOpen(false)}>
+          {(movement) => <TestArena movement={movement} arena={arena} size={size} />}
+        </ArenaCaller>
+      )}
+    </>
+  );
+}
+
+export function callerSheet(name: string): {
+  title: string;
+  movements: Movement[];
+  arena?: string;
+  size?: ArenaSize;
+} | null {
+  const id = testIdForName(name);
+  if (id === "mfs") {
+    return { title: MFS_FLOOR.name, movements: MFS_FLOOR.movements, arena: MFS_FLOOR.arena };
+  }
+  const test = ALL_SET_TESTS.find((item) => item.id === id);
+  if (!test?.movements.length) return null;
+  return { title: test.name, movements: test.movements, arena: test.arena, size: test.arenaSize };
+}
+
 function SetSheet({ test }: { test: SetTest }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => setIdx(0), [test.id]);
@@ -676,6 +723,12 @@ function SetSheet({ test }: { test: SetTest }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <OpenCaller
+        title={test.name}
+        movements={test.movements}
+        arena={test.arena}
+        size={test.arenaSize}
+      />
       <Caller
         movements={test.movements}
         idx={idx}
@@ -752,6 +805,7 @@ function MfsSheet() {
 
   return (
     <div className="flex flex-col gap-4">
+      <OpenCaller title={MFS_FLOOR.name} movements={floor} arena={MFS_FLOOR.arena} />
       <Caller
         movements={floor}
         idx={idx}

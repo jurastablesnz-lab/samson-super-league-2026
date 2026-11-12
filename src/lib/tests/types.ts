@@ -78,6 +78,8 @@ export type Movement = {
   draw: Draw[];
   pace?: Pace;
   lateral?: Lateral;
+  /** When set, the caller plays this instead of speaking the movement text. */
+  audioUrl?: string;
 };
 
 export type SetTest = {

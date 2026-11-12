@@ -18,7 +18,8 @@ import { format, parseISO } from "date-fns";
 import { FloorPlanPicker } from "@/components/floor-plan";
 import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
-import { TestsPanel } from "@/components/test-sheet";
+import { ArenaCaller } from "@/components/arena-caller";
+import { callerSheet, TestArena, TestsPanel } from "@/components/test-sheet";
 import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
 import { resolveRide } from "@/lib/result-summary";
@@ -765,6 +766,8 @@ function TestsTab({
   onWorkspace: (ws: Workspace) => void;
 }) {
   const shown = plan.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
+  const [calling, setCalling] = useState<string | null>(null);
+  const called = calling ? callerSheet(calling) : null;
   const floorPlan = record.config.floorPlan ?? null;
   const showFloor =
     plan.level === "Level 2" ||
@@ -791,8 +794,8 @@ function TestsTab({
         <Kicker>Your tests</Kicker>
         <ul className="mt-3 flex flex-col gap-2">
           {shown.map((t) => (
-            <li key={t} className="flex items-center justify-between rounded-lg bg-bg p-3 text-sm">
-              <span className="font-semibold">
+            <li key={t} className="flex items-center justify-between gap-3 rounded-lg bg-bg p-3 text-sm">
+              <span className="min-w-0 font-semibold">
                 {t}
                 {isAdmin && !isPublishedTest(t, approvedTestIds) && (
                   <span className="ml-2 text-xs font-semibold tracking-wide text-warn uppercase">
@@ -800,12 +803,23 @@ function TestsTab({
                   </span>
                 )}
               </span>
-              <span className="text-xs text-muted">
-                {t === plan.mainTest
-                  ? "Main test — from memory"
-                  : t === plan.homeworkTest
-                    ? "Homework — from the sheet"
-                    : ""}
+              <span className="flex items-center gap-2">
+                {callerSheet(t) && (
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-fg"
+                    onClick={() => setCalling(t)}
+                  >
+                    Caller
+                  </button>
+                )}
+                <span className="text-xs text-muted">
+                  {t === plan.mainTest
+                    ? "Main test — from memory"
+                    : t === plan.homeworkTest
+                      ? "Homework — from the sheet"
+                      : ""}
+                </span>
               </span>
             </li>
           ))}
@@ -813,6 +827,13 @@ function TestsTab({
             <li className="text-sm text-muted">No published tests on this horse yet.</li>
           )}
         </ul>
+        {called && (
+          <ArenaCaller title={called.title} movements={called.movements} onClose={() => setCalling(null)}>
+            {(movement) => (
+              <TestArena movement={movement} arena={called.arena} size={called.size} />
+            )}
+          </ArenaCaller>
+        )}
         <p className="mt-3 text-xs text-muted">
           Official test sheets are on the{" "}
           <a

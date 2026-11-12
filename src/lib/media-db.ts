@@ -1,6 +1,7 @@
 const DB_NAME = "samson-review";
 const STORE = "blobs";
 const UPLOADS = "uploads";
+const COACH = "coach";
 
 export type UploadJournal = {
   uploadId: string;
@@ -11,10 +12,11 @@ export type UploadJournal = {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2);
+    const req = indexedDB.open(DB_NAME, 3);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
       if (!req.result.objectStoreNames.contains(UPLOADS)) req.result.createObjectStore(UPLOADS);
+      if (!req.result.objectStoreNames.contains(COACH)) req.result.createObjectStore(COACH);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("Could not open the media store"));
@@ -124,6 +126,29 @@ export async function writeUploadJournal(id: string, journal: UploadJournal): Pr
 
 export async function clearUploadJournal(id: string): Promise<void> {
   await withUploads("readwrite", (store) => store.delete(id));
+}
+
+export async function readCoachCache<T>(key: string): Promise<T | null> {
+  const db = await openDb();
+  const value = await new Promise<T | undefined>((resolve, reject) => {
+    const tx = db.transaction(COACH, "readonly");
+    const req = tx.objectStore(COACH).get(key);
+    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error ?? new Error("Could not read coaching"));
+  });
+  db.close();
+  return value ?? null;
+}
+
+export async function writeCoachCache<T>(key: string, value: T): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(COACH, "readwrite");
+    tx.objectStore(COACH).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save coaching"));
+  });
+  db.close();
 }
 
 export async function deleteMediaBlob(id: string) {

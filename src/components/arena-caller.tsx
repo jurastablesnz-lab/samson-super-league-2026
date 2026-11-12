@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { clampGap, hearsNext, movementCall } from "@/lib/arena-caller";
+import { clampGap, hearsNext, movementCall, voiceScore } from "@/lib/arena-caller";
 import type { Movement } from "@/lib/tests/types";
 
 type SpeechRec = {
@@ -27,19 +27,42 @@ function recognitionCtor(): (new () => SpeechRec) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+function bestVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis?.getVoices() ?? [];
+  if (voices.length === 0) return null;
+  return [...voices].sort((a, b) => voiceScore(b) - voiceScore(a))[0] ?? null;
+}
+
 function speakText(text: string, token: { cancelled: boolean }): Promise<void> {
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     if (!synth || token.cancelled) return resolve();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-NZ";
-    utterance.rate = 0.95;
-    const finish = () => resolve();
-    utterance.onend = finish;
-    utterance.onerror = finish;
-    synth.cancel();
-    synth.resume();
-    synth.speak(utterance);
+    let started = false;
+    const start = () => {
+      if (started || token.cancelled) return resolve();
+      started = true;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-NZ";
+      utterance.rate = 0.95;
+      const voice = bestVoice();
+      if (voice) utterance.voice = voice;
+      const finish = () => resolve();
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      synth.cancel();
+      synth.resume();
+      synth.speak(utterance);
+    };
+    if (synth.getVoices().length === 0) {
+      const onVoices = () => {
+        synth.removeEventListener("voiceschanged", onVoices);
+        start();
+      };
+      synth.addEventListener("voiceschanged", onVoices);
+      window.setTimeout(start, 250);
+      return;
+    }
+    start();
   });
 }
 
@@ -61,17 +84,27 @@ function playFile(url: string, token: { cancelled: boolean }): Promise<void> {
 export function ArenaCaller({
   title,
   movements,
+  cues = [],
   onClose,
+  onRefresh,
+  refreshing = false,
+  refreshError = null,
   children,
 }: {
   title: string;
   movements: Movement[];
+  cues?: { n: number; text: string; audioUrl?: string }[];
   onClose: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  refreshError?: string | null;
   children: (movement: Movement) => ReactNode;
 }) {
   const [index, setIndex] = useState(0);
   const [play, setPlay] = useState(0);
   const [directives, setDirectives] = useState(false);
+  const [coach, setCoach] = useState(true);
+  const coachRef = useRef(coach);
   const [auto, setAuto] = useState(false);
   const [gap, setGap] = useState(8);
   const [phase, setPhase] = useState<"speaking" | "waiting">("speaking");
@@ -84,6 +117,7 @@ export function ArenaCaller({
   const timerRef = useRef<number | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
   directivesRef.current = directives;
+  coachRef.current = coach;
   autoRef.current = auto;
   gapRef.current = gap;
   indexRef.current = index;
@@ -135,17 +169,21 @@ export function ArenaCaller({
       tokenRef.current.cancelled = true;
       window.speechSynthesis?.cancel();
     };
-    // The caller holds the screen only while it is open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const spokenCue = movement ? cues.find((cue) => cue.n === movement.n) : undefined;
   useEffect(() => {
     if (!movement) return;
     const token = { cancelled: false };
     tokenRef.current = token;
     setPhase("speaking");
     clearWait();
-    const clips = movementCall(movement, directivesRef.current);
+    const personal = cues.find((cue) => cue.n === movement.n);
+    const clips = movementCall(
+      movement,
+      directivesRef.current,
+      coachRef.current ? personal : null,
+    );
     void (async () => {
       for (const clip of clips) {
         if (token.cancelled) return;
@@ -194,8 +232,9 @@ export function ArenaCaller({
       window.speechSynthesis?.cancel();
     };
     // Directives and the gap are read when this movement starts.
+    // A cue that arrives after the caller opens is spoken with this movement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, play]);
+  }, [index, play, spokenCue?.text, spokenCue?.audioUrl]);
 
   if (!movement) return null;
 
@@ -213,6 +252,16 @@ export function ArenaCaller({
         >
           Close
         </button>
+        {onRefresh && (
+          <button
+            type="button"
+            className="min-h-11 text-sm font-semibold text-ink-soft disabled:opacity-50"
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            {refreshing ? "Refreshing…" : "Refresh coaching"}
+          </button>
+        )}
         <p className="font-mono text-sm text-muted tabular-nums">
           {index + 1} of {movements.length}
         </p>
@@ -228,6 +277,9 @@ export function ArenaCaller({
           {letters || `Movement ${movement.n}`}
         </p>
         <p className="mt-2 text-xl leading-snug">{instruction}</p>
+        {coach && spokenCue?.text && (
+          <p className="mt-3 text-base leading-relaxed text-accent">{spokenCue.text}</p>
+        )}
         {directives && movement.directive.trim() && (
           <p className="mt-3 text-base leading-relaxed text-muted">{movement.directive}</p>
         )}
@@ -260,6 +312,18 @@ export function ArenaCaller({
         >
           Repeat
         </button>
+        {refreshError && (
+          <p className="col-span-2 text-xs text-danger">{refreshError}</p>
+        )}
+        <label className="col-span-2 flex min-h-11 items-center justify-between gap-3 text-sm">
+          <span>Coach cues</span>
+          <input
+            type="checkbox"
+            className="size-5"
+            checked={coach}
+            onChange={(event) => setCoach(event.target.checked)}
+          />
+        </label>
         <label className="col-span-2 flex min-h-11 items-center justify-between gap-3 text-sm">
           <span>Directive ideas</span>
           <input

@@ -19,6 +19,7 @@ import { FloorPlanPicker } from "@/components/floor-plan";
 import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
 import { ArenaCaller } from "@/components/arena-caller";
+import { CoachCueEditor, useCallerCues } from "@/components/coach-cues";
 import { callerSheet, TestArena, TestsPanel } from "@/components/test-sheet";
 import { compressSheetPhoto, putMediaBlob } from "@/lib/media-db";
 import { openMedia, syncLocalMedia, type MediaRef } from "@/lib/media-upload";
@@ -53,7 +54,7 @@ import {
   type Workspace,
 } from "@/lib/rider-types";
 import { applyCoachVisits, packKey, packingList, playableFreestyle } from "@/lib/rider-workspace";
-import { isPublishedTest } from "@/lib/test-registry";
+import { isPublishedTest, testIdForName } from "@/lib/test-registry";
 import { MAX_SHEET_PHOTOS } from "@/lib/review-types";
 import {
   daysUntil,
@@ -825,7 +826,33 @@ function TestsTab({
 }) {
   const shown = plan.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
   const [calling, setCalling] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const called = calling ? callerSheet(calling) : null;
+  const edited = editing ? callerSheet(editing) : null;
+  const callBriefs =
+    called?.movements.map((movement) => ({
+      n: movement.n,
+      label: movement.steps.map((step) => [step.at, step.do].filter(Boolean).join(" ")).join(". "),
+    })) ?? [];
+  const editBriefs =
+    edited?.movements.map((movement) => ({
+      n: movement.n,
+      label: movement.steps.map((step) => [step.at, step.do].filter(Boolean).join(" ")).join(". "),
+    })) ?? [];
+  const coaching = useCallerCues(
+    !!calling,
+    record.horseId,
+    calling ? testIdForName(calling) : "",
+    called?.title ?? "",
+    callBriefs,
+  );
+  const editedCues = useCallerCues(
+    !!editing,
+    record.horseId,
+    editing ? testIdForName(editing) : "",
+    edited?.title ?? "",
+    editBriefs,
+  );
   const floorPlan = record.config.floorPlan ?? null;
   const showFloor =
     plan.level === "Level 2" ||
@@ -833,7 +860,12 @@ function TestsTab({
     !!floorPlan;
   return (
     <div className="flex flex-col gap-4">
-      <TestsPanel isAdmin={isAdmin} horseLevel={plan.level} horseTests={plan.tests} />
+      <TestsPanel
+        isAdmin={isAdmin}
+        horseLevel={plan.level}
+        horseTests={plan.tests}
+        horseId={record.horseId}
+      />
       {showFloor && (
         <Card>
           <FloorPlanPicker
@@ -864,13 +896,24 @@ function TestsTab({
               </span>
               <span className="flex items-center gap-2">
                 {callerSheet(t) && (
-                  <button
-                    type="button"
-                    className="min-h-11 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-fg"
-                    onClick={() => setCalling(t)}
-                  >
-                    Caller
-                  </button>
+                  <>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="min-h-11 text-xs font-semibold text-accent"
+                        onClick={() => setEditing(editing === t ? null : t)}
+                      >
+                        Cues
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="min-h-11 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-fg"
+                      onClick={() => setCalling(t)}
+                    >
+                      Caller
+                    </button>
+                  </>
                 )}
                 <span className="text-xs text-muted">
                   {t === plan.mainTest
@@ -886,8 +929,25 @@ function TestsTab({
             <li className="text-sm text-muted">No published tests on this horse yet.</li>
           )}
         </ul>
+        {isAdmin && edited && editing && (
+          <CoachCueEditor
+            horseId={record.horseId}
+            testId={testIdForName(editing)}
+            movements={editBriefs}
+            cues={editedCues.cues}
+            onSaved={editedCues.replace}
+          />
+        )}
         {called && (
-          <ArenaCaller title={called.title} movements={called.movements} onClose={() => setCalling(null)}>
+          <ArenaCaller
+            title={called.title}
+            movements={called.movements}
+            cues={coaching.cues}
+            onRefresh={() => void coaching.refresh()}
+            refreshing={coaching.refreshing}
+            refreshError={coaching.error}
+            onClose={() => setCalling(null)}
+          >
             {(movement) => (
               <TestArena movement={movement} arena={called.arena} size={called.size} />
             )}

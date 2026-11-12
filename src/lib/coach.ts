@@ -1,0 +1,95 @@
+/**
+ * Personal caller cues. The browser never sees the xAI key.
+ * Approved riders and admins only. Admins are not counted against COACH_CUES_PER_DAY.
+ * Set COACH_TTS=xai to cache xAI speech for the cues (same XAI_API_KEY). Optional XAI_TTS_VOICE (default eve).
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { authMiddleware } from "./auth/middleware";
+
+const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+
+async function actor(userId: string) {
+  const { resolveRiderAccess } = await import("./beta.server");
+  const { getSql } = await import("./db");
+  const access = await resolveRiderAccess(userId);
+  return { sql: await getSql(), ...access };
+}
+
+export const loadCoachCues = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId?: string; testId?: string }) => ({
+    horseId: text(input?.horseId, 80),
+    testId: text(input?.testId, 40),
+  }))
+  .handler(async ({ context, data }) => {
+    const { sql, user, approved } = await actor(context.userId);
+    const { sheetReadGate } = await import("./sheet-reads");
+    const gate = sheetReadGate({ approved, isAdmin: user.isAdmin });
+    if (!gate.ok) return { ok: false as const, error: gate.error, cues: [] as { n: number; text: string; source: "ai" | "edit" }[] };
+    const { loadStoredCues } = await import("./coach-cues.server");
+    try {
+      const cues = await loadStoredCues(sql, { userId: user.id, isAdmin: user.isAdmin }, data.horseId, data.testId);
+      return { ok: true as const, cues, error: null };
+    } catch (err) {
+      return {
+        ok: false as const,
+        cues: [] as { n: number; text: string; source: "ai" | "edit" }[],
+        error: err instanceof Error ? err.message : "Could not load coaching.",
+      };
+    }
+  });
+
+export const refreshCoachCues = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      horseId?: string;
+      testId?: string;
+      testName?: string;
+      movements?: { n?: number; label?: string }[];
+    }) => ({
+      horseId: text(input?.horseId, 80),
+      testId: text(input?.testId, 40),
+      testName: text(input?.testName, 80),
+      movements: (Array.isArray(input?.movements) ? input.movements : []).slice(0, 40).map((movement) => ({
+        n: Number(movement?.n) || 0,
+        label: text(movement?.label, 240),
+      })),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const { sql, user, approved } = await actor(context.userId);
+    const { refreshCues } = await import("./coach-cues.server");
+    try {
+      return await refreshCues(sql, { userId: user.id, isAdmin: user.isAdmin, approved }, data);
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "The coaching could not be written." };
+    }
+  });
+
+export const saveCoachCues = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { horseId?: string; testId?: string; cues?: { n?: number; text?: string }[] }) => ({
+    horseId: text(input?.horseId, 80),
+    testId: text(input?.testId, 40),
+    cues: (Array.isArray(input?.cues) ? input.cues : []).slice(0, 40).map((cue) => ({
+      n: Number(cue?.n) || 0,
+      text: text(cue?.text, 320),
+    })),
+  }))
+  .handler(async ({ context, data }) => {
+    const { sql, user } = await actor(context.userId);
+    const { saveEditedCues } = await import("./coach-cues.server");
+    try {
+      const cues = await saveEditedCues(
+        sql,
+        { userId: user.id, isAdmin: user.isAdmin },
+        data.horseId,
+        data.testId,
+        data.cues,
+      );
+      return { ok: true as const, cues };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "Could not save the cues." };
+    }
+  });

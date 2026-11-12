@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import type { AdminRider } from "@/lib/admin-riders";
+import { CoachCueEditor, useCallerCues } from "@/components/coach-cues";
+import { callerSheet } from "@/components/test-sheet";
 import { listRiderFiles, mediaPlaybackUrl } from "@/lib/media";
 import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
+import { testIdForName } from "@/lib/test-registry";
 import { getPublishedTests } from "@/lib/test-publication";
 import { isPublishedTest } from "@/lib/test-registry";
 import { inputCls, Kicker, Panel, PrimaryButton, StatusBadge } from "./beta-ui";
@@ -116,6 +119,7 @@ function RiderRow({
               {horse.level || "No level"} · {horse.phase}
             </p>
             <HorseTests horse={horse} published={published} onChanged={onChanged} />
+            <HorseCoaching horseId={horse.id} level={horse.level} />
             <p className="mt-2 text-xs text-muted">
               <span className="font-semibold">Target competitions:</span>{" "}
               {horse.shows.length ? horse.shows.map((s) => s.name).join(", ") : "None yet"}
@@ -201,6 +205,44 @@ function RiderFiles({
         </li>
       ))}
     </ul>
+  );
+}
+
+function HorseCoaching({ horseId, level }: { horseId: string; level: string }) {
+  const choices = testsForLevel(level).filter((name) => callerSheet(name));
+  const [name, setName] = useState(choices[0] ?? "");
+  const [open, setOpen] = useState(false);
+  const sheet = name ? callerSheet(name) : null;
+  const briefs =
+    sheet?.movements.map((movement) => ({
+      n: movement.n,
+      label: movement.steps.map((step) => [step.at, step.do].filter(Boolean).join(" ")).join(". "),
+    })) ?? [];
+  const session = useCallerCues(
+    open && !!sheet,
+    horseId,
+    name ? testIdForName(name) : "",
+    sheet?.title ?? "",
+    briefs,
+  );
+  if (!sheet || choices.length === 0) return null;
+  return (
+    <details className="mt-3" onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}>
+      <summary className="cursor-pointer text-xs font-semibold text-accent">Coaching cues</summary>
+      <select className={`${inputCls} mt-2`} value={name} onChange={(event) => setName(event.target.value)}>
+        {choices.map((choice) => (
+          <option key={choice}>{choice}</option>
+        ))}
+      </select>
+      {session.error && <p className="mt-2 text-xs text-danger">{session.error}</p>}
+      <CoachCueEditor
+        horseId={horseId}
+        testId={testIdForName(name)}
+        movements={briefs}
+        cues={session.cues}
+        onSaved={session.replace}
+      />
+    </details>
   );
 }
 

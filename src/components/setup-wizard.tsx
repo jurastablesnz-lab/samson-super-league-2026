@@ -217,7 +217,7 @@ export function SetupWizard({
               <Field
                 label="ESNZ registration number"
                 optional
-                hint="Saving a number that matches the results shipped with the app loads those scores. Jura Samson is 219700."
+                hint="Saving a number that matches results shipped with the app loads those scores. For example, 123456."
               >
                 <input
                   className={inputCls}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { authClient } from "@/lib/auth/client";
+import { authClient, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
 import {
   COMPETITION_LEVELS,
   HEARD_FROM,
@@ -112,6 +112,17 @@ function ApplicationForm({
       {!signedIn && (
         <Panel className="space-y-3">
           <Kicker>1 · Your account</Kicker>
+          {GROK_PROVIDERS.filter((p) => p.idp === "google").map((p) => (
+            <button
+              key={p.providerId}
+              type="button"
+              onClick={() => void signIn(p.providerId, { callbackURL: "/join" })}
+              className="w-full cursor-pointer rounded-lg bg-accent px-4 py-3 font-display text-[15px] font-extrabold text-accent-fg transition hover:brightness-110"
+            >
+              Continue with Google
+            </button>
+          ))}
+          <p className="text-sm text-muted">Or use email and password</p>
           <Field label="Email">
             <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>

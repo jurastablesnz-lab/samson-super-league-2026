@@ -28,11 +28,24 @@ function LoginPage() {
     window.location.href = "/";
   }
 
+  const google = GROK_PROVIDERS.find((p) => p.idp === "google");
+  const otherProviders = GROK_PROVIDERS.filter((p) => p !== google);
+
   return (
     <BrandShell>
       <Kicker>XSalute</Kicker>
       <Title>Sign in</Title>
-      <Panel className="mt-5">
+      {google && (
+        <button
+          type="button"
+          onClick={() => void signIn(google.providerId, { callbackURL: "/" })}
+          className="mt-5 w-full cursor-pointer rounded-lg bg-accent px-4 py-3 font-display text-[15px] font-extrabold text-accent-fg transition hover:brightness-110"
+        >
+          Continue with Google
+        </button>
+      )}
+      <Panel className="mt-4">
+        <p className="mb-3 text-sm text-muted">Or use email and password</p>
         <form onSubmit={submit} className="space-y-3">
           <Field label="Email">
             <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -58,19 +71,20 @@ function LoginPage() {
           </p>
         </form>
       </Panel>
-      <Panel className="mt-4 space-y-2">
-        <p className="text-xs text-muted">Team &amp; admin sign-in</p>
-        {GROK_PROVIDERS.map((p) => (
-          <button
-            key={p.providerId}
-            type="button"
-            onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
-            className="w-full cursor-pointer rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-accent"
-          >
-            Continue with {p.label}
-          </button>
-        ))}
-      </Panel>
+      {otherProviders.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {otherProviders.map((p) => (
+            <button
+              key={p.providerId}
+              type="button"
+              onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
+              className="w-full cursor-pointer rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-accent"
+            >
+              Continue with {p.label}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="mt-4 text-center text-sm text-muted">
         New rider? <Link to="/join" className="font-semibold text-accent underline-offset-2 hover:underline">Apply for the beta</Link>
       </p>

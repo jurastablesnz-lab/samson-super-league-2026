@@ -8,8 +8,8 @@ import {
   deleteMediaBlob,
   getMediaBlob,
   putMediaBlob,
-  storeVideoFile,
 } from "@/lib/media-db";
+import { openMedia, PENDING_UPLOAD, readMediaBlob, removeAccountMedia, saveAccountMedia, syncLocalMedia } from "@/lib/media-upload";
 import { summariseSheet } from "@/lib/summarise-sheet";
 import { SHOWS, TEST_OPTIONS, TODAY } from "@/lib/season";
 import { usePlan, type ReviewItem, type SheetRead } from "@/lib/store";
@@ -150,19 +150,42 @@ export function FilmBoard() {
   const [date, setDate] = useState(format(TODAY, "yyyy-MM-dd"));
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+
+  useEffect(() => {
+    syncLocalMedia(
+      videos.map((item) => ({
+        id: item.id,
+        kind: "video" as const,
+        fileName: `${item.test || "test"}.mp4`,
+        mime: item.mime || "video/mp4",
+      })),
+    );
+  }, [videos]);
 
   const saveVideo = async (file: File | undefined) => {
     if (!file) return;
     setError(null);
+    setNotice(null);
     if (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v)$/i.test(file.name)) {
       setError("That file is not a video.");
       return;
     }
     setBusy(true);
+    setProgress(0);
     const id = `v-${Date.now()}`;
     try {
-      await storeVideoFile(id, file);
+      const saved = await saveAccountMedia({
+        id,
+        kind: "video",
+        file,
+        fileName: file.name || "test.mp4",
+        mime: file.type || "video/mp4",
+        onProgress: setProgress,
+      });
+      if (saved.pendingCloud) setNotice(PENDING_UPLOAD);
       addReview({
         id,
         kind: "video",
@@ -174,10 +197,11 @@ export function FilmBoard() {
       });
       setNote("");
     } catch (err) {
-      await deleteMediaBlob(id).catch(() => undefined);
+      await removeAccountMedia(id);
       setError(err instanceof Error ? err.message : "Could not save the video.");
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -189,8 +213,8 @@ export function FilmBoard() {
         </p>
         <h2 className="font-display mt-1 text-xl font-medium">Competition videos</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Film the test, not the warm-up. Clips stay on this phone. Play one back before the next
-          visit, or share it straight to your coach.
+          Film the test, not the warm-up. The clip stays on this phone until it is copied to your account.
+          Play one back before the next visit, or share it with your coach.
         </p>
         <MetaFields
           showId={showId}
@@ -212,12 +236,13 @@ export function FilmBoard() {
             onFile={saveVideo}
             icon={<Video className="size-4" />}
           >
-            Record a test
+            {busy && progress != null ? `Uploading ${Math.round(progress * 100)}%` : "Record a test"}
           </FileButton>
           <FileButton accept="video/*" disabled={busy} onFile={saveVideo} variant="outline">
-            Choose a clip
+            {busy && progress != null ? `Uploading ${Math.round(progress * 100)}%` : "Choose a clip"}
           </FileButton>
         </div>
+        {notice && <p className="mt-3 text-sm text-muted">{notice}</p>}
         {error && <p className="mt-3 text-sm text-warn">{error}</p>}
       </section>
 
@@ -233,7 +258,7 @@ export function FilmBoard() {
               item={item}
               onNote={(note) => updateReview(item.id, { note })}
               onRemove={async () => {
-                await deleteMediaBlob(item.id).catch(() => undefined);
+                await removeAccountMedia(item.id);
                 removeReview(item.id);
               }}
             />
@@ -309,31 +334,34 @@ function VideoCard({
 
   useEffect(() => {
     if (!open) return;
-    let revoke = "";
+    let release = () => {};
     let dead = false;
-    getMediaBlob(item.id)
-      .then((blob) => {
-        if (dead) return;
-        if (!blob) {
-          setError("This clip is no longer on the phone.");
+    void openMedia(item.id)
+      .then((opened) => {
+        if (dead) {
+          opened?.revoke();
           return;
         }
-        revoke = URL.createObjectURL(blob);
-        setUrl(revoke);
+        if (!opened) {
+          setError("This clip isn’t on this phone, and it isn’t on your account yet.");
+          return;
+        }
+        release = opened.revoke;
+        setUrl(opened.url);
       })
       .catch(() => {
         if (!dead) setError("Could not open the clip.");
       });
     return () => {
       dead = true;
-      if (revoke) URL.revokeObjectURL(revoke);
+      release();
     };
   }, [open, item.id]);
 
   const share = async () => {
-    const blob = await getMediaBlob(item.id);
+    const blob = await readMediaBlob(item.id);
     if (!blob) {
-      setError("This clip is no longer on the phone.");
+      setError("This clip isn’t on this phone, and it isn’t on your account yet.");
       return;
     }
     const file = new File([blob], `samson-${item.test.replace(/\s+/g, "-")}.mp4`, {

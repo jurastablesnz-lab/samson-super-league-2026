@@ -1,11 +1,20 @@
 const DB_NAME = "samson-review";
 const STORE = "blobs";
+const UPLOADS = "uploads";
+
+export type UploadJournal = {
+  uploadId: string;
+  partSize: number;
+  size: number;
+  parts: Record<string, string>;
+};
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+      if (!req.result.objectStoreNames.contains(UPLOADS)) req.result.createObjectStore(UPLOADS);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("Could not open the media store"));
@@ -87,6 +96,34 @@ export async function getMediaBlob(id: string): Promise<Blob | undefined> {
   });
   db.close();
   return blob;
+}
+
+async function withUploads<T>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const db = await openDb();
+  const value = await new Promise<T>((resolve, reject) => {
+    const tx = db.transaction(UPLOADS, mode);
+    const req = run(tx.objectStore(UPLOADS));
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("Could not update the upload"));
+  });
+  db.close();
+  return value;
+}
+
+export async function readUploadJournal(id: string): Promise<UploadJournal | null> {
+  const row = await withUploads<UploadJournal | undefined>("readonly", (store) => store.get(id));
+  return row ?? null;
+}
+
+export async function writeUploadJournal(id: string, journal: UploadJournal): Promise<void> {
+  await withUploads("readwrite", (store) => store.put(journal, id));
+}
+
+export async function clearUploadJournal(id: string): Promise<void> {
+  await withUploads("readwrite", (store) => store.delete(id));
 }
 
 export async function deleteMediaBlob(id: string) {

@@ -20,7 +20,8 @@ import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
 import { ArenaCaller } from "@/components/arena-caller";
 import { callerSheet, TestArena, TestsPanel } from "@/components/test-sheet";
-import { compressSheetPhoto, getMediaBlob, putMediaBlob } from "@/lib/media-db";
+import { compressSheetPhoto, putMediaBlob } from "@/lib/media-db";
+import { openMedia, syncLocalMedia, type MediaRef } from "@/lib/media-upload";
 import { describeWhen, GOALS, type GeneratedPlan } from "@/lib/plan-builder";
 import { resolveRide } from "@/lib/result-summary";
 import type { EvoRow } from "@/lib/evo-csv";
@@ -186,6 +187,63 @@ function RiderApp({
   const [logError, setLogError] = useState<string | null>(null);
   const horseIdRef = useRef(horse.id);
   horseIdRef.current = horse.id;
+
+  const mediaKey = [
+    horses
+      .map((item) => {
+        const plan = ws.plans[item.id];
+        const music = plan?.freestyle?.mediaId ?? plan?.config.freestyle?.mediaId ?? "";
+        const floor = plan?.config.floorPlan?.mediaId ?? "";
+        return `${item.id}:${music}:${floor}`;
+      })
+      .join("|"),
+    log?.sheets
+      .filter((sheet) => sheet.kind === "video")
+      .map((sheet) => sheet.id)
+      .join(",") ?? "",
+  ].join(";");
+
+  useEffect(() => {
+    const refs: MediaRef[] = [];
+    for (const item of horses) {
+      const plan = ws.plans[item.id];
+      const music = plan?.freestyle ?? plan?.config.freestyle;
+      if (music?.mediaId) {
+        refs.push({
+          id: music.mediaId,
+          kind: "music",
+          fileName: music.fileName,
+          mime: music.mime || "audio/mpeg",
+          horseId: item.id,
+        });
+      }
+      const floor = plan?.config.floorPlan;
+      if (floor?.mediaId) {
+        refs.push({
+          id: floor.mediaId,
+          kind: "floorplan",
+          fileName: floor.fileName,
+          mime: floor.mime || "application/pdf",
+          horseId: item.id,
+        });
+      }
+    }
+    if (log) {
+      for (const sheet of log.sheets) {
+        if (sheet.kind !== "video") continue;
+        refs.push({
+          id: sheet.id,
+          kind: "video",
+          fileName: `${sheet.test || "test"}.mp4`,
+          mime: sheet.mime || "video/mp4",
+          horseId: log.horseId,
+        });
+      }
+    }
+    syncLocalMedia(refs);
+    // mediaKey already changes when the horse, file or video list changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaKey]);
 
   useEffect(() => {
     let dead = false;
@@ -780,6 +838,7 @@ function TestsTab({
         <Card>
           <FloorPlanPicker
             plan={floorPlan}
+            horseId={record.horseId}
             onChange={async (next) => {
               onWorkspace(
                 await saveHorseFloorPlan({
@@ -859,19 +918,23 @@ function RiderMusic({ horse, record }: { horse: HorseRecord; record: PlanRecord 
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let dead = false;
-    let url: string | null = null;
+    let release = () => {};
     setSrc(null);
     if (!mediaId) return;
-    void getMediaBlob(mediaId)
-      .then((blob) => {
-        if (dead || !blob) return;
-        url = URL.createObjectURL(blob);
-        setSrc(url);
+    void openMedia(mediaId)
+      .then((opened) => {
+        if (dead) {
+          opened?.revoke();
+          return;
+        }
+        if (!opened) return;
+        release = opened.revoke;
+        setSrc(opened.url);
       })
       .catch(() => undefined);
     return () => {
       dead = true;
-      if (url) URL.revokeObjectURL(url);
+      release();
     };
   }, [mediaId]);
   if (!track || !src) return null;
@@ -890,15 +953,21 @@ function FreestyleCard({ record }: { record: PlanRecord }) {
   const [url, setUrl] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
-    let u: string | null = null;
+    let release = () => {};
+    let dead = false;
     if (!ref) return;
-    void getMediaBlob(ref.mediaId).then((b) => {
-      if (!b) return setMissing(true);
-      u = URL.createObjectURL(b);
-      setUrl(u);
+    void openMedia(ref.mediaId).then((opened) => {
+      if (dead) {
+        opened?.revoke();
+        return;
+      }
+      if (!opened) return setMissing(true);
+      release = opened.revoke;
+      setUrl(opened.url);
     });
     return () => {
-      if (u) URL.revokeObjectURL(u);
+      dead = true;
+      release();
     };
   }, [ref]);
   if (!ref) return null;
@@ -916,8 +985,7 @@ function FreestyleCard({ record }: { record: PlanRecord }) {
       {url && <audio className="mt-3 w-full" controls src={url} />}
       {missing && (
         <p className="mt-2 text-sm text-muted">
-          The file is saved on the device you uploaded it from. Re-upload it in Setup to play it
-          here.
+          This track isn’t on this phone, and it isn’t on your account yet. Add it again in Setup.
         </p>
       )}
     </Card>

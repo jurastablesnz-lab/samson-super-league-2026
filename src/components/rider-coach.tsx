@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Share2, Trash2, Video } from "lucide-react";
-import { deleteMediaBlob, getMediaBlob, storeVideoFile } from "@/lib/media-db";
+import { openMedia, PENDING_UPLOAD, readMediaBlob, removeAccountMedia, saveAccountMedia } from "@/lib/media-upload";
 import { deleteCoachVisit, deleteEntry, saveCoachVisit, saveSheet } from "@/lib/rider";
 import type { CoachVisitRecord, HorseLog, HorseRecord, SheetRecord } from "@/lib/rider-types";
 import type { GeneratedPlan } from "@/lib/plan-builder";
@@ -349,20 +349,33 @@ function Videos({
   const [date, setDate] = useState(iso(TODAY));
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function saveVideo(file: File | undefined) {
     if (!file) return;
     setError(null);
+    setNotice(null);
     onError(null);
     if (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v)$/i.test(file.name)) {
       setError("That file is not a video.");
       return;
     }
     setBusy(true);
+    setProgress(0);
     const id = `v-${globalThis.crypto.randomUUID()}`;
     try {
-      await storeVideoFile(id, file);
+      const savedMedia = await saveAccountMedia({
+        id,
+        kind: "video",
+        file,
+        fileName: file.name || "test.mp4",
+        mime: file.type || "video/mp4",
+        horseId: horse.id,
+        onProgress: setProgress,
+      });
+      if (savedMedia.pendingCloud) setNotice(PENDING_UPLOAD);
       const saved = await saveSheet({
         data: {
           horseId: horse.id,
@@ -380,10 +393,11 @@ function Videos({
       onLog(saved);
       setNote("");
     } catch (err) {
-      await deleteMediaBlob(id).catch(() => undefined);
+      await removeAccountMedia(id);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -393,8 +407,8 @@ function Videos({
         <Kicker>For the coach · {horse.name}</Kicker>
         <h2 className="font-display mt-1 text-xl font-medium">Competition videos</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Film the test, not the warm-up. The clip stays on this device and the note is saved to {horse.name}{" "}
-          only. Play it back before the next visit, or share it straight to your coach.
+          Film the test, not the warm-up. The clip stays on this phone until it is copied to your account, and
+          the note is saved to {horse.name} only. Play it back before the next visit, or share it with your coach.
         </p>
         <datalist id={`coach-shows-${horse.id}`}>
           {plan.shows.map((s) => (
@@ -426,12 +440,13 @@ function Videos({
         />
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <FileButton capture accept="video/*" disabled={busy} onFile={saveVideo}>
-            <Video className="size-4" /> Record a test
+            <Video className="size-4" /> {busy && progress != null ? `Uploading ${Math.round(progress * 100)}%` : "Record a test"}
           </FileButton>
           <FileButton accept="video/*" disabled={busy} onFile={saveVideo}>
-            Choose a clip
+            {busy && progress != null ? `Uploading ${Math.round(progress * 100)}%` : "Choose a clip"}
           </FileButton>
         </div>
+        {notice && <p className="mt-3 text-sm text-muted">{notice}</p>}
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </Card>
       {videos.length === 0 ? (
@@ -455,7 +470,7 @@ function Videos({
                 }
               }}
               onRemove={async () => {
-                await deleteMediaBlob(item.id).catch(() => undefined);
+                await removeAccountMedia(item.id);
                 try {
                   onLog(await deleteEntry({ data: { horseId: horse.id, kind: "sheet", id: item.id } }));
                 } catch (err) {
@@ -525,31 +540,34 @@ function VideoCard({
 
   useEffect(() => {
     if (!open) return;
-    let revoke = "";
+    let release = () => {};
     let dead = false;
-    void getMediaBlob(item.id)
-      .then((blob) => {
-        if (dead) return;
-        if (!blob) {
-          setError("This clip is no longer on this device.");
+    void openMedia(item.id)
+      .then((opened) => {
+        if (dead) {
+          opened?.revoke();
           return;
         }
-        revoke = URL.createObjectURL(blob);
-        setUrl(revoke);
+        if (!opened) {
+          setError("This clip isn’t on this phone, and it isn’t on your account yet.");
+          return;
+        }
+        release = opened.revoke;
+        setUrl(opened.url);
       })
       .catch(() => {
         if (!dead) setError("Could not open the clip.");
       });
     return () => {
       dead = true;
-      if (revoke) URL.revokeObjectURL(revoke);
+      release();
     };
   }, [open, item.id]);
 
   const share = async () => {
-    const blob = await getMediaBlob(item.id);
+    const blob = await readMediaBlob(item.id);
     if (!blob) {
-      setError("This clip is no longer on this device.");
+      setError("This clip isn’t on this phone, and it isn’t on your account yet.");
       return;
     }
     const safeName = horse.name.replace(/[^\w.-]+/g, "-") || "horse";

@@ -113,23 +113,23 @@ export type TargetShow = {
 };
 
 export type FreestyleRef = {
-  /** Key in this device's IndexedDB (media-db). The file itself never leaves the device. */
+  /** IndexedDB key, and the id of the private account file once it has uploaded. */
   mediaId: string;
   fileName: string;
   mime: string;
   size: number;
   durationSec?: number | null;
-  storedOn: "device";
+  storedOn: "device" | "cloud";
   uploadedAt: string;
 };
 
-/** A rider's own floor-plan PDF or photo. The file stays in IndexedDB on this device. */
+/** A rider's own floor-plan PDF or photo. */
 export type FloorPlanRef = {
   mediaId: string;
   fileName: string;
   mime: string;
   size: number;
-  storedOn: "device";
+  storedOn: "device" | "cloud";
   uploadedAt: string;
 };
 
@@ -157,7 +157,7 @@ export function sanitiseFloorPlan(raw: unknown): FloorPlanRef | null {
     fileName,
     mime: kind === "pdf" ? "application/pdf" : given.startsWith("image/") ? given : "image/jpeg",
     size: Math.max(0, Math.min(20_000_000, Math.round(Number(f.size) || 0))),
-    storedOn: "device",
+    storedOn: f.storedOn === "cloud" ? "cloud" : "device",
     uploadedAt: text(f.uploadedAt, 40) || new Date().toISOString(),
   };
 }
@@ -172,7 +172,7 @@ export type PlanConfig = {
   /** First day of the plan (defaults to today in NZ). */
   startDate?: string;
   freestyle?: FreestyleRef | null;
-  /** Rider's PDF or photo of the freestyle floor plan. The bytes stay on the device. */
+  /** Rider's PDF or photo of the freestyle floor plan. */
   floorPlan?: FloorPlanRef | null;
 };
 
@@ -536,7 +536,7 @@ export function sanitisePlanConfig(raw: unknown, fallback: { horseName: string; 
       mime: str(f.mime, 80) || "audio/mpeg",
       size: Math.max(0, Math.round(Number(f.size) || 0)),
       durationSec: Number.isFinite(Number(f.durationSec)) ? Number(f.durationSec) : null,
-      storedOn: "device",
+      storedOn: f.storedOn === "cloud" ? "cloud" : "device",
       uploadedAt: str(f.uploadedAt, 40) || new Date().toISOString(),
     };
   }

@@ -28,8 +28,10 @@ function Privacy() {
           Your account (name, email, password hash), your beta application (contact details, region, grade, competition
           level, horses and their ESNZ numbers, ESNZ membership, coach, goals) and its review status. Your season plan,
           scores, ride notes and judge-sheet summaries are stored in our database against your account so they’re on
-          every device. Show results we import from EVO Events are matched to your horses. Photos, videos, freestyle
-          music and floor-plan files stay on the device you added them from.
+          every device. Show results we import from EVO Events are matched to your horses. Judge-sheet photos stay
+          on the device you added them from. Videos, freestyle music and floor plans stay on that device until they
+          have been copied to private storage on your account. Only you and the Virtual Dressage NZ team can open those
+          files.
         </p>
 
         <H>Who sees it</H>

@@ -3,7 +3,7 @@ import { Check, Music, Plus, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { COMPETITION_LEVELS, MAX_HORSES } from "@/lib/beta";
 import { FloorPlanPicker } from "@/components/floor-plan";
-import { putMediaBlob } from "@/lib/media-db";
+import { PENDING_UPLOAD, removeAccountMedia, saveAccountMedia } from "@/lib/media-upload";
 import {
   GOALS,
   describeWhen,
@@ -535,21 +535,36 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
 
 function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Partial<WizardHorse>) => void }) {
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const wantsFreestyle = horse.goals.includes("freestyle") || horse.tests.some(isFreestyle);
   const toggle = (g: GoalId) =>
     onChange({ goals: horse.goals.includes(g) ? horse.goals.filter((x) => x !== g) : [...horse.goals, g] });
 
   async function upload(file: File) {
     setErr(null);
+    setNotice(null);
     if (!file.type.startsWith("audio/") && !/\.(mp3|m4a|wav|aac|ogg)$/i.test(file.name)) {
       return setErr("That doesn’t look like an audio file.");
     }
     if (file.size > 60 * 1024 * 1024) return setErr("Keep the file under 60 MB.");
     setBusy(true);
+    setProgress(0);
     try {
       const mediaId = `freestyle-${globalThis.crypto.randomUUID()}`;
-      await putMediaBlob(mediaId, file);
+      const saved = await saveAccountMedia({
+        id: mediaId,
+        kind: "music",
+        file,
+        fileName: file.name,
+        mime: file.type || "audio/mpeg",
+        onProgress: setProgress,
+      });
+      if (saved.pendingCloud) setNotice(PENDING_UPLOAD);
+      if (horse.freestyle?.mediaId && horse.freestyle.mediaId !== mediaId) {
+        await removeAccountMedia(horse.freestyle.mediaId);
+      }
       const durationSec = await new Promise<number | null>((resolve) => {
         const url = URL.createObjectURL(file);
         const a = new Audio();
@@ -571,7 +586,7 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           mime: file.type || "audio/mpeg",
           size: file.size,
           durationSec,
-          storedOn: "device",
+          storedOn: saved.where === "cloud" ? "cloud" : "device",
           uploadedAt: new Date().toISOString(),
         },
       });
@@ -579,6 +594,7 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -609,8 +625,8 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           <p className="text-sm font-semibold">Freestyle music {wantsFreestyle ? "" : "(optional)"}</p>
         </div>
         <p className="text-xs text-muted">
-          Upload your freestyle track to practise with in the app. The file stays on this device; we save its name and
-          length with your plan.
+          Upload your freestyle track to practise with in the app. The file stays on this phone until it is copied to
+          your account. We save its name and length with your plan.
         </p>
         {horse.freestyle ? (
           <div className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm">
@@ -618,13 +634,17 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
               {horse.freestyle.fileName}
               {horse.freestyle.durationSec ? ` · ${fmtDuration(horse.freestyle.durationSec)}` : ""}
             </span>
-            <button type="button" className="cursor-pointer text-xs font-semibold text-muted hover:text-danger" onClick={() => onChange({ freestyle: null })}>
+            <button type="button" className="cursor-pointer text-xs font-semibold text-muted hover:text-danger" onClick={() => {
+              const id = horse.freestyle?.mediaId;
+              onChange({ freestyle: null });
+              if (id) void removeAccountMedia(id);
+            }}>
               Remove
             </button>
           </div>
         ) : (
           <label className="block cursor-pointer rounded-lg border border-dashed border-line px-3 py-3 text-center text-sm font-semibold text-ink-soft">
-            {busy ? "Saving…" : "Choose an audio file"}
+            {busy ? (progress == null ? "Saving…" : `Uploading ${Math.round(progress * 100)}%`) : "Choose an audio file"}
             <input
               type="file"
               accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
@@ -637,6 +657,7 @@ function GoalsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
             />
           </label>
         )}
+        {notice && <p className="text-xs text-muted">{notice}</p>}
         {err && <p className="text-xs text-danger">{err}</p>}
         <FloorPlanPicker plan={horse.floorPlan} onChange={(floorPlan) => onChange({ floorPlan })} />
       </Panel>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AdminRider } from "@/lib/admin-riders";
+import { listRiderFiles, mediaPlaybackUrl } from "@/lib/media";
 import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
@@ -63,8 +64,12 @@ function RiderRow({
 }) {
   const waiting = rider.horses.reduce((n, h) => n + h.pendingEvo, 0);
   const nameOnly = rider.horses.flatMap((h) => h.tests.filter((t) => t.nameOnly)).length;
+  const [open, setOpen] = useState(false);
   return (
-    <details className="rounded-xl border border-line bg-bg">
+    <details
+      className="rounded-xl border border-line bg-bg"
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
       <summary className="cursor-pointer list-none p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -146,8 +151,56 @@ function RiderRow({
             )}
           </section>
         ))}
+        {open && <RiderFiles userId={rider.userId} horses={rider.horses} />}
       </div>
     </details>
+  );
+}
+
+function RiderFiles({
+  userId,
+  horses,
+}: {
+  userId: string;
+  horses: AdminRider["horses"];
+}) {
+  const [files, setFiles] = useState<{ id: string; kind: string; fileName: string; horseId: string | null }[] | null>(
+    null,
+  );
+  const [error, setError] = useState("");
+  useEffect(() => {
+    listRiderFiles({ data: { userId } })
+      .then((result) => setFiles(result.files))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+  }, [userId]);
+  if (error) return <p className="text-xs text-danger">{error}</p>;
+  if (!files) return <p className="text-xs text-muted">Loading files…</p>;
+  if (files.length === 0) return <p className="text-xs text-muted">No videos, music or floor plans stored yet.</p>;
+  const horseName = new Map(horses.map((horse) => [horse.id, horse.name]));
+  return (
+    <ul className="space-y-1 text-xs">
+      {files.map((file) => (
+        <li key={file.id} className="flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate">
+            {file.kind === "video" ? "Video" : file.kind === "music" ? "Music" : "Floor plan"}
+            {file.horseId && horseName.get(file.horseId) ? ` · ${horseName.get(file.horseId)}` : ""} · {file.fileName}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 font-semibold text-accent"
+            onClick={() => {
+              void mediaPlaybackUrl({ data: { mediaId: file.id } })
+                .then((result) => {
+                  if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+                })
+                .catch(() => setError("Could not open that file."));
+            }}
+          >
+            Open
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

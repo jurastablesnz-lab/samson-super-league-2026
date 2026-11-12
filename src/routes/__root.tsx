@@ -15,7 +15,7 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#0B1020" },
       { name: "application-name", content: BRAND_NAME },
       { name: "apple-mobile-web-app-title", content: BRAND_NAME },
-      { name: "description", content: "Your dressage season: four phases, weekly sessions, test practice, freestyle music, score tracking and ride notes." },
+      { name: "description", content: "Your horse's official results, the judges' comments and your coach's notes, turned into one plan for your next show." },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

@@ -61,8 +61,11 @@ function TrainingApp({ access }: { access: BetaAccess }) {
 function Welcome() {
   return (
     <BrandShell>
-      <Kicker>Plan · Train · Compete · Reflect</Kicker>
-      <Title>Your dressage season, in one place.</Title>
+      <Kicker>XSalute · private beta</Kicker>
+      <Title>
+        Your horse&apos;s official results, the judges&apos; comments and your coach&apos;s notes,
+        turned into one plan for your next show.
+      </Title>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         XSalute by Virtual Dressage NZ is in private beta with a small group of riders. Apply for a
         place, or sign in if you already have one.

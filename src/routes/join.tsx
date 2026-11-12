@@ -50,12 +50,15 @@ function JoinPage() {
   }
   return (
     <BrandShell>
-      <Kicker>Founding rider beta · 2026 season</Kicker>
-      <Title>Apply to join the XSalute beta</Title>
+      <Kicker>XSalute · private beta</Kicker>
+      <Title>
+        Your horse&apos;s official results, the judges&apos; comments and your coach&apos;s notes,
+        turned into one plan for your next show.
+      </Title>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        XSalute helps you plan, train, compete and reflect across your dressage season. We’re opening a small number of
-        free beta places to committed riders who’ll use it and tell us what works. Create your account, tell us about you
-        and your horse, and we’ll be in touch.
+        Bring the scores, what the judges wrote, and what your coach asked you to work on. We’ll turn that into the
+        plan you ride toward your next show. A small number of free beta places are open. Create your account, tell us
+        about you and your horse, and we’ll be in touch.
       </p>
       <ApplicationForm signedIn={access.state === "ready"} defaultName={access.state === "ready" ? access.access.name ?? "" : ""} onDone={() => { setDone(true); access.reload(); }} />
     </BrandShell>

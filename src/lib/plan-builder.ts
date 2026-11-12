@@ -37,6 +37,19 @@ export const GOALS = [
 export type GoalId = (typeof GOALS)[number]["id"];
 
 /** Tests by level, as offered in the setup wizard. Riders can also type their own. */
+const DRESSAGE_LEVELS = [
+  "Not competing yet",
+  "Training / Preliminary",
+  "Level 1",
+  "Level 2",
+  "Level 3",
+  "Level 4",
+  "Level 5",
+  "Level 6",
+  "Level 7 / FEI Small Tour",
+  "Grand Prix",
+] as const;
+
 export const TESTS_BY_LEVEL: Record<string, string[]> = {
   "Not competing yet": ["Training 1", "Training 2", "Training 3"],
   "Training / Preliminary": ["Training 1", "Training 2", "Training 3", "Preliminary 1A", "Preliminary 1B"],
@@ -48,18 +61,40 @@ export const TESTS_BY_LEVEL: Record<string, string[]> = {
   "Level 6": ["6A", "6B", "6C", "Level 6 musical freestyle"],
   "Level 7 / FEI Small Tour": ["FEI Prix St-Georges", "FEI Intermediate I", "FEI Intermediate I Freestyle"],
   "Grand Prix": ["FEI Intermediate II", "FEI Grand Prix", "FEI Grand Prix Freestyle"],
+  "Para Grade I": ["Grade I Para Grand Prix A", "Grade I Para Grand Prix B", "Grade I Freestyle"],
+  "Para Grade II": ["Grade II Para Grand Prix A", "Grade II Para Grand Prix B", "Grade II Freestyle"],
+  "Para Grade III": ["Grade III Para Grand Prix A", "Grade III Para Grand Prix B", "Grade III Freestyle"],
+  "Para Grade IV": ["Grade IV Para Grand Prix A", "Grade IV Para Grand Prix B", "Grade IV Freestyle"],
+  "Para Grade V": ["Grade V Para Grand Prix A", "Grade V Para Grand Prix B", "Grade V Freestyle"],
 };
 
-const LEVEL_ORDER = Object.keys(TESTS_BY_LEVEL);
+const PARA_LEVEL: Record<string, string> = {
+  "1": "Para Grade I",
+  i: "Para Grade I",
+  "2": "Para Grade II",
+  ii: "Para Grade II",
+  "3": "Para Grade III",
+  iii: "Para Grade III",
+  "4": "Para Grade IV",
+  iv: "Para Grade IV",
+  "5": "Para Grade V",
+  v: "Para Grade V",
+};
 
 export function testsForLevel(level: string): string[] {
-  return TESTS_BY_LEVEL[level] ?? TESTS_BY_LEVEL["Level 2"];
+  if (TESTS_BY_LEVEL[level]) return TESTS_BY_LEVEL[level];
+  const para = level.match(/\bgrade\s*(iv|v|iii|ii|i|[1-5])\b/i);
+  const named = para ? TESTS_BY_LEVEL[PARA_LEVEL[para[1].toLowerCase()] ?? ""] : undefined;
+  if (named) return named;
+  if (/para|\bgrade\b/i.test(level)) return [];
+  return TESTS_BY_LEVEL["Level 2"];
 }
 
+/** Para grades are a choice, not the step after Grand Prix. */
 export function nextLevel(level: string): string | null {
-  const i = LEVEL_ORDER.indexOf(level);
-  if (i < 0 || i >= LEVEL_ORDER.length - 1) return null;
-  return LEVEL_ORDER[i + 1];
+  const i = DRESSAGE_LEVELS.indexOf(level as (typeof DRESSAGE_LEVELS)[number]);
+  if (i < 0 || i >= DRESSAGE_LEVELS.length - 1) return null;
+  return DRESSAGE_LEVELS[i + 1];
 }
 
 export type TargetShow = {

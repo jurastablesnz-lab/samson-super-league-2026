@@ -36,6 +36,11 @@ export const COMPETITION_LEVELS = [
   "Level 6",
   "Level 7 / FEI Small Tour",
   "Grand Prix",
+  "Para Grade I",
+  "Para Grade II",
+  "Para Grade III",
+  "Para Grade IV",
+  "Para Grade V",
 ] as const;
 export const HEARD_FROM = [
   "Virtual Dressage NZ website",

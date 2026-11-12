@@ -2,7 +2,7 @@
  * Every test a rider can be offered. Sheets live in code; publication lives in
  * `test_approvals`. A test that is not in that table is a draft.
  */
-import { TESTS_BY_LEVEL } from "./plan-builder.ts";
+import { TESTS_BY_LEVEL, testsForLevel } from "./plan-builder.ts";
 import {
   ADVANCED_FS,
   ADVANCED_MEDIUM_FS,
@@ -221,9 +221,11 @@ export function visibleDiagramIds(opts: {
 }): string[] {
   const approved = new Set(opts.approvedIds);
   const scoped = opts.level != null || opts.tests != null;
-  const levelIds = new Set(
-    (opts.level ? (TESTS_BY_LEVEL[opts.level] ?? []) : []).map((name) => testIdForName(name)),
-  );
+  const levelNames = !opts.level
+    ? []
+    : (TESTS_BY_LEVEL[opts.level] ??
+      (/para|\bgrade\b/i.test(opts.level) ? testsForLevel(opts.level) : []));
+  const levelIds = new Set(levelNames.map((name) => testIdForName(name)));
   const selected = new Set((opts.tests ?? []).map((name) => testIdForName(name)));
   const ids: string[] = [];
   for (const item of catalogTests()) {
@@ -247,7 +249,5 @@ export function testsForLevelPublished(
   includeDrafts = false,
 ): string[] {
   const approved = new Set(approvedIds);
-  return (TESTS_BY_LEVEL[level] ?? TESTS_BY_LEVEL["Level 2"]).filter(
-    (name) => includeDrafts || approved.has(testIdForName(name)),
-  );
+  return testsForLevel(level).filter((name) => includeDrafts || approved.has(testIdForName(name)));
 }

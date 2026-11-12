@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { groupResults } from "./result-summary.ts";
+import { groupResults, testsForRide } from "./result-summary.ts";
 
 test("Level 2 view groups 2A, 2B, 2C and MFS, and keeps other levels separate", () => {
   const board = groupResults(
@@ -87,4 +87,89 @@ test("Level 2 view groups 2A, 2B, 2C and MFS, and keeps other levels separate", 
     "Medium",
     "Preliminary",
   ]);
+});
+
+test("a Para Grade V horse offers Grade V tags and keeps older levels separate", () => {
+  const board = groupResults(
+    [
+      {
+        id: "g",
+        date: "2026-06-01",
+        showName: "Para",
+        test: "Grade V A",
+        level: "Para Grade V",
+        percent: 68,
+        place: "2",
+        status: "ok",
+        dressageTest: "Grade V A",
+      },
+      {
+        id: "u",
+        date: "2026-07-01",
+        showName: "Para",
+        test: "Grade V · 12",
+        level: "Grade V",
+        percent: 61,
+        place: "4",
+        status: "ok",
+      },
+      {
+        id: "n",
+        date: "2024-05-01",
+        showName: "Old",
+        test: "Novice (L2) · 201",
+        level: "Novice (L2)",
+        percent: 64,
+        place: "3",
+        status: "ok",
+        dressageTest: "2B",
+      },
+      {
+        id: "m",
+        date: "2025-05-10",
+        showName: "HDG",
+        test: "Medium (L4) · 13",
+        level: "Medium (L4)",
+        percent: 58.3,
+        place: "5",
+        status: "ok",
+        dressageTest: "4A",
+      },
+      {
+        id: "e",
+        date: "2023-01-01",
+        showName: "Club",
+        test: "Elementary · 3",
+        level: "Elementary (L3)",
+        percent: 60,
+        place: "6",
+        status: "ok",
+        dressageTest: "3A",
+      },
+    ],
+    "Para Grade V",
+  );
+  assert.equal(board.primary.section, "Grade V");
+  assert.deepEqual(
+    board.primary.groups.map((group) => group.label),
+    ["Grade V A", "Grade V B", "Grade V Freestyle"],
+  );
+  assert.equal(board.primary.groups[0].count, 1);
+  assert.equal(board.unassigned[0].id, "u");
+  assert.deepEqual(testsForRide("Grade V"), ["Grade V A", "Grade V B", "Grade V Freestyle"]);
+  assert.equal(testsForRide("Para Grade V").includes("MFS"), false);
+  assert.deepEqual(testsForRide(board.unassigned[0].level), [
+    "Grade V A",
+    "Grade V B",
+    "Grade V Freestyle",
+  ]);
+  assert.deepEqual(board.others.map((section) => section.section).sort(), [
+    "Elementary",
+    "Level 2",
+    "Medium",
+  ]);
+  assert.equal(
+    board.others.find((section) => section.section === "Level 2")?.groups[0].label,
+    "2B",
+  );
 });

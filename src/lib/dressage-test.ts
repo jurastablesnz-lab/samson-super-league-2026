@@ -18,9 +18,27 @@ export const TESTS_BY_SECTION: Record<string, string[]> = {
   "Level 5": ["5A", "5B", "5C", "MFS"],
   "Level 6": ["6A", "6B", "6C", "MFS"],
   "Level 7": ["PSG", "Inter I", "Inter I FS"],
+  "Grade I": ["Grade I A", "Grade I B", "Grade I Freestyle"],
+  "Grade II": ["Grade II A", "Grade II B", "Grade II Freestyle"],
+  "Grade III": ["Grade III A", "Grade III B", "Grade III Freestyle"],
+  "Grade IV": ["Grade IV A", "Grade IV B", "Grade IV Freestyle"],
+  "Grade V": ["Grade V A", "Grade V B", "Grade V Freestyle"],
 };
 
 const ALLOWED = new Set([...Object.values(TESTS_BY_SECTION).flat(), "2B Super 5"]);
+
+const PARA_GRADE: Record<string, string> = {
+  "1": "Grade I",
+  i: "Grade I",
+  "2": "Grade II",
+  ii: "Grade II",
+  "3": "Grade III",
+  iii: "Grade III",
+  "4": "Grade IV",
+  iv: "Grade IV",
+  "5": "Grade V",
+  v: "Grade V",
+};
 
 export function placeNumber(place: string): string {
   const match = place.match(/\d+/);
@@ -35,6 +53,9 @@ export function canonicalTest(raw: string): string | null {
   if (/^(?:preliminary|prelim)\s+1[ABCD]$/i.test(text))
     return text.replace(/^(?:preliminary|prelim)\s+/i, "").toUpperCase();
   if (/^[1-6][A-D]$/i.test(text)) return text.toUpperCase();
+  const para = paraCanonical(text);
+  if (para) return para;
+  if (ALLOWED.has(text)) return text;
   if (/^(?:L2\s+)?MFS$/i.test(text) || /musical freestyle/i.test(text)) return "MFS";
   if (/medium\s*toc/i.test(text)) return "Medium TOC";
   if (/prix\s*st|^\s*psg\s*$/i.test(text)) return "PSG";
@@ -49,7 +70,23 @@ export function testFamily(test: string): string {
   return test;
 }
 
+function paraCanonical(text: string): string | null {
+  const match = text.match(
+    /^grade\s+(iv|v|iii|ii|i)\b(?:\s+para\b)?(?:\s+grand\s+prix\b)?(?:\s+(a|b|freestyle|musical\s+freestyle))?\s*$/i,
+  );
+  if (!match?.[2]) return null;
+  const grade = PARA_GRADE[match[1].toLowerCase()];
+  if (!grade) return null;
+  const kind = /^a$/i.test(match[2]) ? "A" : /^b$/i.test(match[2]) ? "B" : "Freestyle";
+  return `${grade} ${kind}`;
+}
+
 export function sectionForLevel(level: string): string {
+  const para = level.match(/\bgrade\s*(iv|v|iii|ii|i|[1-5])\b/i);
+  if (para) {
+    const section = PARA_GRADE[para[1].toLowerCase()];
+    if (section) return section;
+  }
   if (/medium|\bl4\b|level\s*4/i.test(level)) return "Medium";
   if (/prelim|\bl1\b|level\s*1/i.test(level)) return "Preliminary";
   if (/elementary|\bl3\b|level\s*3/i.test(level)) return "Elementary";
@@ -67,7 +104,10 @@ export function horseSection(level: string): string {
 }
 
 export function pickerTests(level: string): string[] {
-  return TESTS_BY_SECTION[sectionForLevel(level)] ?? TESTS_BY_SECTION["Level 2"];
+  const listed = TESTS_BY_SECTION[sectionForLevel(level)];
+  if (listed) return listed;
+  if (/para|\bgrade\b/i.test(level)) return [];
+  return TESTS_BY_SECTION["Level 2"];
 }
 
 export function isAllowedTest(test: string): boolean {

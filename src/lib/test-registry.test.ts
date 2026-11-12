@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { nextLevel, testsForLevel } from "./plan-builder.ts";
 import {
   SEEDED_APPROVED_TEST_IDS,
   catalogTests,
@@ -112,4 +113,17 @@ test("riders only see published names, and new registry tests start unpublished"
   assert.deepEqual(testsForLevelPublished("Level 5", approved), []);
   assert.deepEqual(testsForLevelPublished("Level 6", approved), []);
   assert.equal(isPublishedTest("preliminary-9z", approved), false);
+  assert.deepEqual(
+    testsForLevel("Para Grade V").map((name) => testIdForName(name)),
+    ["gv-a", "gv-b", "gv-fs"],
+  );
+  assert.deepEqual(
+    testsForLevel("Para Grade I").map((name) => testIdForName(name)),
+    ["g1a", "g1b", "g1-fs"],
+  );
+  assert.deepEqual(testsForLevelPublished("Para Grade V", approved), []);
+  assert.equal(testsForLevelPublished("Para Grade V", approved).includes("2A"), false);
+  assert.equal(nextLevel("Grand Prix"), null);
+  assert.equal(nextLevel("Para Grade V"), null);
+  assert.equal(nextLevel("Level 6"), "Level 7 / FEI Small Tour");
 });

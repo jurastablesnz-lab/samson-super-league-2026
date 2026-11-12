@@ -73,7 +73,9 @@ function summarise(label: string, rides: RideView[]): TestGroup {
 export function groupResults(rows: ScoreRow[], horseLevel: string): ResultBoard {
   const rides = rows.map(resolveRide);
   const primaryName = horseSection(horseLevel || "Level 2");
-  const labels = TESTS_BY_SECTION[primaryName] ?? TESTS_BY_SECTION["Level 2"];
+  const labels =
+    TESTS_BY_SECTION[primaryName] ??
+    (/para|\bgrade\b/i.test(horseLevel) ? [] : TESTS_BY_SECTION["Level 2"]);
   const assigned = rides.filter((ride) => ride.family);
   const unassigned = rides
     .filter((ride) => !ride.family)
@@ -86,9 +88,13 @@ export function groupResults(rows: ScoreRow[], horseLevel: string): ResultBoard 
     ),
   );
 
-  const otherNames = [...new Set(assigned.map((ride) => ride.section))].filter(
-    (name) => name !== primaryName,
-  );
+  const otherNames = [
+    ...new Set(
+      rides
+        .map((ride) => ride.section)
+        .filter((name) => name !== primaryName && TESTS_BY_SECTION[name]),
+    ),
+  ];
   const others = otherNames.sort().map((section) => {
     const inSection = assigned.filter((ride) => ride.section === section);
     const names = [...new Set(inSection.map((ride) => ride.family as string))];

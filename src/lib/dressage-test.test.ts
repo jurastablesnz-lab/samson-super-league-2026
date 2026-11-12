@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { inferDressageTest } from "./dressage-test.ts";
+import { canonicalTest, inferDressageTest, pickerTests, sectionForLevel } from "./dressage-test.ts";
 
 const samson = [
   ["2026-10-24", 64.6, "3", "201", null],
@@ -51,4 +51,20 @@ test("recorded results name the test, and unmatched class numbers stay blank", (
     null,
     "a bare class number is not treated as test A",
   );
+});
+
+test("Para grades tag as their own tests and never as novice", () => {
+  assert.deepEqual(pickerTests("Para Grade V"), ["Grade V A", "Grade V B", "Grade V Freestyle"]);
+  assert.deepEqual(pickerTests("Grade II"), ["Grade II A", "Grade II B", "Grade II Freestyle"]);
+  assert.equal(pickerTests("Para Grade V").includes("2A"), false);
+  assert.equal(pickerTests("Para").includes("2A"), false);
+  assert.deepEqual(pickerTests("Novice (L2)"), ["2A", "2B", "2C", "MFS"]);
+  assert.equal(sectionForLevel("Para Grade V"), "Grade V");
+  assert.equal(sectionForLevel("Novice (L2)"), "Level 2");
+  assert.equal(sectionForLevel("Medium (L4)"), "Medium");
+  assert.equal(sectionForLevel("Elementary (L3)"), "Elementary");
+  assert.equal(canonicalTest("Grade V Freestyle"), "Grade V Freestyle");
+  assert.equal(canonicalTest("Grade V musical freestyle"), "Grade V Freestyle");
+  assert.equal(canonicalTest("Grade V Para Grand Prix A"), "Grade V A");
+  assert.equal(canonicalTest("Level 2 musical freestyle"), "MFS");
 });

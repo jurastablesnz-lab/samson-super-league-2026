@@ -8,6 +8,8 @@ export type HorseRecord = {
   name: string;
   level: string;
   esnzNumber: string;
+  /** Barn name. Empty means the caller uses the registered name. */
+  paddockName: string;
   notes: string;
   isLegacySamson: boolean;
   sortOrder: number;
@@ -144,6 +146,7 @@ export type SetupHorseInput = {
   name: string;
   level: string;
   esnzNumber?: string;
+  paddockName?: string;
   notes?: string;
   config: PlanConfig;
 };

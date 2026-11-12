@@ -54,6 +54,8 @@ import {
   type Workspace,
 } from "@/lib/rider-types";
 import { applyCoachVisits, packKey, packingList, playableFreestyle } from "@/lib/rider-workspace";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { cueRiderName, riderFirstName, spokenHorseName } from "@/lib/coach-cues";
 import { isPublishedTest, testIdForName } from "@/lib/test-registry";
 import { MAX_SHEET_PHOTOS } from "@/lib/review-types";
 import {
@@ -179,6 +181,11 @@ function RiderApp({
   onEditSetup: () => void;
   onWorkspace: (ws: Workspace) => void;
 }) {
+  const account = useCurrentUser();
+  const riderName = cueRiderName({
+    applicationName: ws.displayName,
+    accountName: account?.displayName,
+  });
   const [tab, setTab] = useState<Tab>("today");
   const [horseId, setHorseId] = useState(horses[0].id);
   const horse = horses.find((h) => h.id === horseId) ?? horses[0];
@@ -376,6 +383,9 @@ function RiderApp({
             key={`tests-${horse.id}`}
             plan={plan}
             record={record}
+            horse={horse}
+            riderName={riderName}
+            accountName={account?.displayName ?? ""}
             isAdmin={ws.isOwner}
             approvedTestIds={ws.approvedTestIds}
             onWorkspace={onWorkspace}
@@ -814,16 +824,31 @@ function SeasonTab({
 function TestsTab({
   plan,
   record,
+  horse,
+  riderName,
+  accountName,
   isAdmin,
   approvedTestIds,
   onWorkspace,
 }: {
   plan: GeneratedPlan;
   record: PlanRecord;
+  horse: HorseRecord;
+  riderName: string;
+  accountName: string;
   isAdmin: boolean;
   approvedTestIds: string[];
   onWorkspace: (ws: Workspace) => void;
 }) {
+  const naming = {
+    riderName,
+    dropNames:
+      riderFirstName(accountName) && riderFirstName(accountName) !== riderName
+        ? [riderFirstName(accountName)]
+        : [],
+    spokenHorse: spokenHorseName(horse.name, horse.paddockName),
+    registeredName: horse.name,
+  };
   const shown = plan.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
   const [calling, setCalling] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -845,6 +870,7 @@ function TestsTab({
     calling ? testIdForName(calling) : "",
     called?.title ?? "",
     callBriefs,
+    naming,
   );
   const editedCues = useCallerCues(
     !!editing,
@@ -852,6 +878,7 @@ function TestsTab({
     editing ? testIdForName(editing) : "",
     edited?.title ?? "",
     editBriefs,
+    naming,
   );
   const floorPlan = record.config.floorPlan ?? null;
   const showFloor =
@@ -865,6 +892,7 @@ function TestsTab({
         horseLevel={plan.level}
         horseTests={plan.tests}
         horseId={record.horseId}
+        naming={naming}
       />
       {showFloor && (
         <Card>

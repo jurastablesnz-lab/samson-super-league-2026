@@ -53,8 +53,15 @@ export const HEARD_FROM = [
 
 export const MAX_HORSES = 6;
 
-/** One horse on an application. `esnzNumber` is optional (ESNZ horse registration). */
-export type HorseEntry = { name: string; level: string; notes: string; esnzNumber?: string };
+/** One horse on an application. `esnzNumber` and `paddockName` are optional. */
+export type HorseEntry = {
+  name: string;
+  level: string;
+  notes: string;
+  esnzNumber?: string;
+  /** Barn name the caller uses. Results keep `name`. */
+  paddockName?: string;
+};
 
 /** Loose ESNZ registration check: letters, digits, spaces and dashes, up to 20. */
 export function cleanEsnz(v: unknown): string {
@@ -168,6 +175,7 @@ export function parseHorseList(raw: unknown, legacy: string | null | undefined):
         level: clip(h.level, 60),
         notes: clip(h.notes, 300),
         esnzNumber: cleanEsnz(h.esnzNumber),
+        paddockName: clip(h.paddockName, 40),
       }))
       .filter((h) => h.name);
     if (list.length) return list;
@@ -208,8 +216,9 @@ function validate(input: unknown): ApplicationInput {
         level: clip(h.level, 60),
         notes: clip(h.notes, 300),
         esnzNumber: cleanEsnz(h.esnzNumber),
+        paddockName: clip(h.paddockName, 40),
       }))
-      .filter((h) => h.name || h.level || h.notes || h.esnzNumber),
+      .filter((h) => h.name || h.level || h.notes || h.esnzNumber || h.paddockName),
     esnzMember: i.esnzMember === true,
     coach: clip(i.coach, 120),
     goals: clip(i.goals, 1500),

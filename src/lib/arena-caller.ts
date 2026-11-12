@@ -21,6 +21,48 @@ export function movementCall(
   return clips;
 }
 
+export type SpeechSink = {
+  paused?: boolean;
+  cancel: () => void;
+  resume?: () => void;
+  speak: (text: string) => void;
+};
+
+/**
+ * Speak inside a tap. iOS only allows speechSynthesis.speak during the gesture,
+ * and a standalone home-screen app often starts paused. Cancel and resume must
+ * not throw out of the click handler.
+ */
+export function primeCallerSpeech(synth: SpeechSink | null | undefined, texts: string[]): "ok" | "unavailable" | "blocked" {
+  if (!synth || typeof synth.speak !== "function") return "unavailable";
+  try {
+    synth.cancel();
+  } catch {
+    // iOS can throw if nothing is speaking.
+  }
+  try {
+    synth.resume?.();
+  } catch {
+    // Standalone Safari sometimes rejects resume. Speaking can still work.
+  }
+  try {
+    for (const text of texts) {
+      if (text.trim()) synth.speak(text);
+    }
+    return "ok";
+  } catch {
+    return "blocked";
+  }
+}
+
+export const SPEECH_SILENT_HINT = "Check your phone isn't on silent.";
+
+export function speechStatusMessage(outcome: "ok" | "unavailable" | "blocked"): string | null {
+  if (outcome === "unavailable") return `Speech isn't available in this browser. ${SPEECH_SILENT_HINT}`;
+  if (outcome === "blocked") return `Speech is blocked. ${SPEECH_SILENT_HINT}`;
+  return null;
+}
+
 /** Higher is a better browser voice for a New Zealand rider. */
 export function voiceScore(voice: { lang: string; name: string }): number {
   const lang = voice.lang.toLowerCase();

@@ -6,6 +6,19 @@ import {
   refreshCallerCues,
   type CachedCue,
 } from "@/lib/coach-cache";
+import { rewriteCueText } from "@/lib/coach-cues";
+
+export type CueNaming = {
+  riderName: string;
+  dropNames: string[];
+  spokenHorse: string;
+  registeredName: string;
+};
+
+function named(cues: CachedCue[], naming?: CueNaming): CachedCue[] {
+  if (!naming) return cues;
+  return cues.map((cue) => ({ ...cue, text: rewriteCueText(cue.text, naming) }));
+}
 
 export function useCallerCues(
   active: boolean,
@@ -13,6 +26,7 @@ export function useCallerCues(
   testId: string,
   testName: string,
   movements: { n: number; label: string }[],
+  naming?: CueNaming,
 ) {
   const [cues, setCues] = useState<CachedCue[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -22,19 +36,19 @@ export function useCallerCues(
     if (!active || !horseId || !testId) return;
     let dead = false;
     void (async () => {
-      const local = await cachedCallerCues(horseId, testId);
+      const local = named(await cachedCallerCues(horseId, testId), naming);
       if (!dead && local.length) setCues(local);
       const loaded = await loadCallerCues(horseId, testId);
       if (dead) return;
       if (loaded.cues.length > 0) {
-        setCues(loaded.cues);
+        setCues(named(loaded.cues, naming));
         setError(loaded.error);
         return;
       }
       setRefreshing(true);
       const fresh = await refreshCallerCues(horseId, testId, testName, movements);
       if (dead) return;
-      setCues(fresh.cues);
+      setCues(named(fresh.cues, naming));
       setError(fresh.error);
       setRefreshing(false);
     })();
@@ -43,14 +57,14 @@ export function useCallerCues(
     };
     // Movements are read once when this test opens. A later edit does not restart the ride.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, horseId, testId]);
+  }, [active, horseId, testId, naming?.riderName, naming?.spokenHorse, naming?.registeredName]);
 
   async function refresh() {
     if (!horseId || !testId) return;
     setRefreshing(true);
     setError(null);
     const fresh = await refreshCallerCues(horseId, testId, testName, movements);
-    setCues(fresh.cues);
+    setCues(named(fresh.cues, naming));
     setError(fresh.error);
     setRefreshing(false);
   }

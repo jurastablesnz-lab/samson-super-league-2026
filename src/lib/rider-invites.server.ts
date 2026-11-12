@@ -94,10 +94,11 @@ export async function prepareRiderWorkspace(
       name: string;
       level: string;
       esnzNumber: string | null;
+      paddockName?: string;
       config: unknown;
       plan: unknown;
     }[];
-    applicationHorses: { name: string; level: string; esnzNumber?: string; notes: string }[];
+    applicationHorses: { name: string; level: string; esnzNumber?: string; paddockName?: string; notes: string }[];
   },
 ) {
   await sql.query("begin");
@@ -113,7 +114,7 @@ export async function prepareRiderWorkspace(
     await sql`update beta_applications set horse_list = ${JSON.stringify(input.applicationHorses)}::jsonb, horses = ${input.applicationHorses.map((h) => `${h.name} (${h.level})`).join("\n")} where user_id = ${invitation.userId}`;
     for (const [index, horse] of input.horses.entries()) {
       const horseId = crypto.randomUUID();
-      await sql`insert into horses (id, user_id, name, level, esnz_number, sort_order) values (${horseId}, ${invitation.userId}, ${horse.name}, ${horse.level}, ${horse.esnzNumber}, ${index})`;
+      await sql`insert into horses (id, user_id, name, paddock_name, level, esnz_number, sort_order) values (${horseId}, ${invitation.userId}, ${horse.name}, ${horse.paddockName ?? ""}, ${horse.level}, ${horse.esnzNumber}, ${index})`;
       await sql`insert into plans (horse_id, user_id, config, plan) values (${horseId}, ${invitation.userId}, ${JSON.stringify(horse.config)}::jsonb, ${JSON.stringify(horse.plan)}::jsonb)`;
     }
     await sql.query("commit");

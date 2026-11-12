@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { clampGap, hearsNext, movementCall, voiceScore } from "@/lib/arena-caller";
+import {
+  clampGap,
+  hearsNext,
+  movementCall,
+  primeCallerSpeech,
+  speechStatusMessage,
+  voiceScore,
+  type SpeechSink,
+  SPEECH_SILENT_HINT,
+} from "@/lib/arena-caller";
+import type { CallClip } from "@/lib/arena-caller";
 import type { Movement } from "@/lib/tests/types";
 
 type SpeechRec = {
@@ -20,66 +30,42 @@ type SpeechRecEvent = {
 
 function recognitionCtor(): (new () => SpeechRec) | null {
   if (typeof window === "undefined") return null;
-  const w = window as Window & {
-    SpeechRecognition?: new () => SpeechRec;
-    webkitSpeechRecognition?: new () => SpeechRec;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+  try {
+    const w = window as Window & {
+      SpeechRecognition?: new () => SpeechRec;
+      webkitSpeechRecognition?: new () => SpeechRec;
+    };
+    return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+  } catch {
+    return null;
+  }
 }
 
-function bestVoice(): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  if (voices.length === 0) return null;
-  return [...voices].sort((a, b) => voiceScore(b) - voiceScore(a))[0] ?? null;
-}
-
-function speakText(text: string, token: { cancelled: boolean }): Promise<void> {
-  return new Promise((resolve) => {
-    const synth = window.speechSynthesis;
-    if (!synth || token.cancelled) return resolve();
-    let started = false;
-    const start = () => {
-      if (started || token.cancelled) return resolve();
-      started = true;
+function sinkFor(
+  synth: SpeechSynthesis,
+  voice: SpeechSynthesisVoice | null,
+  onBlocked: () => void,
+): SpeechSink {
+  return {
+    get paused() {
+      return synth.paused;
+    },
+    cancel: () => synth.cancel(),
+    resume: () => synth.resume(),
+    speak: (text: string) => {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "en-NZ";
       utterance.rate = 0.95;
-      const voice = bestVoice();
       if (voice) utterance.voice = voice;
-      const finish = () => resolve();
-      utterance.onend = finish;
-      utterance.onerror = finish;
-      synth.cancel();
-      synth.resume();
+      utterance.onerror = () => onBlocked();
       synth.speak(utterance);
-    };
-    if (synth.getVoices().length === 0) {
-      const onVoices = () => {
-        synth.removeEventListener("voiceschanged", onVoices);
-        start();
-      };
-      synth.addEventListener("voiceschanged", onVoices);
-      window.setTimeout(start, 250);
-      return;
-    }
-    start();
-  });
-}
-
-function playFile(url: string, token: { cancelled: boolean }): Promise<void> {
-  return new Promise((resolve) => {
-    if (token.cancelled) return resolve();
-    const audio = new Audio(url);
-    const finish = () => resolve();
-    audio.onended = finish;
-    audio.onerror = finish;
-    void audio.play().catch(finish);
-  });
+    },
+  };
 }
 
 /**
- * Full-screen caller. Speech is browser TTS unless a movement has audioUrl.
- * "Next" is heard where the browser allows it, and tapping always advances.
+ * Full-screen caller. The first speak() happens inside the tap. iOS ignores
+ * speech that starts later, including from an effect.
  */
 export function ArenaCaller({
   title,
@@ -101,26 +87,32 @@ export function ArenaCaller({
   children: (movement: Movement) => ReactNode;
 }) {
   const [index, setIndex] = useState(0);
-  const [play, setPlay] = useState(0);
+  const [armed, setArmed] = useState(false);
   const [directives, setDirectives] = useState(false);
   const [coach, setCoach] = useState(true);
-  const coachRef = useRef(coach);
   const [auto, setAuto] = useState(false);
   const [gap, setGap] = useState(8);
-  const [phase, setPhase] = useState<"speaking" | "waiting">("speaking");
-  const [canHear, setCanHear] = useState(() => recognitionCtor() != null);
+  const [phase, setPhase] = useState<"speaking" | "waiting">("waiting");
+  const [canHear, setCanHear] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
   const directivesRef = useRef(directives);
+  const coachRef = useRef(coach);
   const autoRef = useRef(auto);
   const gapRef = useRef(gap);
   const indexRef = useRef(index);
-  const tokenRef = useRef({ cancelled: false });
+  const cuesRef = useRef(cues);
+  const movementsRef = useRef(movements);
   const timerRef = useRef<number | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   directivesRef.current = directives;
   coachRef.current = coach;
   autoRef.current = auto;
   gapRef.current = gap;
   indexRef.current = index;
+  cuesRef.current = cues;
+  movementsRef.current = movements;
   const movement = movements[Math.min(index, Math.max(0, movements.length - 1))];
   const letters = movement?.steps
     .map((step) => step.at)
@@ -130,111 +122,160 @@ export function ArenaCaller({
     .map((step) => step.do)
     .filter(Boolean)
     .join(". ");
+  const spokenCue = movement ? cues.find((cue) => cue.n === movement.n) : undefined;
 
-  function clearWait() {
-    if (timerRef.current != null) window.clearTimeout(timerRef.current);
-    timerRef.current = null;
+  function clipsFor(at: number): CallClip[] {
+    const current = movementsRef.current[at];
+    if (!current) return [];
+    const cue = cuesRef.current.find((item) => item.n === current.n);
+    return movementCall(current, directivesRef.current, coachRef.current && cue?.text ? cue : null);
+  }
+
+  function stopRecognition() {
     try {
       recRef.current?.stop();
     } catch {
-      // Already stopped.
+      // Already stopped, or this browser has no recognition.
     }
+    recRef.current = null;
   }
 
-  function go(next: number, replay = false) {
-    clearWait();
-    tokenRef.current.cancelled = true;
-    window.speechSynthesis?.cancel();
-    const clamped = Math.min(movements.length - 1, Math.max(0, next));
-    if (replay || clamped !== indexRef.current) {
-      if (clamped === indexRef.current) setPlay((n) => n + 1);
-      else setIndex(clamped);
+  function listenAfterSpeech() {
+    const Ctor = recognitionCtor();
+    if (!Ctor) {
+      setCanHear(false);
+      return;
     }
-  }
-
-  useEffect(() => {
-    let lock: { release: () => Promise<void> } | null = null;
-    let dropped = false;
-    void navigator.wakeLock
-      ?.request("screen")
-      .then((sentinel) => {
-        if (dropped) void sentinel.release();
-        else lock = sentinel;
-      })
-      .catch(() => undefined);
-    return () => {
-      dropped = true;
-      void lock?.release();
-      clearWait();
-      tokenRef.current.cancelled = true;
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
-
-  const spokenCue = movement ? cues.find((cue) => cue.n === movement.n) : undefined;
-  useEffect(() => {
-    if (!movement) return;
-    const token = { cancelled: false };
-    tokenRef.current = token;
-    setPhase("speaking");
-    clearWait();
-    const personal = cues.find((cue) => cue.n === movement.n);
-    const clips = movementCall(
-      movement,
-      directivesRef.current,
-      coachRef.current ? personal : null,
-    );
-    void (async () => {
-      for (const clip of clips) {
-        if (token.cancelled) return;
-        if (clip.audioUrl) await playFile(clip.audioUrl, token);
-        else await speakText(clip.text, token);
-      }
-      if (token.cancelled) return;
-      setPhase("waiting");
-      if (autoRef.current && indexRef.current < movements.length - 1) {
-        timerRef.current = window.setTimeout(
-          () => go(indexRef.current + 1),
-          clampGap(gapRef.current) * 1000,
-        );
-      }
-      const Ctor = recognitionCtor();
-      if (!Ctor || !canHear) return;
+    try {
       const rec = new Ctor();
       rec.continuous = true;
       rec.interimResults = true;
       rec.lang = "en-NZ";
       rec.onresult = (event) => {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (hearsNext(event.results[i][0].transcript)) go(indexRef.current + 1);
-        }
-      };
-      rec.onend = () => {
-        if (!token.cancelled && canHear) {
-          try {
-            rec.start();
-          } catch {
-            // The browser ended the session and refused a restart.
+        try {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (hearsNext(event.results[i][0].transcript)) go(indexRef.current + 1);
           }
+        } catch {
+          setCanHear(false);
         }
       };
-      rec.onerror = () => undefined;
+      rec.onend = () => undefined;
+      rec.onerror = () => setCanHear(false);
       recRef.current = rec;
-      try {
-        rec.start();
-      } catch {
-        setCanHear(false);
+      rec.start();
+      setCanHear(true);
+    } catch {
+      setCanHear(false);
+    }
+  }
+
+  function speakAt(at: number) {
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    stopRecognition();
+    try {
+      audioRef.current?.pause();
+    } catch {
+      // The previous clip had already ended.
+    }
+    const clips = clipsFor(at);
+    const texts = clips.filter((clip) => !clip.audioUrl && clip.text.trim()).map((clip) => clip.text);
+    const synth = typeof window === "undefined" ? undefined : window.speechSynthesis;
+    let finished = false;
+    const wait = () => {
+      if (finished) return;
+      finished = true;
+      setPhase("waiting");
+      listenAfterSpeech();
+      if (autoRef.current && at < movementsRef.current.length - 1) {
+        timerRef.current = window.setTimeout(() => go(at + 1), clampGap(gapRef.current) * 1000);
       }
-    })();
-    return () => {
-      token.cancelled = true;
-      clearWait();
-      window.speechSynthesis?.cancel();
     };
-    // Directives and the gap are read when this movement starts.
-    // A cue that arrives after the caller opens is spoken with this movement.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, play, spokenCue?.text, spokenCue?.audioUrl]);
+    const outcome = primeCallerSpeech(
+      synth
+        ? sinkFor(synth, voiceRef.current, () => {
+            setSpeechStatus(speechStatusMessage("blocked"));
+            wait();
+          })
+        : null,
+      texts,
+    );
+    for (const clip of clips) {
+      if (!clip.audioUrl) continue;
+      try {
+        const audio = new Audio(clip.audioUrl);
+        audioRef.current = audio;
+        audio.onended = wait;
+        void audio.play().catch(() => {
+          setSpeechStatus(speechStatusMessage("blocked"));
+          wait();
+        });
+      } catch {
+        setSpeechStatus(speechStatusMessage("blocked"));
+      }
+    }
+    setSpeechStatus(speechStatusMessage(outcome));
+    setPhase(clips.length ? "speaking" : "waiting");
+    if (!texts.length || outcome !== "ok") wait();
+    else window.setTimeout(wait, Math.max(2500, texts.join(" ").length * 70));
+  }
+
+  function go(next: number, replay = false) {
+    const last = Math.max(0, movementsRef.current.length - 1);
+    const clamped = Math.min(last, Math.max(0, next));
+    if (!replay && clamped === indexRef.current && armed) return;
+    speakAt(clamped);
+    indexRef.current = clamped;
+    setIndex(clamped);
+    setArmed(true);
+  }
+
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) {
+      setSpeechStatus(speechStatusMessage("unavailable"));
+      return;
+    }
+    const remember = () => {
+      try {
+        const voices = synth.getVoices();
+        voiceRef.current = [...voices].sort((a, b) => voiceScore(b) - voiceScore(a))[0] ?? null;
+      } catch {
+        voiceRef.current = null;
+      }
+    };
+    remember();
+    synth.addEventListener?.("voiceschanged", remember);
+    let lock: { release: () => Promise<void> } | null = null;
+    let dropped = false;
+    try {
+      void navigator.wakeLock
+        ?.request("screen")
+        .then((sentinel) => {
+          if (dropped) void sentinel.release().catch(() => undefined);
+          else lock = sentinel;
+        })
+        .catch(() => undefined);
+    } catch {
+      // Wake Lock is optional. A throw here must not kill the caller.
+    }
+    return () => {
+      dropped = true;
+      synth.removeEventListener?.("voiceschanged", remember);
+      try {
+        void lock?.release();
+      } catch {
+        // Already released.
+      }
+      stopRecognition();
+      try {
+        synth.cancel();
+      } catch {
+        // Nothing was speaking.
+      }
+    };
+  }, []);
 
   if (!movement) return null;
 
@@ -245,11 +286,7 @@ export function ArenaCaller({
       aria-label={`Caller for ${title}`}
     >
       <div className="flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button
-          type="button"
-          className="min-h-11 text-sm font-semibold text-accent"
-          onClick={onClose}
-        >
+        <button type="button" className="min-h-11 text-sm font-semibold text-accent" onClick={onClose}>
           Close
         </button>
         {onRefresh && (
@@ -266,12 +303,7 @@ export function ArenaCaller({
           {index + 1} of {movements.length}
         </p>
       </div>
-      <button
-        type="button"
-        className="flex min-h-0 flex-1 flex-col px-4 pt-2 text-left"
-        onClick={() => go(index + 1)}
-        aria-label="Next movement"
-      >
+      <div className="flex min-h-0 flex-1 flex-col px-4 pt-2">
         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</p>
         <p className="font-display mt-1 text-3xl leading-tight font-medium">
           {letters || `Movement ${movement.n}`}
@@ -284,37 +316,53 @@ export function ArenaCaller({
           <p className="mt-3 text-base leading-relaxed text-muted">{movement.directive}</p>
         )}
         <div className="mx-auto mt-4 w-full max-w-sm">{children(movement)}</div>
+        {!armed ? (
+          <button
+            type="button"
+            className="mt-4 min-h-16 w-full rounded-xl bg-accent text-lg font-semibold text-accent-fg"
+            onClick={() => go(0, true)}
+          >
+            Tap to start
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="mt-4 min-h-16 w-full rounded-xl border border-line text-base font-semibold"
+            onClick={() => go(index + 1)}
+            aria-label="Next movement"
+          >
+            Next
+          </button>
+        )}
         <p className="mt-auto py-3 text-center text-sm text-muted">
-          {phase === "speaking"
-            ? "Reading this movement"
-            : canHear
-              ? "Say next, or tap"
-              : "Tap for the next movement"}
+          {speechStatus ??
+            (phase === "speaking"
+              ? "Reading this movement"
+              : canHear
+                ? "Say next, or tap"
+                : "Tap for the next movement")}
           {auto ? ` · auto ${clampGap(gap)}s` : ""}
         </p>
-      </button>
-      <div
-        className="grid grid-cols-2 gap-2 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-        onClick={(event) => event.stopPropagation()}
-      >
+        <p className="pb-2 text-center text-xs text-muted">{SPEECH_SILENT_HINT}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
-          disabled={index <= 0}
+          disabled={!armed || index <= 0}
           onClick={() => go(index - 1)}
         >
           Back
         </button>
         <button
           type="button"
-          className="min-h-12 rounded-lg border border-line text-sm font-semibold"
+          className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
+          disabled={!armed}
           onClick={() => go(index, true)}
         >
           Repeat
         </button>
-        {refreshError && (
-          <p className="col-span-2 text-xs text-danger">{refreshError}</p>
-        )}
+        {refreshError && <p className="col-span-2 text-xs text-danger">{refreshError}</p>}
         <label className="col-span-2 flex min-h-11 items-center justify-between gap-3 text-sm">
           <span>Coach cues</span>
           <input

@@ -9,6 +9,7 @@ export type AdminRiderHorse = {
   id: string;
   name: string;
   esnzNumber: string;
+  paddockName: string;
   level: string;
   tests: { name: string; nameOnly: boolean }[];
   shows: TargetShow[];
@@ -23,6 +24,7 @@ export type AdminRiderHorse = {
 export type AdminRider = {
   userId: string;
   name: string;
+  accountName: string;
   email: string;
   applicationStatus: BetaStatus | "invited";
   lastActiveAt: string | null;
@@ -41,6 +43,7 @@ type Row = {
   horse_id: string | null;
   horse_name: string | null;
   esnz_number: string | null;
+  paddock_name: string | null;
   level: string | null;
   plan: unknown;
   horse_updated_at: string | Date | null;
@@ -57,7 +60,7 @@ type Row = {
 /** Read-only aggregate for admins. There are no mutation endpoints here. */
 export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
   const rows = await sql<Row>`select r.user_id, r.display_name, u.email, u.name, b.status,
-    r.last_active_at, r.updated_at, h.id as horse_id, h.name as horse_name, h.esnz_number, h.level,
+    r.last_active_at, r.updated_at, h.id as horse_id, h.name as horse_name, h.paddock_name, h.esnz_number, h.level,
     p.plan, p.config, greatest(h.updated_at, coalesce(p.updated_at, h.updated_at)) as horse_updated_at, coalesce(sc.kept, 0) as kept, coalesce(sc.pending, 0) as pending,
     coalesce(sc.rejected, 0) as rejected, coalesce(sc.others, 0) as others, sc.best,
     i.email as invite_email, i.claimed_at
@@ -82,6 +85,7 @@ export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
       rider = {
         userId: row.user_id,
         name: row.display_name || row.name || row.email || "Rider",
+        accountName: row.name ?? "",
         email: row.invite_email ?? row.email ?? "",
         applicationStatus: (row.status as AdminRider["applicationStatus"] | null) ?? "invited",
         lastActiveAt: new Date(
@@ -123,6 +127,7 @@ export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
       id: row.horse_id,
       name: row.horse_name ?? "",
       esnzNumber: row.esnz_number ?? "",
+      paddockName: row.paddock_name ?? "",
       level: row.level ?? plan.level ?? "",
       tests: names,
       shows: plan.shows ?? [],

@@ -23,6 +23,7 @@ import { Field, inputCls, Kicker, Panel, PrimaryButton, Title } from "./beta-ui"
 export type WizardHorse = {
   id?: string;
   name: string;
+  paddockName: string;
   level: string;
   esnzNumber: string;
   notes: string;
@@ -55,6 +56,7 @@ export function wizardHorsesFrom(ws: Workspace): WizardHorse[] {
       return {
         id: h.id,
         name: h.name,
+        paddockName: h.paddockName,
         level: h.level,
         esnzNumber: h.esnzNumber,
         notes: h.notes,
@@ -72,6 +74,7 @@ export function wizardHorsesFrom(ws: Workspace): WizardHorse[] {
   const fromApp = ws.applicationHorses.length ? ws.applicationHorses : [{ name: "", level: "", notes: "", esnzNumber: "" }];
   return fromApp.map((h) => ({
     name: h.name,
+    paddockName: h.paddockName ?? "",
     level: (COMPETITION_LEVELS as readonly string[]).includes(h.level) ? h.level : "",
     esnzNumber: h.esnzNumber ?? "",
     notes: h.notes,
@@ -142,6 +145,7 @@ export function SetupWizard({
           horses: horses.map((h) => ({
             id: h.id,
             name: h.name.trim(),
+            paddockName: h.paddockName.trim(),
             level: h.level,
             esnzNumber: h.esnzNumber.trim(),
             notes: h.notes,
@@ -199,8 +203,11 @@ export function SetupWizard({
                   </button>
                 )}
               </div>
-              <Field label="Horse name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
+              <Field label="Registered name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
                 <input className={inputCls} value={x.name} onChange={(e) => update(i, { name: e.target.value })} />
+              </Field>
+              <Field label="Paddock name" optional hint="The barn name the caller uses, if it is different. Results keep the registered name.">
+                <input className={inputCls} value={x.paddockName} onChange={(e) => update(i, { paddockName: e.target.value })} placeholder="e.g. Samson" />
               </Field>
               <Field label="Level you’re competing at this season">
                 <select
@@ -236,6 +243,7 @@ export function SetupWizard({
                   ...l,
                   {
                     name: "",
+                    paddockName: "",
                     level: "",
                     esnzNumber: "",
                     notes: "",

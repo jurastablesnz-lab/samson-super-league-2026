@@ -12,6 +12,8 @@ export type CoachCue = {
 export type CueEvidence = {
   firstName: string;
   horseName: string;
+  /** Registered name, only so the model can be told not to say it. */
+  registeredName?: string;
   testName: string;
   sheets: {
     date: string;
@@ -44,6 +46,53 @@ export function riderFirstName(name: string | null | undefined): string {
   return /^[A-Za-z][A-Za-z'’-]{0,30}$/.test(word) ? word : "";
 }
 
+/**
+ * The name to speak. The application or rider profile wins. The sign-in account
+ * name is never used, so a Google account called "Virtual Dressage" does not
+ * become "Virtual".
+ */
+export function cueRiderName(input: {
+  applicationName?: string | null;
+  profileName?: string | null;
+  accountName?: string | null;
+}): string {
+  const account = riderFirstName(input.accountName);
+  const application = riderFirstName(input.applicationName);
+  if (application && application.toLowerCase() !== account.toLowerCase()) return application;
+  const profile = riderFirstName(input.profileName);
+  if (profile && profile.toLowerCase() !== account.toLowerCase()) return profile;
+  return "";
+}
+
+/** What the caller calls the horse. A paddock name wins; results keep the registered name. */
+export function spokenHorseName(registered: string, paddock?: string | null): string {
+  const barn = (paddock ?? "").trim();
+  return barn || registered.trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Replace a wrong leading name, and the registered horse name once a paddock name is set. */
+export function rewriteCueText(
+  text: string,
+  opts: { riderName: string; dropNames: string[]; spokenHorse: string; registeredName: string },
+): string {
+  let next = text.replace(/\s+/g, " ").trim();
+  const drops = opts.dropNames.map((name) => name.trim()).filter((name) => name && name.toLowerCase() !== opts.riderName.toLowerCase());
+  for (const drop of drops) {
+    const lead = new RegExp(`^${escapeRegExp(drop)}\\b[,:]?\\s*`, "i");
+    if (lead.test(next)) next = next.replace(lead, opts.riderName ? `${opts.riderName}, ` : "");
+  }
+  const registered = opts.registeredName.trim();
+  const spoken = opts.spokenHorse.trim();
+  if (registered && spoken && registered.toLowerCase() !== spoken.toLowerCase()) {
+    next = next.replace(new RegExp(escapeRegExp(registered), "gi"), spoken);
+  }
+  return next.replace(/\s+/g, " ").trim();
+}
+
 /** A photographed sheet counts for this test when its name is the same test. */
 export function sheetMatchesTest(sheetTest: string, testId: string, testName: string): boolean {
   const label = sheetTest.toLowerCase();
@@ -59,13 +108,19 @@ export function sheetMatchesTest(sheetTest: string, testId: string, testName: st
 
 export function evidenceScript(evidence: CueEvidence): string {
   const lines: string[] = [
-    `Rider first name: ${evidence.firstName || "unknown"}`,
+    evidence.firstName
+      ? `Rider first name: ${evidence.firstName}`
+      : "Rider first name: none. Do not address the rider by name.",
     `Horse: ${evidence.horseName}`,
+    evidence.registeredName &&
+    evidence.registeredName.toLowerCase() !== evidence.horseName.toLowerCase()
+      ? `Do not call the horse ${evidence.registeredName}.`
+      : "",
     `Test: ${evidence.testName}`,
   ];
   if (evidence.results.length === 0 && evidence.sheets.length === 0 && evidence.notes.length === 0 && evidence.visits.length === 0) {
     lines.push("Evidence: none.");
-    return lines.join("\n");
+    return lines.filter(Boolean).join("\n");
   }
   for (const result of evidence.results) {
     const percent = result.percent == null ? "percent not recorded" : `${result.percent}%`;
@@ -88,7 +143,7 @@ export function evidenceScript(evidence: CueEvidence): string {
       `Coach ${visit.date}: ${[visit.focus, visit.homework, visit.leaveIt].filter(Boolean).join(" ")}`.trim(),
     );
   }
-  return lines.join("\n");
+  return lines.filter(Boolean).join("\n");
 }
 
 function scoreTokens(text: string): string[] {

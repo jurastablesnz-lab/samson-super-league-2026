@@ -11,8 +11,11 @@ import {
   cueIsGrounded,
   evidenceScript,
   mergeCoachCues,
+  cueRiderName,
+  rewriteCueText,
   riderFirstName,
   sheetMatchesTest,
+  spokenHorseName,
 } from "./coach-cues.ts";
 
 const evidence = evidenceScript({
@@ -78,6 +81,31 @@ test("coaching is only for an approved rider, and an admin is not limited", () =
   assert.equal(coachTtsMode(undefined), "browser");
   assert.equal(coachTtsMode("xai"), "xai");
   assert.equal(riderFirstName("Susan Leach"), "Susan");
+  assert.equal(
+    cueRiderName({ applicationName: "Susan Leach", accountName: "Virtual Dressage" }),
+    "Susan",
+  );
+  assert.equal(cueRiderName({ applicationName: "", profileName: "Virtual Dressage", accountName: "Virtual Dressage" }), "");
+  assert.equal(spokenHorseName("Jura Samson", "Samson"), "Samson");
+  assert.equal(spokenHorseName("Jura Samson", ""), "Jura Samson");
+  assert.equal(
+    rewriteCueText("Virtual, ride Jura Samson into a halt", {
+      riderName: "Susan",
+      dropNames: ["Virtual"],
+      spokenHorse: "Samson",
+      registeredName: "Jura Samson",
+    }),
+    "Susan, ride Samson into a halt",
+  );
+  assert.equal(
+    rewriteCueText("Virtual, ride Jura Samson into a halt", {
+      riderName: "",
+      dropNames: ["Virtual"],
+      spokenHorse: "Jura Samson",
+      registeredName: "Jura Samson",
+    }),
+    "ride Jura Samson into a halt",
+  );
   assert.equal(sheetMatchesTest("Novice 2A", "2a", "Novice 2A"), true);
   assert.equal(sheetMatchesTest("2B", "2a", "Novice 2A"), false);
 });

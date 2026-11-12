@@ -8,7 +8,9 @@ import {
   coachTtsMode,
   evidenceScript,
   mergeCoachCues,
-  riderFirstName,
+  cueRiderName,
+  rewriteCueText,
+  spokenHorseName,
   sheetMatchesTest,
   type CoachCue,
   type CueEvidence,
@@ -28,10 +30,32 @@ function clip(value: string, max: number) {
 }
 
 async function horseRow(sql: Sql, userId: string, horseId: string, isAdmin: boolean) {
-  const rows = await sql<{ id: string; name: string; user_id: string }>`
-    select id, name, user_id from horses
+  const rows = await sql<{ id: string; name: string; paddock_name: string; user_id: string }>`
+    select id, name, paddock_name, user_id from horses
     where id = ${horseId} and not archived and (${isAdmin} or user_id = ${userId})`;
   return rows[0] ?? null;
+}
+
+async function namingFor(sql: Sql, horse: { name: string; paddock_name: string; user_id: string }) {
+  const rows = await sql<{ full_name: string | null; display_name: string | null; account_name: string | null }>`
+    select b.full_name, r.display_name, u.name as account_name
+    from "user" u
+    left join riders r on r.user_id = u.id
+    left join beta_applications b on b.user_id = u.id
+    where u.id = ${horse.user_id}`;
+  const row = rows[0];
+  const riderName = cueRiderName({
+    applicationName: row?.full_name,
+    profileName: row?.display_name,
+    accountName: row?.account_name,
+  });
+  const account = (row?.account_name ?? "").trim().split(/\s+/)[0] ?? "";
+  return {
+    riderName,
+    dropNames: account && account.toLowerCase() !== riderName.toLowerCase() ? [account] : [],
+    spokenHorse: spokenHorseName(horse.name, horse.paddock_name),
+    registeredName: horse.name,
+  };
 }
 
 async function loadEvidence(
@@ -42,6 +66,7 @@ async function loadEvidence(
   firstName: string,
   testId: string,
   testName: string,
+  registeredName = "",
 ): Promise<CueEvidence> {
   const sheets = await sql<{ ride_date: string | null; test: string; sheet: SheetRead | null }>`
     select ride_date::text as ride_date, test, sheet from judge_sheets
@@ -90,6 +115,7 @@ async function loadEvidence(
   return {
     firstName,
     horseName,
+    registeredName: registeredName && registeredName !== horseName ? registeredName : undefined,
     testName,
     sheets: matchingSheets.slice(0, 4).map((row) => ({
       date: row.ride_date ?? "",
@@ -147,7 +173,14 @@ export async function loadStoredCues(
 ): Promise<CoachCue[]> {
   const horse = await horseRow(sql, actor.userId, horseId, actor.isAdmin);
   if (!horse) throw new Error("Horse not found");
-  return readStored(sql, horse.id, testId);
+  const stored = await readStored(sql, horse.id, testId);
+  const naming = await namingFor(sql, horse);
+  const cues = stored.map((cue) => ({ ...cue, text: rewriteCueText(cue.text, naming) }));
+  if (cues.some((cue, index) => cue.text !== stored[index]?.text)) {
+    await sql`update coach_cues set cues = ${JSON.stringify(cues)}::jsonb, updated_at = now()
+      where horse_id = ${horse.id} and test_id = ${testId}`;
+  }
+  return cues;
 }
 
 export async function saveEditedCues(
@@ -262,7 +295,7 @@ export async function refreshCues(
     });
     if (!slot.ok) return slot;
   }
-  const owner = await sql<{ name: string }>`select name from "user" where id = ${horse.user_id}`;
+  const naming = await namingFor(sql, horse);
   const movements = input.movements
     .filter((movement) => Number.isInteger(movement.n) && movement.n > 0 && movement.n < 80)
     .slice(0, 40);
@@ -270,15 +303,22 @@ export async function refreshCues(
     sql,
     horse.user_id,
     horse.id,
-    horse.name,
-    riderFirstName(owner[0]?.name),
+    naming.spokenHorse,
+    naming.riderName,
     input.testId,
     input.testName,
+    naming.registeredName,
   );
   const script = evidenceScript(evidence);
   const raw = await askXai(apiKey, script, movements);
-  const accepted = acceptCues(raw, movements, script);
-  const previous = await readStored(sql, horse.id, input.testId);
+  const accepted = acceptCues(raw, movements, script).map((cue) => ({
+    ...cue,
+    text: rewriteCueText(cue.text, naming),
+  }));
+  const previous = (await readStored(sql, horse.id, input.testId)).map((cue) => ({
+    ...cue,
+    text: rewriteCueText(cue.text, naming),
+  }));
   const cues = mergeCoachCues(previous, accepted);
   await sql`insert into coach_cues (horse_id, test_id, user_id, cues)
     values (${horse.id}, ${input.testId}, ${horse.user_id}, ${JSON.stringify(cues)}::jsonb)

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampGap, hearsNext, movementCall, voiceScore } from "./arena-caller.ts";
+import { clampGap, hearsNext, movementCall, primeCallerSpeech, speechStatusMessage, voiceScore } from "./arena-caller.ts";
 import type { Movement } from "./tests/types.ts";
 
 const movement = {
@@ -41,6 +41,31 @@ test("next is a word, and the auto gap stays in a usable range", () => {
   assert.equal(clampGap(0), 2);
   assert.equal(clampGap(8.2), 8);
   assert.equal(clampGap(90), 60);
+});
+
+test("speech is primed inside the tap even when cancel throws", () => {
+  const spoken: string[] = [];
+  let resumed = false;
+  const outcome = primeCallerSpeech(
+    {
+      paused: true,
+      cancel() {
+        throw new Error("nothing to cancel");
+      },
+      resume() {
+        resumed = true;
+      },
+      speak(text) {
+        spoken.push(text);
+      },
+    },
+    ["Enter at A", "Susan, sit for the halt"],
+  );
+  assert.equal(outcome, "ok");
+  assert.equal(resumed, true);
+  assert.deepEqual(spoken, ["Enter at A", "Susan, sit for the halt"]);
+  assert.match(speechStatusMessage("blocked") ?? "", /isn't on silent/);
+  assert.equal(primeCallerSpeech(null, ["Hello"]), "unavailable");
 });
 
 test("a New Zealand natural voice outranks a generic English one", () => {

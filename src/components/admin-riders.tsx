@@ -6,6 +6,7 @@ import { listRiderFiles, mediaPlaybackUrl } from "@/lib/media";
 import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
+import { cueRiderName, riderFirstName, spokenHorseName } from "@/lib/coach-cues";
 import { testIdForName } from "@/lib/test-registry";
 import { getPublishedTests } from "@/lib/test-publication";
 import { isPublishedTest } from "@/lib/test-registry";
@@ -113,13 +114,23 @@ function RiderRow({
         {rider.horses.length === 0 && <p className="text-sm text-muted">No horses yet.</p>}
         {rider.horses.map((horse) => (
           <section key={horse.id} className="rounded-lg bg-surface p-3 text-sm">
-            <p className="font-semibold">{horse.name}</p>
+            <p className="font-semibold">
+              {horse.name}
+              {horse.paddockName ? <span className="font-normal text-muted"> · {horse.paddockName}</span> : null}
+            </p>
             <p className="mt-0.5 text-xs text-muted">
               {horse.esnzNumber ? `ESNZ ${horse.esnzNumber}` : "No ESNZ number"} ·{" "}
               {horse.level || "No level"} · {horse.phase}
             </p>
             <HorseTests horse={horse} published={published} onChanged={onChanged} />
-            <HorseCoaching horseId={horse.id} level={horse.level} />
+            <HorseCoaching
+              horseId={horse.id}
+              level={horse.level}
+              registeredName={horse.name}
+              paddockName={horse.paddockName}
+              riderName={rider.name}
+              accountName={rider.accountName}
+            />
             <p className="mt-2 text-xs text-muted">
               <span className="font-semibold">Target competitions:</span>{" "}
               {horse.shows.length ? horse.shows.map((s) => s.name).join(", ") : "None yet"}
@@ -208,7 +219,29 @@ function RiderFiles({
   );
 }
 
-function HorseCoaching({ horseId, level }: { horseId: string; level: string }) {
+function HorseCoaching({
+  horseId,
+  level,
+  registeredName,
+  paddockName,
+  riderName,
+  accountName,
+}: {
+  horseId: string;
+  level: string;
+  registeredName: string;
+  paddockName: string;
+  riderName: string;
+  accountName: string;
+}) {
+  const spoken = spokenHorseName(registeredName, paddockName);
+  const first = cueRiderName({ profileName: riderName, accountName });
+  const naming = {
+    riderName: first,
+    dropNames: riderFirstName(accountName) && riderFirstName(accountName) !== first ? [riderFirstName(accountName)] : [],
+    spokenHorse: spoken,
+    registeredName,
+  };
   const choices = testsForLevel(level).filter((name) => callerSheet(name));
   const [name, setName] = useState(choices[0] ?? "");
   const [open, setOpen] = useState(false);
@@ -224,6 +257,7 @@ function HorseCoaching({ horseId, level }: { horseId: string; level: string }) {
     name ? testIdForName(name) : "",
     sheet?.title ?? "",
     briefs,
+    naming,
   );
   if (!sheet || choices.length === 0) return null;
   return (
@@ -393,7 +427,7 @@ function AddRiderForm({ onPrepared, published }: { onPrepared: () => void; publi
               <button
                 type="button"
                 onClick={() =>
-                  setHorses((all) => [...all, { name: "", esnzNumber: "", level: "", tests: [] }])
+                  setHorses((all) => [...all, { name: "", paddockName: "", esnzNumber: "", level: "", tests: [] }])
                 }
                 className="text-xs font-semibold text-accent"
               >
@@ -404,11 +438,18 @@ function AddRiderForm({ onPrepared, published }: { onPrepared: () => void; publi
           {horses.map((horse, index) => (
             <div key={index} className="grid gap-2 rounded-lg bg-bg p-3 sm:grid-cols-2">
               <input
-                aria-label="Horse name"
+                aria-label="Registered name"
                 className={inputCls}
-                placeholder="Horse name"
+                placeholder="Registered name"
                 value={horse.name}
                 onChange={(event) => update(index, { name: event.target.value })}
+              />
+              <input
+                aria-label="Paddock name"
+                className={inputCls}
+                placeholder="Paddock name (optional)"
+                value={horse.paddockName ?? ""}
+                onChange={(event) => update(index, { paddockName: event.target.value })}
               />
               <input
                 aria-label="ESNZ number"

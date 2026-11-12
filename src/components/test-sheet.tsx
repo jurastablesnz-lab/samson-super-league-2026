@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { getPublishedTests, setTestPublished } from "@/lib/test-publication";
 import { ArenaCaller } from "@/components/arena-caller";
-import { useCallerCues } from "@/components/coach-cues";
+import { useCallerCues, type CueNaming } from "@/components/coach-cues";
 import { catalogTests, testIdForName, visibleDiagramIds, type CatalogTest } from "@/lib/test-registry";
 import { Button } from "@/components/ui/button";
 import { FreestyleCard } from "@/components/freestyle-player";
@@ -677,6 +677,7 @@ function OpenCaller({
   size,
   horseId,
   testId,
+  naming,
 }: {
   title: string;
   movements: Movement[];
@@ -684,13 +685,14 @@ function OpenCaller({
   size?: ArenaSize;
   horseId?: string;
   testId?: string;
+  naming?: CueNaming;
 }) {
   const [open, setOpen] = useState(false);
   const briefs = movements.map((movement) => ({
     n: movement.n,
     label: movement.steps.map((step) => [step.at, step.do].filter(Boolean).join(" ")).join(". "),
   }));
-  const coaching = useCallerCues(open, horseId, testId ?? "", title, briefs);
+  const coaching = useCallerCues(open, horseId, testId ?? "", title, briefs, naming);
   if (!movements.length) return null;
   return (
     <>
@@ -733,7 +735,7 @@ export function callerSheet(name: string): {
   return { title: test.name, movements: test.movements, arena: test.arena, size: test.arenaSize };
 }
 
-function SetSheet({ test, horseId }: { test: SetTest; horseId?: string }) {
+function SetSheet({ test, horseId, naming }: { test: SetTest; horseId?: string; naming?: CueNaming }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => setIdx(0), [test.id]);
 
@@ -748,6 +750,7 @@ function SetSheet({ test, horseId }: { test: SetTest; horseId?: string }) {
         size={test.arenaSize}
         horseId={horseId}
         testId={test.id}
+        naming={naming}
       />
       <Caller
         movements={test.movements}
@@ -818,14 +821,21 @@ function SetSheet({ test, horseId }: { test: SetTest; horseId?: string }) {
   );
 }
 
-function MfsSheet({ horseId }: { horseId?: string }) {
+function MfsSheet({ horseId, naming }: { horseId?: string; naming?: CueNaming }) {
   const s = MFS_SHEET;
   const [idx, setIdx] = useState(0);
   const floor = MFS_FLOOR.movements;
 
   return (
     <div className="flex flex-col gap-4">
-      <OpenCaller title={MFS_FLOOR.name} movements={floor} arena={MFS_FLOOR.arena} horseId={horseId} testId="mfs" />
+      <OpenCaller
+        title={MFS_FLOOR.name}
+        movements={floor}
+        arena={MFS_FLOOR.arena}
+        horseId={horseId}
+        testId="mfs"
+        naming={naming}
+      />
       <Caller
         movements={floor}
         idx={idx}
@@ -1412,12 +1422,14 @@ export function TestsPanel({
   horseLevel,
   horseTests,
   horseId,
+  naming,
 }: {
   isAdmin?: boolean;
   /** When set, the tabs are this horse's level sheets plus any extra tests on the plan. */
   horseLevel?: string;
   horseTests?: string[];
   horseId?: string;
+  naming?: CueNaming;
 }) {
   const [active, setActive] = useState("2b");
   const [approvedIds, setApprovedIds] = useState<string[] | null>(null);
@@ -1529,10 +1541,10 @@ export function TestsPanel({
       {error && <p className="text-sm text-danger">{error}</p>}
 
       {test && visible.some((item) => item.viewId === test.id) && (
-        <SetSheet test={test} horseId={horseId} />
+        <SetSheet test={test} horseId={horseId} naming={naming} />
       )}
       {active === "mfs" && visible.some((item) => item.viewId === "mfs") && (
-        <MfsSheet horseId={horseId} />
+        <MfsSheet horseId={horseId} naming={naming} />
       )}
       {active === "medium-fs" && visible.some((item) => item.viewId === "medium-fs") && (
         <FreestyleTable sheet={MEDIUM_FS} />

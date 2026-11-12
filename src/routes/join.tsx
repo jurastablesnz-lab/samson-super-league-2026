@@ -32,7 +32,7 @@ const EMPTY: ApplicationInput = {
   region: "",
   riderGrade: "",
   competitionLevel: "",
-  horseList: [{ name: "", level: "", notes: "", esnzNumber: "" }],
+  horseList: [{ name: "", paddockName: "", level: "", notes: "", esnzNumber: "" }],
   esnzMember: false,
   coach: "",
   goals: "",
@@ -243,8 +243,11 @@ function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h
               </button>
             )}
           </div>
-          <Field label="Horse name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
-            <input className={inputCls} required={i === 0} value={h.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="e.g. Samson" />
+          <Field label="Registered name" hint="Use the registered name, exactly as it appears on EVO Events, so your results can be matched.">
+            <input className={inputCls} required={i === 0} value={h.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Registered name" />
+          </Field>
+          <Field label="Paddock name" optional hint="The barn name the caller uses. Leave blank to use the registered name.">
+            <input className={inputCls} value={h.paddockName ?? ""} onChange={(e) => update(i, { paddockName: e.target.value })} placeholder="e.g. Samson" />
           </Field>
           <Field label="Current competition level">
             <select className={inputCls} value={h.level} onChange={(e) => update(i, { level: e.target.value })}>
@@ -271,7 +274,7 @@ function HorsesEditor({ horses, onChange }: { horses: HorseEntry[]; onChange: (h
       {horses.length < MAX_HORSES ? (
         <button
           type="button"
-          onClick={() => onChange([...horses, { name: "", level: "", notes: "", esnzNumber: "" }])}
+          onClick={() => onChange([...horses, { name: "", paddockName: "", level: "", notes: "", esnzNumber: "" }])}
           className="w-full cursor-pointer rounded-lg border border-dashed border-accent/60 px-3 py-2.5 text-sm font-semibold text-accent hover:bg-accent/10"
         >
           + Add another horse

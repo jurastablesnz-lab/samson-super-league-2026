@@ -7,6 +7,7 @@ import { validateRiderTestAssignment } from "./rider-test-assignment";
 export type PreparedHorseInput = {
   name: string;
   esnzNumber?: string;
+  paddockName?: string;
   level: string;
   tests: string[];
 };
@@ -31,6 +32,9 @@ function validate(input: PrepareRiderInput): PrepareRiderInput {
       esnzNumber: String(h?.esnzNumber ?? "")
         .trim()
         .slice(0, 20),
+      paddockName: String(h?.paddockName ?? "")
+        .trim()
+        .slice(0, 40),
       level: String(h?.level ?? ""),
       tests: (Array.isArray(h?.tests) ? h.tests : [])
         .map((t) => String(t).trim().slice(0, 60))
@@ -91,6 +95,7 @@ export const prepareRider = createServerFn({ method: "POST" })
         name: horse.name,
         level: horse.level,
         esnzNumber: horse.esnzNumber || null,
+        paddockName: horse.paddockName || "",
         config,
         plan: generatePlan(config, new Date(), { defaults: config.tests.length > 0 }),
       };
@@ -104,6 +109,7 @@ export const prepareRider = createServerFn({ method: "POST" })
         name: horse.name,
         level: horse.level,
         esnzNumber: horse.esnzNumber,
+        paddockName: horse.paddockName,
         notes: "",
       })),
     });

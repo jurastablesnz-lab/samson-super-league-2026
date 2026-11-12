@@ -82,6 +82,7 @@ type HorseRow = {
   name: string;
   level: string;
   esnz_number: string | null;
+  paddock_name: string | null;
   notes: string;
   is_legacy_samson: boolean;
   sort_order: number;
@@ -91,6 +92,7 @@ const toHorse = (r: HorseRow): HorseRecord => ({
   name: r.name,
   level: r.level,
   esnzNumber: r.esnz_number ?? "",
+  paddockName: r.paddock_name ?? "",
   notes: r.notes,
   isLegacySamson: r.is_legacy_samson,
   sortOrder: r.sort_order,
@@ -184,6 +186,7 @@ export async function saveSetup(
     if (!name) throw new Error("Every horse needs a name");
     const level = s(h.level, 60).trim();
     const esnz = s(h.esnzNumber, 20).trim() || null;
+    const paddock = s(h.paddockName, 40).trim();
     let id = typeof h.id === "string" && h.id ? h.id : "";
     if (id) {
       const own = await sql<{
@@ -194,10 +197,10 @@ export async function saveSetup(
     }
     if (!id) {
       id = newId();
-      await sql`insert into horses (id, user_id, name, level, esnz_number, notes, sort_order)
-        values (${id}, ${user.id}, ${name}, ${level}, ${esnz}, ${s(h.notes, 300)}, ${order})`;
+      await sql`insert into horses (id, user_id, name, paddock_name, level, esnz_number, notes, sort_order)
+        values (${id}, ${user.id}, ${name}, ${paddock}, ${level}, ${esnz}, ${s(h.notes, 300)}, ${order})`;
     } else {
-      await sql`update horses set name = ${name}, level = ${level}, esnz_number = ${esnz},
+      await sql`update horses set name = ${name}, paddock_name = ${paddock}, level = ${level}, esnz_number = ${esnz},
         notes = ${s(h.notes, 300)}, sort_order = ${order}, archived = false, updated_at = now()
         where id = ${id} and user_id = ${user.id}`;
     }

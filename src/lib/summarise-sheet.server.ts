@@ -28,13 +28,38 @@ Rules:
 - If the photo is the wrong page, blurry, or mostly unreadable, set readable to false, say so in caveat, and still offer 3 general options appropriate to the horse's level only if something on the sheet supports them. Otherwise workOns can be empty.
 - Tone: direct NZ dressage coach. Gender-neutral: say "your horse", the horse's name or "they", never he/she for horse or rider. No emoji.`;
 
-export async function summariseSheetOnServer(data: {
-  images: SheetImage[];
-  testHint: string;
-  showName: string;
-  horseName?: string;
-  level?: string;
-}): Promise<{ ok: true; sheet: SheetRead } | { ok: false; error: string }> {
+async function guardSheetRead(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { resolveRiderAccess } = await import("./beta.server");
+  const { sheetReadGate } = await import("./sheet-reads");
+  const { user, approved } = await resolveRiderAccess(userId);
+  const gate = sheetReadGate({ approved, isAdmin: user.isAdmin });
+  if (!gate.ok) return gate;
+  if (!process.env.XAI_API_KEY) return { ok: false, error: "Reading sheets is not available right now." };
+  if (!gate.limited) return { ok: true };
+  const { getSql } = await import("./db");
+  const { aucklandDay, claimSheetRead, sheetReadsPerDay } = await import("./sheet-reads");
+  return claimSheetRead(await getSql(), {
+    userId: user.id,
+    limit: sheetReadsPerDay(process.env.SHEET_READS_PER_DAY),
+    day: aucklandDay(),
+  });
+}
+
+export async function summariseSheetOnServer(
+  userId: string,
+  data: {
+    images: SheetImage[];
+    testHint: string;
+    showName: string;
+    horseName?: string;
+    level?: string;
+  },
+): Promise<{ ok: true; sheet: SheetRead } | { ok: false; error: string }> {
+  const allowed = await guardSheetRead(userId);
+  if (!allowed.ok) return allowed;
+
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { ok: false, error: "Reading sheets is not available right now." };
 

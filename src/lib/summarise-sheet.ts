@@ -15,8 +15,11 @@ export const summariseSheet = createServerFn({ method: "POST" })
     };
   })
   .handler(
-    async ({ data }): Promise<{ ok: true; sheet: SheetRead } | { ok: false; error: string }> => {
+    async ({
+      data,
+      context,
+    }): Promise<{ ok: true; sheet: SheetRead } | { ok: false; error: string }> => {
       const { summariseSheetOnServer } = await import("./summarise-sheet.server");
-      return summariseSheetOnServer(data);
+      return summariseSheetOnServer(context.userId, data);
     },
   );

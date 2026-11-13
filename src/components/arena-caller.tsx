@@ -91,6 +91,8 @@ export function ArenaCaller({
   const [lastError, setLastError] = useState("");
   const [prep, setPrep] = useState<{ done: number; total: number } | null>(null);
   const [prepNote, setPrepNote] = useState<string | null>(null);
+  const [ttsVoice, setTtsVoice] = useState("");
+  const [lastVoice, setLastVoice] = useState("none");
   const directivesRef = useRef(directives);
   const coachRef = useRef(coach);
   const autoRef = useRef(auto);
@@ -103,6 +105,7 @@ export function ArenaCaller({
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlsRef = useRef<Record<string, string>>({});
+  const ttsVoiceRef = useRef("");
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const startTimerRef = useRef<number | null>(null);
   const titleTaps = useRef(0);
@@ -127,6 +130,12 @@ export function ArenaCaller({
 
   function logDiag(line: string) {
     setDiagLines((prev) => [...prev.slice(-11), line]);
+  }
+
+  function noteVoice(engine: string, text: string) {
+    const snippet = speechText(text).slice(0, 80);
+    setLastVoice(engine);
+    logDiag(`${engine}: ${snippet}`);
   }
 
   function clipsFor(at: number): CallClip[] {
@@ -256,6 +265,7 @@ export function ArenaCaller({
         : null,
       [line],
     );
+    noteVoice("phone", line);
     if (outcome !== "ok") {
       setVoiceLine(outcome === "unavailable" ? "Voice: not started" : "Voice: blocked");
       setVoiceBlocked(true);
@@ -317,7 +327,7 @@ export function ArenaCaller({
           setVoiceBlocked(false);
           setSpeechStatus(null);
           setVoiceLine("Voice: speaking");
-          logDiag("audio");
+          noteVoice(ttsVoiceRef.current || "xai", clip.text);
         };
         audio.onended = () => {
           if (gen !== speakGen.current) return;
@@ -406,7 +416,7 @@ export function ArenaCaller({
         if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
         setVoiceBlocked(false);
         setVoiceLine("Voice: speaking");
-        logDiag("audio");
+        noteVoice(ttsVoiceRef.current || "xai", TEST_SOUND_TEXT);
       };
       audio.onended = () => {
         if (gen === speakGen.current) setVoiceLine("Voice: ended");
@@ -506,6 +516,10 @@ export function ArenaCaller({
     }).then((result) => {
       if (dead) return;
       urlsRef.current = { ...urlsRef.current, ...result.urls };
+      if (result.voice) {
+        ttsVoiceRef.current = result.voice;
+        setTtsVoice(result.voice);
+      }
       if (result.note) setPrepNote(result.note);
     });
     return () => {
@@ -678,7 +692,10 @@ export function ArenaCaller({
           <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-ink p-2 text-[10px] leading-snug text-accent-fg" data-testid="caller-debug">
             {`speechSynthesis: ${typeof window !== "undefined" && window.speechSynthesis ? "yes" : "no"}
 voices: ${voiceCount}
-voice: ${voiceLabel}
+phone voice: ${voiceLabel}
+tts voice: ${ttsVoice || "not prepared"}
+last voice: ${lastVoice}
+prefetch: ${prep ? `${prep.done} of ${prep.total}` : "not started"}
 recognition: ${recognitionCtor() ? recState : "unsupported"}
 phase: ${phase}${canHear ? " · mic" : ""}
 last error: ${lastError || "none"}

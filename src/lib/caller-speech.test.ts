@@ -20,7 +20,7 @@ test("a line keeps its hash for the same voice and text", async () => {
   assert.equal(speechText("  Hello   Susan "), "Hello Susan");
 });
 
-test("the caller prepares the instruction and the cue, not the directive", () => {
+test("the caller prepares the instruction, the cue, and the directive", () => {
   const lines = callerSpeechLines(
     [
       {
@@ -29,11 +29,17 @@ test("the caller prepares the instruction and the cue, not the directive", () =>
           { at: "A", do: "Enter in working trot" },
           { at: "X", do: "Halt, salute" },
         ],
+        directive: "Immobility (min. 3 secs)",
       },
     ],
     [{ n: 1, text: "Keep the halt still." }],
   );
-  assert.deepEqual(lines, [TEST_SOUND_TEXT, "ay Enter in working trot. ex Halt, salute", "Keep the halt still."]);
+  assert.deepEqual(lines, [
+    TEST_SOUND_TEXT,
+    "ay Enter in working trot. ex Halt, salute",
+    "Keep the halt still.",
+    "Immobility minimum 3 seconds",
+  ]);
   assert.equal(instructionText({ steps: [{ at: "A", do: "Enter in working trot" }] }), "ay Enter in working trot");
   const overridden = callerSpeechLines(
     [{ n: 1, steps: [{ at: "P", do: "Circle left 15m" }] }],
@@ -53,7 +59,11 @@ test("Novice 2B speech stays within a few cents the first time it is generated",
   const chars = lines.reduce((sum, line) => sum + line.length, 0);
   const cost = ttsCostUsd(chars);
   assert.equal(lines[0], TEST_SOUND_TEXT);
-  assert.equal(lines.length, 1 + TEST_2B.movements.length * 2);
-  assert.ok(chars > 2000 && chars < 8000, `unexpected character count ${chars}`);
-  assert.ok(cost < 0.15, `unexpected cost ${cost} for ${chars} characters`);
+  for (const movement of TEST_2B.movements) {
+    const directive = speechText(movement.directive);
+    if (directive) assert.ok(lines.includes(directive), directive);
+  }
+  assert.ok(lines.length > 1 + TEST_2B.movements.length * 2);
+  assert.ok(chars > 2000 && chars < 12000, `unexpected character count ${chars}`);
+  assert.ok(cost < 0.2, `unexpected cost ${cost} for ${chars} characters`);
 });

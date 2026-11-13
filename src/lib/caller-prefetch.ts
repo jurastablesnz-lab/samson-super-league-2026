@@ -17,16 +17,16 @@ function audioBlob(value: string): Blob {
 export async function prefetchCallerSpeech(
   lines: string[],
   onProgress?: (done: number, total: number) => void,
-): Promise<{ urls: Record<string, string>; note: string | null }> {
+): Promise<{ urls: Record<string, string>; note: string | null; voice: string }> {
   const unique = [...new Set(lines.map(speechText).filter(Boolean))];
   const urls: Record<string, string> = {};
   let done = 0;
   let note: string | null = null;
   const tick = () => onProgress?.(Math.min(done, unique.length), unique.length);
   tick();
-  if (!unique.length) return { urls, note };
   const index =
     (await readCoachCache<SpeechIndex>(INDEX_KEY).catch(() => null)) ?? { voice: "", entries: {} };
+  if (!unique.length) return { urls, note, voice: index.voice };
   const missing: string[] = [];
   for (const text of unique) {
     const hash = index.voice ? index.entries[text] : "";
@@ -48,7 +48,7 @@ export async function prefetchCallerSpeech(
     if (!remote?.ok || remote.mode !== "xai") {
       done = unique.length;
       tick();
-      return { urls, note };
+      return { urls, note, voice: index.voice };
     }
     if (remote.budget === "spent") note = "Today's voice allowance is used. New lines use this phone's voice.";
     if (remote.voice) index.voice = remote.voice;
@@ -72,5 +72,5 @@ export async function prefetchCallerSpeech(
     done = unique.length;
     tick();
   }
-  return { urls, note };
+  return { urls, note, voice: index.voice };
 }

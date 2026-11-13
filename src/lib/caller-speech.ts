@@ -21,9 +21,13 @@ export function instructionText(movement: { steps: { at?: string; do?: string }[
   );
 }
 
-/** Instruction and personal cue for every movement, plus the test phrase. Directives stay on the phone voice. */
+/**
+ * Every line the caller can say: the test phrase, each movement, each personal cue,
+ * and each directive. Directives are prepared even while the toggle is off, so turning
+ * them on does not switch to the phone voice mid-ride.
+ */
 export function callerSpeechLines(
-  movements: { n: number; steps: { at?: string; do?: string }[] }[],
+  movements: { n: number; steps: { at?: string; do?: string }[]; directive?: string }[],
   cues: { n: number; text?: string; spoken?: string }[],
 ): string[] {
   const lines = [TEST_SOUND_TEXT];
@@ -33,6 +37,8 @@ export function callerSpeechLines(
     if (instruction) lines.push(instruction);
     const personal = speechText(cue?.text ?? "");
     if (personal) lines.push(personal);
+    const directive = speechText(movement.directive ?? "");
+    if (directive) lines.push(directive);
   }
   return [...new Set(lines)];
 }

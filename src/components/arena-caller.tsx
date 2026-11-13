@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   chooseVoice,
   clampGap,
-  hearsNext,
   interruptCallerSpeech,
   movementCall,
   primeCallerSpeech,
@@ -12,6 +11,9 @@ import {
 import type { CallClip } from "@/lib/arena-caller";
 import { callerSpeechLines, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
 import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
+import { callerDevice, micHelp, type MicStatus, type RideCommand } from "@/lib/caller-commands";
+import { createCallerEar, type CallerEar } from "@/lib/caller-ear";
+import { hearCallerClip } from "@/lib/coach";
 import type { Movement } from "@/lib/tests/types";
 
 const UNLOCK_BEEP =
@@ -93,6 +95,9 @@ export function ArenaCaller({
   const [prepNote, setPrepNote] = useState<string | null>(null);
   const [ttsVoice, setTtsVoice] = useState("");
   const [lastVoice, setLastVoice] = useState("none");
+  const [micStatus, setMicStatus] = useState<MicStatus>("off");
+  const [micMode, setMicMode] = useState<"webkit" | "mic" | "none">("none");
+  const [homeScreen, setHomeScreen] = useState(false);
   const directivesRef = useRef(directives);
   const coachRef = useRef(coach);
   const autoRef = useRef(auto);
@@ -106,6 +111,8 @@ export function ArenaCaller({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlsRef = useRef<Record<string, string>>({});
   const ttsVoiceRef = useRef("");
+  const earRef = useRef<CallerEar | null>(null);
+  const commandRef = useRef<(command: RideCommand) => void>(() => undefined);
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const startTimerRef = useRef<number | null>(null);
   const titleTaps = useRef(0);
@@ -156,45 +163,6 @@ export function ArenaCaller({
       // Already stopped, or this browser has no recognition.
     }
     recRef.current = null;
-  }
-
-  function listenAfterSpeech() {
-    const Ctor = recognitionCtor();
-    if (!Ctor) {
-      setCanHear(false);
-      setRecState("unsupported");
-      return;
-    }
-    try {
-      const rec = new Ctor();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = "en-NZ";
-      rec.onresult = (event) => {
-        try {
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (hearsNext(event.results[i][0].transcript)) go(indexRef.current + 1);
-          }
-        } catch (err) {
-          setCanHear(false);
-          setRecState("error");
-          setLastError(err instanceof Error ? err.message : String(err));
-        }
-      };
-      rec.onend = () => setRecState("idle");
-      rec.onerror = () => {
-        setCanHear(false);
-        setRecState("error");
-      };
-      recRef.current = rec;
-      rec.start();
-      setCanHear(true);
-      setRecState("listening");
-    } catch (err) {
-      setCanHear(false);
-      setRecState("error");
-      setLastError(err instanceof Error ? err.message : String(err));
-    }
   }
 
   function quietAudio() {
@@ -289,6 +257,7 @@ export function ArenaCaller({
 
   function playClips(clips: CallClip[], at: number) {
     quietAudio();
+    earRef.current?.suspend();
     stopRecognition();
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
@@ -302,7 +271,7 @@ export function ArenaCaller({
       finished = true;
       setPhase("waiting");
       setVoiceLine((line) => (line.startsWith("Voice: error") || line === "Voice: blocked" ? line : "Voice: ended"));
-      listenAfterSpeech();
+      earRef.current?.resume();
       if (autoRef.current && at < movementsRef.current.length - 1) {
         timerRef.current = window.setTimeout(() => go(at + 1), clampGap(gapRef.current) * 1000);
       }
@@ -451,6 +420,58 @@ export function ArenaCaller({
   }
 
   useEffect(() => {
+    commandRef.current = (command) => {
+      if (command === "back") go(indexRef.current - 1);
+      else if (command === "repeat") go(indexRef.current, true);
+      else go(indexRef.current + 1);
+    };
+    const device = callerDevice({
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      maxTouchPoints: navigator.maxTouchPoints,
+      standalone: (navigator as Navigator & { standalone?: boolean }).standalone,
+      displayStandalone: window.matchMedia("(display-mode: standalone)").matches,
+    });
+    setHomeScreen(device.standalone);
+    const ear = createCallerEar({
+      ios: device.ios,
+      hasRecognition: !!recognitionCtor(),
+      hasMic: !!navigator.mediaDevices?.getUserMedia,
+      Recognition: recognitionCtor(),
+      transcribe: async (blob, seconds) => {
+        const audio = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const value = String(reader.result ?? "");
+            resolve(value.slice(value.indexOf(",") + 1));
+          };
+          reader.onerror = () => reject(reader.error ?? new Error("Could not read the clip"));
+          reader.readAsDataURL(blob);
+        });
+        const result = await hearCallerClip({ data: { audio, mime: blob.type || "audio/mp4", seconds } });
+        if (!result.ok) {
+          if (/tomorrow/.test(result.error)) setMicStatus("paused");
+          logDiag(`mic: ${result.error}`);
+          return "";
+        }
+        return result.text;
+      },
+      onCommand: (command) => commandRef.current(command),
+      onStatus: (status) => {
+        setMicStatus(status);
+        setRecState(status);
+        setCanHear(status === "listening");
+      },
+      onLog: (line) => logDiag(line),
+    });
+    earRef.current = ear;
+    setMicMode(ear.mode);
+    return () => ear.stop();
+    // The ear is created once. Commands always read the latest movement through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const synth = window.speechSynthesis;
     if (!synth) {
       setSpeechStatus(speechStatusMessage("unavailable"));
@@ -589,6 +610,14 @@ export function ArenaCaller({
             {prep.done >= prep.total ? "Voice ready" : `Preparing voice ${prep.done} of ${prep.total}`}
           </p>
         )}
+        <button
+          type="button"
+          className="relative z-30 mt-1 min-h-11 w-full text-center text-xs font-semibold text-muted"
+          data-testid="mic-status"
+          onClick={() => earRef.current?.arm()}
+        >
+          {micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })}
+        </button>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -696,6 +725,7 @@ phone voice: ${voiceLabel}
 tts voice: ${ttsVoice || "not prepared"}
 last voice: ${lastVoice}
 prefetch: ${prep ? `${prep.done} of ${prep.total}` : "not started"}
+mic: ${micStatus} (${micMode})
 recognition: ${recognitionCtor() ? recState : "unsupported"}
 phase: ${phase}${canHear ? " · mic" : ""}
 last error: ${lastError || "none"}

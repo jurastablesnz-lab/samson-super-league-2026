@@ -124,3 +124,25 @@ export const speakCallerLines = createServerFn({ method: "POST" })
       return { ok: false as const, error: err instanceof Error ? err.message : "The voice could not be prepared." };
     }
   });
+
+export const hearCallerClip = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { audio?: string; mime?: string; seconds?: number }) => ({
+    audio: typeof input?.audio === "string" ? input.audio.slice(0, 200_000) : "",
+    mime: text(input?.mime, 40),
+    seconds: Number(input?.seconds) || 1,
+  }))
+  .handler(async ({ context, data }) => {
+    const { sql, user, approved } = await actor(context.userId);
+    const { hearClip } = await import("./caller-stt.server");
+    try {
+      return await hearClip(
+        sql,
+        { userId: user.id, isAdmin: user.isAdmin, approved },
+        { audioBase64: data.audio, mime: data.mime, seconds: data.seconds },
+        { apiKey: process.env.XAI_API_KEY, secondsPerDay: process.env.COACH_STT_SECONDS_PER_DAY },
+      );
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "That word could not be heard." };
+    }
+  });

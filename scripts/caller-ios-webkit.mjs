@@ -185,3 +185,63 @@ if (said.spoken[0] !== "Hello Susan, testing" || said.inClick !== true) {
 }
 await layoutPage.context().browser().close();
 console.log("webkit 390x844 caller layout ok");
+
+const listen = `<!doctype html>
+<p id="mic">The home-screen app cannot hear you. Open this page in Safari, or allow the microphone and tap here.</p>
+<p id="heard"></p>
+<script>
+  window.__starts = 0;
+  let speaking = false;
+  class Rec {
+    constructor() { this.onresult = null; this.onend = null; this.onerror = null; }
+    start() {
+      window.__starts += 1;
+      const mine = this;
+      setTimeout(() => {
+        if (speaking) return;
+        mine.onresult && mine.onresult({ resultIndex: 0, results: [{ 0: { transcript: "okay next" }, isFinal: true }] });
+        mine.onend && mine.onend();
+      }, 10);
+    }
+    stop() { this.onend && this.onend(); }
+  }
+  window.webkitSpeechRecognition = Rec;
+  let current = null;
+  let want = true;
+  function start() {
+    if (!want || speaking || current) return;
+    const rec = new Rec();
+    current = rec;
+    rec.onresult = (event) => {
+      if (speaking) return;
+      document.getElementById("heard").textContent = event.results[0][0].transcript;
+    };
+    rec.onend = () => {
+      if (current === rec) current = null;
+      if (want && !speaking) setTimeout(start, 20);
+    };
+    rec.start();
+  }
+  document.getElementById("mic").onclick = () => { speaking = false; start(); };
+  window.__speak = () => { speaking = true; };
+</script>`;
+const listenPage = await (await webkit.launch()).newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }).then(async (ctx) => {
+  const p = await ctx.newPage();
+  await p.setContent(listen);
+  return p;
+});
+const home = await listenPage.locator("#mic").innerText();
+if (!home.includes("home-screen") || !home.includes("Safari")) throw new Error("home-screen help missing");
+await listenPage.locator("#mic").click();
+await listenPage.waitForTimeout(80);
+const first = await listenPage.evaluate(() => ({ starts: window.__starts, heard: document.getElementById("heard").textContent }));
+if (first.starts < 2 || first.heard !== "okay next") {
+  console.error(first);
+  throw new Error("recognition did not restart or hear next");
+}
+await listenPage.evaluate(() => window.__speak());
+await listenPage.waitForTimeout(40);
+const during = await listenPage.evaluate(() => document.getElementById("heard").textContent);
+if (during !== "okay next") throw new Error("a word was accepted while Ara was speaking");
+await listenPage.context().browser().close();
+console.log("webkit voice command restart ok");

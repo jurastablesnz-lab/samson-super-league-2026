@@ -100,3 +100,88 @@ if (result.status !== "Voice blocked") throw new Error(`expected Voice blocked, 
 if (!result.hint.includes("isn't on silent")) throw new Error("silent hint missing");
 if (result.movement !== "A") throw new Error("Back/Repeat did not keep the text moving");
 console.log("webkit iPhone caller gesture ok");
+
+const layout = `<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html,body{margin:0;height:100%;background:#0b1020;color:#fff;font-family:sans-serif}
+  .app{height:100dvh;display:flex;flex-direction:column}
+  .mid{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:16px}
+  .arena{flex:1;min-height:0;overflow:hidden;pointer-events:none;display:flex;align-items:center;justify-content:center}
+  .arena svg{pointer-events:none;height:100%;max-height:100%;width:auto;max-width:100%;display:block}
+  .bar{position:relative;z-index:20;flex-shrink:0;background:#0b1020;padding:12px 16px 28px}
+  button{min-height:56px;font-size:16px;position:relative;z-index:30}
+</style>
+<div class="app">
+  <div class="mid">
+    <p>NOVICE 2B</p>
+    <h1>A · X</h1>
+    <p>Enter in working trot. Halt, salute.</p>
+    <div class="arena" id="arena"><svg viewBox="0 0 220 272" width="800" height="1000"><rect width="800" height="1000" fill="#f00"/></svg></div>
+  </div>
+  <div class="bar" id="bar">
+    <p id="voice">Voice: not started</p>
+    <button id="test">Test sound</button>
+    <button id="start">Tap to start</button>
+    <button id="back">Back</button>
+    <button id="repeat">Repeat</button>
+    <button id="next">Next</button>
+  </div>
+</div>
+<script>
+  window.__during = false;
+  window.__spoken = [];
+  const synth = { resume(){}, speak(t){ window.__spoken.push(t); window.__inClick = window.__during; } };
+  document.getElementById("test").onclick = () => {
+    window.__during = true;
+    try { synth.resume(); } catch (e) {}
+    synth.speak("Hello Susan, testing");
+    window.__during = false;
+    document.getElementById("voice").textContent = "Voice: speaking";
+  };
+</script>`;
+
+const layoutPage = await (await webkit.launch()).newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }).then(async (ctx) => {
+  const p = await ctx.newPage();
+  await p.setContent(layout);
+  return p;
+});
+const boxes = await layoutPage.evaluate(() => {
+  const box = (id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
+  };
+  const hit = (id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return el && (el.id || el.tagName);
+  };
+  return {
+    arena: box("arena"),
+    bar: box("bar"),
+    start: box("start"),
+    back: box("back"),
+    next: box("next"),
+    hitStart: hit("start"),
+    hitBack: hit("back"),
+    hitNext: hit("next"),
+    voice: document.getElementById("voice").textContent,
+  };
+});
+if (boxes.arena.bottom > boxes.bar.top + 1) {
+  console.error(boxes);
+  throw new Error("diagram overlaps the control bar");
+}
+if (boxes.hitStart !== "start" || boxes.hitBack !== "back" || boxes.hitNext !== "next") {
+  console.error(boxes);
+  throw new Error("a control is covered");
+}
+if (boxes.voice !== "Voice: not started") throw new Error("voice status missing");
+await layoutPage.getByRole("button", { name: "Test sound" }).click();
+const said = await layoutPage.evaluate(() => ({ spoken: window.__spoken, inClick: window.__inClick }));
+if (said.spoken[0] !== "Hello Susan, testing" || said.inClick !== true) {
+  console.error(said);
+  throw new Error("Test sound did not speak inside the click");
+}
+await layoutPage.context().browser().close();
+console.log("webkit 390x844 caller layout ok");

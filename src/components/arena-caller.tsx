@@ -12,6 +12,9 @@ import {
 import type { CallClip } from "@/lib/arena-caller";
 import type { Movement } from "@/lib/tests/types";
 
+const UNLOCK_BEEP =
+  "data:audio/wav;base64,UklGRhQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YfAAAACAgoaIhHtxa3B+kqChkXZcUFt5n7m4nXVSRFJ1nbi5oHhURE9xmra6o3xXRE1tlrW7poBaRUtqk7O8qYRdRkpmj7G8rIhgR0hji668rotjSEdgiKy8sY9mSkZdhKm8s5NqS0VagKa7tZZtTURXfKO6tppxT0RUeKC5uJ11UkRSdZ24uaB4VERPcZq2uqN8V0RNbZa1u6aAWkVLapOzvKmEXUZKZo+xvKyIYEdIY4uuvK6LY0hHYIisvLGPZkpGXYSpvLOTaktFWoCmu7WWbU1EV3yjuLOXc1hQXnqXpqORemdianuMlJOKfnZ0eH6DhII=";
+
 type SpeechRec = {
   continuous: boolean;
   interimResults: boolean;
@@ -73,6 +76,7 @@ export function ArenaCaller({
   const [phase, setPhase] = useState<"speaking" | "waiting">("waiting");
   const [canHear, setCanHear] = useState(false);
   const [speechStatus, setSpeechStatus] = useState<string | null>(null);
+  const [voiceLine, setVoiceLine] = useState("Voice: not started");
   const [voiceBlocked, setVoiceBlocked] = useState(false);
   const [debug, setDebug] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -94,6 +98,7 @@ export function ArenaCaller({
   const recRef = useRef<SpeechRec | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const beepRef = useRef<HTMLAudioElement | null>(null);
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const startTimerRef = useRef<number | null>(null);
   const titleTaps = useRef(0);
@@ -176,6 +181,7 @@ export function ArenaCaller({
   }
 
   function speakAt(at: number) {
+    unlockAudio();
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
     if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
@@ -222,9 +228,11 @@ export function ArenaCaller({
                 heardStart = true;
                 if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
                 setVoiceBlocked(false);
+                setVoiceLine("Voice: speaking");
                 logDiag("start");
               };
               utterance.onend = () => {
+                setVoiceLine("Voice: ended");
                 logDiag("end");
                 if (last) afterSpeech();
               };
@@ -232,6 +240,7 @@ export function ArenaCaller({
                 const code = event.error || "unknown";
                 logDiag(`error:${code}`);
                 setLastError(code);
+                setVoiceLine(`Voice: error ${code}`);
                 if (code !== "interrupted" && code !== "canceled") {
                   setVoiceBlocked(true);
                   setSpeechStatus("Voice blocked");
@@ -267,6 +276,7 @@ export function ArenaCaller({
         if (!heardStart) {
           setVoiceBlocked(true);
           setSpeechStatus("Voice blocked");
+          setVoiceLine("Voice: blocked");
           logDiag("no start within 1.5s");
         }
       }, 1500);
@@ -299,6 +309,78 @@ export function ArenaCaller({
     indexRef.current = clamped;
     setIndex(clamped);
     setArmed(true);
+  }
+
+  function unlockAudio() {
+    try {
+      if (!beepRef.current) {
+        const audio = new Audio(UNLOCK_BEEP);
+        audio.preload = "auto";
+        beepRef.current = audio;
+      }
+      beepRef.current.currentTime = 0;
+      void beepRef.current.play();
+    } catch (err) {
+      setLastError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function testSound() {
+    unlockAudio();
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance("Hello Susan, testing");
+    const voice = voiceRef.current;
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
+    utterance.rate = 0.95;
+    utterancesRef.current = [utterance];
+    let heard = false;
+    utterance.onstart = () => {
+      heard = true;
+      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+      setVoiceBlocked(false);
+      setVoiceLine("Voice: speaking");
+      logDiag("start");
+    };
+    utterance.onend = () => {
+      setVoiceLine("Voice: ended");
+      logDiag("end");
+    };
+    utterance.onerror = (event) => {
+      const code = event.error || "unknown";
+      setVoiceLine(`Voice: error ${code}`);
+      setLastError(code);
+      setVoiceBlocked(true);
+      logDiag(`error:${code}`);
+    };
+    const outcome = primeCallerSpeech(
+      synth
+        ? {
+            resume: () => synth.resume(),
+            speak: () => synth.speak(utterance),
+          }
+        : null,
+      ["Hello Susan, testing"],
+    );
+    if (outcome !== "ok") {
+      setVoiceLine(outcome === "unavailable" ? "Voice: not started" : "Voice: blocked");
+      setVoiceBlocked(true);
+      setSpeechStatus(outcome === "unavailable" ? speechStatusMessage("unavailable") : "Voice blocked");
+      return;
+    }
+    if (!heard) {
+      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+      startTimerRef.current = window.setTimeout(() => {
+        if (!heard) {
+          setVoiceBlocked(true);
+          setSpeechStatus("Voice blocked");
+          setVoiceLine("Voice: blocked");
+          logDiag("no start within 1.5s");
+        }
+      }, 1500);
+    }
   }
 
   function pressDown() {
@@ -390,11 +472,11 @@ export function ArenaCaller({
           {index + 1} of {movements.length}
         </p>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col px-4 pt-2">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</p>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-2">
+        <p className="shrink-0 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</p>
         <button
           type="button"
-          className="font-display mt-1 text-left text-3xl leading-tight font-medium"
+          className="font-display mt-1 shrink-0 text-left text-3xl leading-tight font-medium"
           onClick={() => {
             titleTaps.current += 1;
             if (titleTaps.current >= 5) setDebug(true);
@@ -402,124 +484,134 @@ export function ArenaCaller({
         >
           {letters || `Movement ${movement.n}`}
         </button>
-        <p className="mt-2 text-xl leading-snug">{instruction}</p>
-        {coach && spokenCue?.text && (
-          <p className="mt-3 text-base leading-relaxed text-accent">{spokenCue.text}</p>
-        )}
-        {directives && movement.directive.trim() && (
-          <p className="mt-3 text-base leading-relaxed text-muted">{movement.directive}</p>
-        )}
-        <div className="mx-auto mt-4 w-full max-w-sm">{children(movement)}</div>
-        {!armed ? (
+        <div className="mt-2 max-h-[28%] shrink-0 overflow-y-auto">
+          <p className="text-xl leading-snug">{instruction}</p>
+          {coach && spokenCue?.text && (
+            <p className="mt-2 text-base leading-relaxed text-accent">{spokenCue.text}</p>
+          )}
+          {directives && movement.directive.trim() && (
+            <p className="mt-2 text-base leading-relaxed text-muted">{movement.directive}</p>
+          )}
+        </div>
+        <div className="caller-arena mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden pointer-events-none [&_svg]:pointer-events-none [&_svg]:mx-auto [&_svg]:h-full [&_svg]:max-h-full [&_svg]:w-auto [&_svg]:max-w-full">
+          {children(movement)}
+        </div>
+      </div>
+      <div className="relative z-20 shrink-0 border-t border-line bg-bg px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <p className="text-center text-sm font-semibold" data-testid="voice-status">
+          {voiceLine}
+        </p>
+        <p className="text-center text-xs text-muted">{speechStatus ?? SPEECH_SILENT_HINT}</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
-            className="mt-4 min-h-16 w-full rounded-xl bg-accent text-lg font-semibold text-accent-fg"
-            onClick={() => go(0, true)}
+            className="relative z-30 min-h-14 rounded-xl border border-line bg-bg text-base font-semibold"
+            onClick={testSound}
           >
-            Tap to start
+            Test sound
           </button>
-        ) : (
+          {!armed ? (
+            <button
+              type="button"
+              className="relative z-30 min-h-14 rounded-xl bg-accent text-base font-semibold text-accent-fg"
+              onClick={() => go(0, true)}
+            >
+              Tap to start
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="relative z-30 min-h-14 rounded-xl bg-accent text-base font-semibold text-accent-fg"
+              onPointerDown={pressDown}
+              onClick={() => go(index + 1)}
+              aria-label="Next movement"
+            >
+              Next
+            </button>
+          )}
           <button
             type="button"
-            className="mt-4 min-h-16 w-full rounded-xl border border-line text-base font-semibold"
+            className="relative z-30 min-h-14 rounded-xl border border-line bg-bg text-base font-semibold disabled:opacity-40"
+            disabled={!armed || index <= 0}
             onPointerDown={pressDown}
-            onClick={() => go(index + 1)}
-            aria-label="Next movement"
+            onClick={() => go(index - 1)}
           >
-            Next
+            Back
           </button>
-        )}
+          <button
+            type="button"
+            className="relative z-30 min-h-14 rounded-xl border border-line bg-bg text-base font-semibold disabled:opacity-40"
+            disabled={!armed}
+            onPointerDown={pressDown}
+            onClick={() => go(index, true)}
+          >
+            Repeat
+          </button>
+        </div>
         {voiceBlocked && (
           <button
             type="button"
-            className="mt-2 min-h-12 w-full rounded-xl border border-line text-base font-semibold"
+            className="relative z-30 mt-2 min-h-12 w-full rounded-xl border border-line bg-bg text-base font-semibold"
             onClick={() => go(index, true)}
           >
             Retry voice
           </button>
         )}
-        <p className="mt-auto py-3 text-center text-sm text-muted">
-          {speechStatus ??
-            (phase === "speaking"
-              ? "Reading this movement"
-              : canHear
-                ? "Say next, or tap"
-                : "Tap for the next movement")}
-          {auto ? ` · auto ${clampGap(gap)}s` : ""}
-        </p>
-        <p className="pb-2 text-center text-xs text-muted">{SPEECH_SILENT_HINT}</p>
+        {refreshError && <p className="mt-2 text-xs text-danger">{refreshError}</p>}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="flex min-h-11 items-center justify-between gap-2 text-sm">
+            <span>Coach cues</span>
+            <input
+              type="checkbox"
+              className="size-5"
+              checked={coach}
+              onChange={(event) => setCoach(event.target.checked)}
+            />
+          </label>
+          <label className="flex min-h-11 items-center justify-between gap-2 text-sm">
+            <span>Directive ideas</span>
+            <input
+              type="checkbox"
+              className="size-5"
+              checked={directives}
+              onChange={(event) => setDirectives(event.target.checked)}
+            />
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-5"
+              checked={auto}
+              onChange={(event) => setAuto(event.target.checked)}
+            />
+            Auto
+          </label>
+          <label className="flex min-h-11 items-center justify-end gap-2 text-sm">
+            Gap
+            <input
+              type="number"
+              min={2}
+              max={60}
+              inputMode="numeric"
+              value={gap}
+              onChange={(event) => setGap(clampGap(Number(event.target.value)))}
+              className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right tabular-nums"
+              aria-label="Seconds before the next movement"
+            />
+            s
+          </label>
+        </div>
         {debug && (
-          <pre className="mb-2 max-h-40 overflow-auto rounded-lg bg-ink p-2 text-[10px] leading-snug text-accent-fg" data-testid="caller-debug">
+          <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-ink p-2 text-[10px] leading-snug text-accent-fg" data-testid="caller-debug">
             {`speechSynthesis: ${typeof window !== "undefined" && window.speechSynthesis ? "yes" : "no"}
 voices: ${voiceCount}
 voice: ${voiceLabel}
 recognition: ${recognitionCtor() ? recState : "unsupported"}
+phase: ${phase}${canHear ? " · mic" : ""}
 last error: ${lastError || "none"}
 ${diagLines.join("\n")}`}
           </pre>
         )}
-      </div>
-      <div className="grid grid-cols-2 gap-2 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
-          disabled={!armed || index <= 0}
-          onPointerDown={pressDown}
-          onClick={() => go(index - 1)}
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
-          disabled={!armed}
-          onPointerDown={pressDown}
-          onClick={() => go(index, true)}
-        >
-          Repeat
-        </button>
-        {refreshError && <p className="col-span-2 text-xs text-danger">{refreshError}</p>}
-        <label className="col-span-2 flex min-h-11 items-center justify-between gap-3 text-sm">
-          <span>Coach cues</span>
-          <input
-            type="checkbox"
-            className="size-5"
-            checked={coach}
-            onChange={(event) => setCoach(event.target.checked)}
-          />
-        </label>
-        <label className="col-span-2 flex min-h-11 items-center justify-between gap-3 text-sm">
-          <span>Directive ideas</span>
-          <input
-            type="checkbox"
-            className="size-5"
-            checked={directives}
-            onChange={(event) => setDirectives(event.target.checked)}
-          />
-        </label>
-        <label className="flex min-h-11 items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-5"
-            checked={auto}
-            onChange={(event) => setAuto(event.target.checked)}
-          />
-          Auto
-        </label>
-        <label className="flex min-h-11 items-center justify-end gap-2 text-sm">
-          Gap
-          <input
-            type="number"
-            min={2}
-            max={60}
-            inputMode="numeric"
-            value={gap}
-            onChange={(event) => setGap(clampGap(Number(event.target.value)))}
-            className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right tabular-nums"
-            aria-label="Seconds before the next movement"
-          />
-          s
-        </label>
       </div>
     </div>
   );

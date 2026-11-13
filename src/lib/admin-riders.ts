@@ -1,3 +1,4 @@
+import { aucklandMonthStart, microsToUsd, monthlyBudgetUsd } from "./ai-cost.ts";
 import type { BetaStatus } from "./beta";
 import type { GeneratedPlan, TargetShow } from "./plan-builder";
 import type { Sql } from "./db";
@@ -30,6 +31,8 @@ export type AdminRider = {
   lastActiveAt: string | null;
   horses: AdminRiderHorse[];
   prepared: boolean;
+  aiMonthUsd: number;
+  aiBudgetUsd: number;
 };
 
 type Row = {
@@ -55,6 +58,7 @@ type Row = {
   best: number | string | null;
   invite_email: string | null;
   claimed_at: string | Date | null;
+  spend_micros: number | string | null;
 };
 
 /** Read-only aggregate for admins. There are no mutation endpoints here. */
@@ -63,7 +67,7 @@ export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
     r.last_active_at, r.updated_at, h.id as horse_id, h.name as horse_name, h.paddock_name, h.esnz_number, h.level,
     p.plan, p.config, greatest(h.updated_at, coalesce(p.updated_at, h.updated_at)) as horse_updated_at, coalesce(sc.kept, 0) as kept, coalesce(sc.pending, 0) as pending,
     coalesce(sc.rejected, 0) as rejected, coalesce(sc.others, 0) as others, sc.best,
-    i.email as invite_email, i.claimed_at
+    i.email as invite_email, i.claimed_at, coalesce(spend.micros, 0) as spend_micros
     from riders r
     join "user" u on u.id = r.user_id
     left join beta_applications b on b.user_id = r.user_id
@@ -77,6 +81,7 @@ export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
       count(*) filter (where source <> 'evo_csv' and review_status = 'kept') as others,
       max(percent) filter (where review_status = 'kept' and status = 'ok') as best
       from results group by horse_id, user_id) sc on sc.horse_id = h.id and sc.user_id = r.user_id
+    left join ai_spend spend on spend.user_id = r.user_id and spend.month_on = ${aucklandMonthStart()}::date
     order by coalesce(r.last_active_at, r.updated_at, greatest(h.updated_at, p.updated_at)) desc, r.display_name, h.sort_order`;
   const riders = new Map<string, AdminRider>();
   for (const row of rows) {
@@ -98,6 +103,8 @@ export async function loadAdminRiders(sql: Sql): Promise<AdminRider[]> {
         ).toISOString(),
         horses: [],
         prepared: !!row.invite_email && !row.claimed_at,
+        aiMonthUsd: microsToUsd(Number(row.spend_micros ?? 0)),
+        aiBudgetUsd: monthlyBudgetUsd(process.env.AI_MONTHLY_BUDGET_USD),
       };
       riders.set(row.user_id, rider);
     }

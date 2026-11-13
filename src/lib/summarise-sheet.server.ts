@@ -28,23 +28,16 @@ Rules:
 - If the photo is the wrong page, blurry, or mostly unreadable, set readable to false, say so in caveat, and still offer 3 general options appropriate to the horse's level only if something on the sheet supports them. Otherwise workOns can be empty.
 - Tone: direct NZ dressage coach. Gender-neutral: say "your horse", the horse's name or "they", never he/she for horse or rider. No emoji.`;
 
-async function guardSheetRead(
-  userId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+async function guardSheetRead(userId: string): Promise<
+  { ok: true; limited: boolean; userId: string } | { ok: false; error: string }
+> {
   const { resolveRiderAccess } = await import("./beta.server");
   const { sheetReadGate } = await import("./sheet-reads");
   const { user, approved } = await resolveRiderAccess(userId);
   const gate = sheetReadGate({ approved, isAdmin: user.isAdmin });
   if (!gate.ok) return gate;
   if (!process.env.XAI_API_KEY) return { ok: false, error: "Reading sheets is not available right now." };
-  if (!gate.limited) return { ok: true };
-  const { getSql } = await import("./db");
-  const { aucklandDay, claimSheetRead, sheetReadsPerDay } = await import("./sheet-reads");
-  return claimSheetRead(await getSql(), {
-    userId: user.id,
-    limit: sheetReadsPerDay(process.env.SHEET_READS_PER_DAY),
-    day: aucklandDay(),
-  });
+  return { ok: true, limited: gate.limited, userId: user.id };
 }
 
 export async function summariseSheetOnServer(
@@ -64,6 +57,35 @@ export async function summariseSheetOnServer(
   if (!apiKey) return { ok: false, error: "Reading sheets is not available right now." };
 
   const count = data.images.length;
+  const { getSql } = await import("./db");
+  const { refundAiMicros, reserveMonthlySpend, sheetReadUsd } = await import("./ai-cost");
+  const { aucklandDay, claimSheetRead, sheetReadsPerDay } = await import("./sheet-reads");
+  const sql = await getSql();
+  let charged = { micros: 0, month: "" };
+  if (allowed.limited) {
+    const reserved = await reserveMonthlySpend(sql, {
+      userId: allowed.userId,
+      limited: true,
+      usd: sheetReadUsd(count),
+      budgetUsd: process.env.AI_MONTHLY_BUDGET_USD,
+    });
+    if (!reserved.ok) return reserved;
+    charged = reserved;
+    const daily = await claimSheetRead(sql, {
+      userId: allowed.userId,
+      limit: sheetReadsPerDay(process.env.SHEET_READS_PER_DAY),
+      day: aucklandDay(),
+    });
+    if (!daily.ok) {
+      await refundAiMicros(sql, { userId: allowed.userId, month: charged.month, micros: charged.micros });
+      return daily;
+    }
+  }
+  const release = async () => {
+    if (charged.micros) {
+      await refundAiMicros(sql, { userId: allowed.userId, month: charged.month, micros: charged.micros });
+    }
+  };
   const prompt =
     count === 1
       ? `The rider thinks this is ${data.testHint || (data.level ? `a ${data.level} test` : "a Level 2 test")} at ${data.showName || "a show"}. Read the sheet.`
@@ -104,6 +126,7 @@ export async function summariseSheetOnServer(
     if (res.ok || (res.status !== 429 && res.status < 500)) break;
   }
   if (!res || !res.ok) {
+    await release();
     return { ok: false, error: "The sheet could not be read. Try the photo again." };
   }
   const json = (await res.json()) as {
@@ -111,6 +134,9 @@ export async function summariseSheetOnServer(
   };
   const text = json.choices?.[0]?.message?.content ?? "";
   const sheet = parseSheetRead(text);
-  if (!sheet) return { ok: false, error: "The read came back incomplete. Try the photo again." };
+  if (!sheet) {
+    await release();
+    return { ok: false, error: "The read came back incomplete. Try the photo again." };
+  }
   return { ok: true, sheet };
 }

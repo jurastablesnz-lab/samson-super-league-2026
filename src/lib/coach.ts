@@ -115,6 +115,7 @@ export const speakCallerLines = createServerFn({ method: "POST" })
           apiKey: process.env.XAI_API_KEY,
           voice: process.env.XAI_TTS_VOICE,
           charsPerDay: process.env.COACH_TTS_CHARS_PER_DAY,
+          budgetUsd: process.env.AI_MONTHLY_BUDGET_USD,
         },
         (line, voice) => synthesizeXai(process.env.XAI_API_KEY ?? "", voice, line),
         writeTtsObject,
@@ -140,7 +141,11 @@ export const hearCallerClip = createServerFn({ method: "POST" })
         sql,
         { userId: user.id, isAdmin: user.isAdmin, approved },
         { audioBase64: data.audio, mime: data.mime, seconds: data.seconds },
-        { apiKey: process.env.XAI_API_KEY, secondsPerDay: process.env.COACH_STT_SECONDS_PER_DAY },
+        {
+          apiKey: process.env.XAI_API_KEY,
+          secondsPerDay: process.env.COACH_STT_SECONDS_PER_DAY,
+          budgetUsd: process.env.AI_MONTHLY_BUDGET_USD,
+        },
       );
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : "That word could not be heard." };

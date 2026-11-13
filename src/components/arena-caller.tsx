@@ -96,6 +96,7 @@ export function ArenaCaller({
   const [ttsVoice, setTtsVoice] = useState("");
   const [lastVoice, setLastVoice] = useState("none");
   const [micStatus, setMicStatus] = useState<MicStatus>("off");
+  const [micNote, setMicNote] = useState<string | null>(null);
   const [micMode, setMicMode] = useState<"webkit" | "mic" | "none">("none");
   const [homeScreen, setHomeScreen] = useState(false);
   const directivesRef = useRef(directives);
@@ -450,10 +451,14 @@ export function ArenaCaller({
         });
         const result = await hearCallerClip({ data: { audio, mime: blob.type || "audio/mp4", seconds } });
         if (!result.ok) {
-          if (/tomorrow/.test(result.error)) setMicStatus("paused");
+          if (/Monthly limit|tomorrow/.test(result.error)) {
+            setMicStatus("paused");
+            setMicNote(result.error);
+          }
           logDiag(`mic: ${result.error}`);
           return "";
         }
+        setMicNote(null);
         return result.text;
       },
       onCommand: (command) => commandRef.current(command),
@@ -616,7 +621,7 @@ export function ArenaCaller({
           data-testid="mic-status"
           onClick={() => earRef.current?.arm()}
         >
-          {micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })}
+          {micNote ?? micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })}
         </button>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button

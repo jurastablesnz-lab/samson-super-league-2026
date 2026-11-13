@@ -1,5 +1,6 @@
 import type { Sql } from "./db.ts";
 import type { SheetRead } from "./review-types.ts";
+import { coachRefreshUsd, refundAiMicros, reserveMonthlySpend } from "./ai-cost.ts";
 import { aucklandDay, sheetReadGate } from "./sheet-reads.ts";
 import {
   acceptCues,
@@ -258,13 +259,25 @@ export async function refreshCues(
   if (!horse) return { ok: false, error: "Horse not found" };
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) return { ok: false, error: "Coaching cues are not available right now." };
+  let charged = { micros: 0, month: "" };
   if (gate.limited) {
+    const reserved = await reserveMonthlySpend(sql, {
+      userId: actor.userId,
+      limited: true,
+      usd: coachRefreshUsd(),
+      budgetUsd: process.env.AI_MONTHLY_BUDGET_USD,
+    });
+    if (!reserved.ok) return reserved;
+    charged = reserved;
     const slot = await claimCoachGeneration(sql, {
       userId: actor.userId,
       limit: coachCuesPerDay(process.env.COACH_CUES_PER_DAY),
       day: aucklandDay(),
     });
-    if (!slot.ok) return slot;
+    if (!slot.ok) {
+      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+      return slot;
+    }
   }
   const naming = await namingFor(sql, horse);
   const movements = input.movements
@@ -281,7 +294,15 @@ export async function refreshCues(
     naming.registeredName,
   );
   const script = evidenceScript(evidence);
-  const raw = await askXai(apiKey, script, movements);
+  let raw = "";
+  try {
+    raw = await askXai(apiKey, script, movements);
+  } catch (err) {
+    if (charged.micros) {
+      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+    }
+    throw err;
+  }
   const accepted = acceptCues(raw, movements, script).map((cue) => ({
     ...cue,
     text: rewriteCueText(cue.text, naming),

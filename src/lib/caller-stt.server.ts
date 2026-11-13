@@ -1,4 +1,5 @@
 import type { Sql } from "./db.ts";
+import { refundAiMicros, reserveMonthlySpend, sttUsd } from "./ai-cost.ts";
 import { claimSttSeconds, clipSeconds, coachSttSecondsPerDay, releaseSttSeconds, transcriptFromStt } from "./caller-stt.ts";
 import { aucklandDay, sheetReadGate } from "./sheet-reads.ts";
 
@@ -35,7 +36,7 @@ export async function hearClip(
   sql: Sql,
   actor: { userId: string; isAdmin: boolean; approved: boolean },
   input: { audioBase64: string; mime: string; seconds: number },
-  env: { apiKey?: string; secondsPerDay?: string; day?: string },
+  env: { apiKey?: string; secondsPerDay?: string; budgetUsd?: string; day?: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const gate = sheetReadGate(actor);
@@ -58,15 +59,31 @@ export async function hearClip(
   const seconds = clipSeconds(input.seconds);
   const day = env.day ?? aucklandDay();
   const limit = coachSttSecondsPerDay(env.secondsPerDay);
+  let charged = { micros: 0, month: "" };
   if (gate.limited) {
+    const reserved = await reserveMonthlySpend(sql, {
+      userId: actor.userId,
+      limited: true,
+      usd: sttUsd(seconds),
+      budgetUsd: env.budgetUsd,
+      day,
+    });
+    if (!reserved.ok) return reserved;
+    charged = reserved;
     const claim = await claimSttSeconds(sql, { userId: actor.userId, limit, day, seconds });
-    if (!claim.ok) return claim;
+    if (!claim.ok) {
+      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+      return claim;
+    }
   }
   try {
     const text = await transcribeClip(apiKey, bytes, mime, fetchImpl);
     return { ok: true, text };
   } catch {
-    if (gate.limited) await releaseSttSeconds(sql, { userId: actor.userId, day, seconds });
+    if (gate.limited) {
+      await releaseSttSeconds(sql, { userId: actor.userId, day, seconds });
+      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+    }
     return { ok: false, error: "That word could not be heard. The buttons still work." };
   }
 }

@@ -50,7 +50,9 @@ export async function prefetchCallerSpeech(
       tick();
       return { urls, note, voice: index.voice };
     }
-    if (remote.budget === "spent") note = "Today's voice allowance is used. New lines use this phone's voice.";
+    if (remote.budget === "spent") {
+      note = remote.limitMessage || "Today's voice allowance is used. New lines use this phone's voice.";
+    }
     if (remote.voice) index.voice = remote.voice;
     const seen = new Set<string>();
     for (const clip of remote.clips) {

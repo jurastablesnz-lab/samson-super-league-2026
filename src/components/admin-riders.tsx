@@ -6,6 +6,7 @@ import { listRiderFiles, mediaPlaybackUrl } from "@/lib/media";
 import { prepareRider, setRiderHorseTest, type PreparedHorseInput } from "@/lib/rider-admin";
 import { COMPETITION_LEVELS } from "@/lib/beta";
 import { testsForLevel } from "@/lib/plan-builder";
+import { formatUsd } from "@/lib/ai-cost";
 import { cueRiderName, riderFirstName, spokenHorseName } from "@/lib/coach-cues";
 import { testIdForName } from "@/lib/test-registry";
 import { getPublishedTests } from "@/lib/test-publication";
@@ -88,6 +89,9 @@ function RiderRow({
             <p className="text-xs text-muted">
               {rider.email} · {rider.applicationStatus} · {rider.horses.length} horse
               {rider.horses.length === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 text-xs text-faint">
+              AI this month: {formatUsd(rider.aiMonthUsd)} of {formatUsd(rider.aiBudgetUsd)}
             </p>
             <p className="mt-1 text-xs text-faint">
               Last active / updated:{" "}

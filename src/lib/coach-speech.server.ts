@@ -7,6 +7,7 @@ import {
   coachTtsVoice,
   releaseTtsChars,
 } from "./coach-cues.ts";
+import { refundAiMicros, reserveMonthlySpend, ttsUsd } from "./ai-cost.ts";
 import { aucklandDay, sheetReadGate } from "./sheet-reads.ts";
 
 const BATCH = 8;
@@ -15,7 +16,14 @@ const MAX_AUDIO_BYTES = 500_000;
 export type SpeechClip = { text: string; hash: string; audioBase64?: string; cached: boolean };
 
 export type SpeechResult =
-  | { ok: true; mode: "browser" | "xai"; voice: string; budget: "ok" | "spent"; clips: SpeechClip[] }
+  | {
+      ok: true;
+      mode: "browser" | "xai";
+      voice: string;
+      budget: "ok" | "spent";
+      limitMessage?: string;
+      clips: SpeechClip[];
+    }
   | { ok: false; error: string };
 
 type SpeechRow = { speech_hash: string; audio_b64: string | null; object_key: string | null };
@@ -66,7 +74,7 @@ export async function ensureCallerSpeech(
   sql: Sql,
   actor: { userId: string; isAdmin: boolean; approved: boolean },
   lines: string[],
-  env: { coachTts?: string; apiKey?: string; voice?: string; charsPerDay?: string; day?: string },
+  env: { coachTts?: string; apiKey?: string; voice?: string; charsPerDay?: string; budgetUsd?: string; day?: string },
   synthesize: (text: string, voice: string) => Promise<Uint8Array | null>,
   storeObject?: (hash: string, bytes: Uint8Array) => Promise<string | null>,
   readObject?: (key: string) => Promise<Uint8Array | null>,
@@ -88,25 +96,48 @@ export async function ensureCallerSpeech(
     else missing.push({ text, hash });
   }
   let budget: "ok" | "spent" = "ok";
+  let limitMessage: string | undefined;
   const day = env.day ?? aucklandDay();
   const limit = coachTtsCharsPerDay(env.charsPerDay);
-  const made: { text: string; hash: string }[] = [];
+  const made: { text: string; hash: string; micros: number; month: string }[] = [];
   for (const line of missing) {
+    let micros = 0;
+    let month = "";
     if (gate.limited) {
+      const reserved = await reserveMonthlySpend(sql, {
+        userId: actor.userId,
+        limited: true,
+        usd: ttsUsd(line.text.length),
+        budgetUsd: env.budgetUsd,
+        day,
+      });
+      if (!reserved.ok) {
+        budget = "spent";
+        limitMessage = reserved.error;
+        clips.push({ text: line.text, hash: line.hash, cached: false });
+        continue;
+      }
+      micros = reserved.micros;
+      month = reserved.month;
       const claim = await claimTtsChars(sql, { userId: actor.userId, limit, day, chars: line.text.length });
       if (!claim.ok) {
+        await refundAiMicros(sql, { userId: actor.userId, month, micros });
         budget = "spent";
+        limitMessage = claim.error;
         clips.push({ text: line.text, hash: line.hash, cached: false });
         continue;
       }
     }
-    made.push(line);
+    made.push({ ...line, micros, month });
   }
   await Promise.all(
     made.map(async (line) => {
       const bytes = await synthesize(line.text, voice).catch(() => null);
       if (!bytes) {
-        if (gate.limited) await releaseTtsChars(sql, { userId: actor.userId, day, chars: line.text.length });
+        if (gate.limited) {
+          await releaseTtsChars(sql, { userId: actor.userId, day, chars: line.text.length });
+          await refundAiMicros(sql, { userId: actor.userId, month: line.month, micros: line.micros });
+        }
         clips.push({ text: line.text, hash: line.hash, cached: false });
         return;
       }
@@ -124,5 +155,5 @@ export async function ensureCallerSpeech(
   );
   const order = new Map(unique.map((text, index) => [text, index]));
   clips.sort((a, b) => (order.get(a.text) ?? 0) - (order.get(b.text) ?? 0));
-  return { ok: true, mode: "xai", voice, budget, clips };
+  return { ok: true, mode: "xai", voice, budget, limitMessage, clips };
 }

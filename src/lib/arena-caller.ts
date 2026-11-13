@@ -23,23 +23,34 @@ export function movementCall(
 
 export type SpeechSink = {
   paused?: boolean;
-  cancel: () => void;
+  cancel?: () => void;
+  pause?: () => void;
   resume?: () => void;
   speak: (text: string) => void;
 };
 
 /**
- * Speak inside a tap. iOS only allows speechSynthesis.speak during the gesture,
- * and a standalone home-screen app often starts paused. Cancel and resume must
- * not throw out of the click handler.
+ * Stop anything already speaking. Call this on pointerdown, never in the same
+ * turn as speak(). iOS drops an utterance when cancel() and speak() run together.
+ */
+export function interruptCallerSpeech(
+  synth: { cancel?: () => void; speaking?: boolean; pending?: boolean } | null | undefined,
+) {
+  try {
+    if (!synth) return;
+    if (synth.speaking === false && synth.pending === false) return;
+    synth.cancel?.();
+  } catch {
+    // Nothing was speaking, or this iOS build throws on an idle cancel.
+  }
+}
+
+/**
+ * Speak inside the click. This never calls cancel(). Resume first: a home-screen
+ * app often starts paused, and the paused flag is not reliable.
  */
 export function primeCallerSpeech(synth: SpeechSink | null | undefined, texts: string[]): "ok" | "unavailable" | "blocked" {
   if (!synth || typeof synth.speak !== "function") return "unavailable";
-  try {
-    synth.cancel();
-  } catch {
-    // iOS can throw if nothing is speaking.
-  }
   try {
     synth.resume?.();
   } catch {
@@ -49,10 +60,23 @@ export function primeCallerSpeech(synth: SpeechSink | null | undefined, texts: s
     for (const text of texts) {
       if (text.trim()) synth.speak(text);
     }
+    // A home-screen app can pause the queue as speak() returns. Resume again,
+    // still inside the tap. Do not cancel here.
+    try {
+      synth.resume?.();
+    } catch {
+      // resume is optional.
+    }
     return "ok";
   } catch {
     return "blocked";
   }
+}
+
+/** A voice to assign, or null to leave the utterance on the system default. */
+export function chooseVoice<T extends { lang: string; name: string }>(voices: T[]): T | null {
+  if (!voices.length) return null;
+  return [...voices].sort((a, b) => voiceScore(b) - voiceScore(a))[0] ?? null;
 }
 
 export const SPEECH_SILENT_HINT = "Check your phone isn't on silent.";

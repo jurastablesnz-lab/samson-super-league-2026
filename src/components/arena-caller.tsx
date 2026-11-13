@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  chooseVoice,
   clampGap,
   hearsNext,
+  interruptCallerSpeech,
   movementCall,
   primeCallerSpeech,
   speechStatusMessage,
-  voiceScore,
-  type SpeechSink,
   SPEECH_SILENT_HINT,
 } from "@/lib/arena-caller";
 import type { CallClip } from "@/lib/arena-caller";
@@ -41,28 +41,6 @@ function recognitionCtor(): (new () => SpeechRec) | null {
   }
 }
 
-function sinkFor(
-  synth: SpeechSynthesis,
-  voice: SpeechSynthesisVoice | null,
-  onBlocked: () => void,
-): SpeechSink {
-  return {
-    get paused() {
-      return synth.paused;
-    },
-    cancel: () => synth.cancel(),
-    resume: () => synth.resume(),
-    speak: (text: string) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-NZ";
-      utterance.rate = 0.95;
-      if (voice) utterance.voice = voice;
-      utterance.onerror = () => onBlocked();
-      synth.speak(utterance);
-    },
-  };
-}
-
 /**
  * Full-screen caller. The first speak() happens inside the tap. iOS ignores
  * speech that starts later, including from an effect.
@@ -95,6 +73,16 @@ export function ArenaCaller({
   const [phase, setPhase] = useState<"speaking" | "waiting">("waiting");
   const [canHear, setCanHear] = useState(false);
   const [speechStatus, setSpeechStatus] = useState<string | null>(null);
+  const [voiceBlocked, setVoiceBlocked] = useState(false);
+  const [debug, setDebug] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("debug") === "1";
+  });
+  const [diagLines, setDiagLines] = useState<string[]>([]);
+  const [voiceCount, setVoiceCount] = useState(0);
+  const [voiceLabel, setVoiceLabel] = useState("default (lang unset)");
+  const [recState, setRecState] = useState("idle");
+  const [lastError, setLastError] = useState("");
   const directivesRef = useRef(directives);
   const coachRef = useRef(coach);
   const autoRef = useRef(auto);
@@ -106,6 +94,10 @@ export function ArenaCaller({
   const recRef = useRef<SpeechRec | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
+  const startTimerRef = useRef<number | null>(null);
+  const titleTaps = useRef(0);
+  const speakGen = useRef(0);
   directivesRef.current = directives;
   coachRef.current = coach;
   autoRef.current = auto;
@@ -123,6 +115,10 @@ export function ArenaCaller({
     .filter(Boolean)
     .join(". ");
   const spokenCue = movement ? cues.find((cue) => cue.n === movement.n) : undefined;
+
+  function logDiag(line: string) {
+    setDiagLines((prev) => [...prev.slice(-11), line]);
+  }
 
   function clipsFor(at: number): CallClip[] {
     const current = movementsRef.current[at];
@@ -144,6 +140,7 @@ export function ArenaCaller({
     const Ctor = recognitionCtor();
     if (!Ctor) {
       setCanHear(false);
+      setRecState("unsupported");
       return;
     }
     try {
@@ -156,35 +153,48 @@ export function ArenaCaller({
           for (let i = event.resultIndex; i < event.results.length; i++) {
             if (hearsNext(event.results[i][0].transcript)) go(indexRef.current + 1);
           }
-        } catch {
+        } catch (err) {
           setCanHear(false);
+          setRecState("error");
+          setLastError(err instanceof Error ? err.message : String(err));
         }
       };
-      rec.onend = () => undefined;
-      rec.onerror = () => setCanHear(false);
+      rec.onend = () => setRecState("idle");
+      rec.onerror = () => {
+        setCanHear(false);
+        setRecState("error");
+      };
       recRef.current = rec;
       rec.start();
       setCanHear(true);
-    } catch {
+      setRecState("listening");
+    } catch (err) {
       setCanHear(false);
+      setRecState("error");
+      setLastError(err instanceof Error ? err.message : String(err));
     }
   }
 
   function speakAt(at: number) {
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
-    stopRecognition();
+    if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+    startTimerRef.current = null;
     try {
       audioRef.current?.pause();
     } catch {
       // The previous clip had already ended.
     }
+    const gen = ++speakGen.current;
     const clips = clipsFor(at);
     const texts = clips.filter((clip) => !clip.audioUrl && clip.text.trim()).map((clip) => clip.text);
     const synth = typeof window === "undefined" ? undefined : window.speechSynthesis;
+    const created: SpeechSynthesisUtterance[] = [];
+    utterancesRef.current = created;
+    let heardStart = false;
     let finished = false;
-    const wait = () => {
-      if (finished) return;
+    const afterSpeech = () => {
+      if (finished || gen !== speakGen.current) return;
       finished = true;
       setPhase("waiting");
       listenAfterSpeech();
@@ -194,10 +204,44 @@ export function ArenaCaller({
     };
     const outcome = primeCallerSpeech(
       synth
-        ? sinkFor(synth, voiceRef.current, () => {
-            setSpeechStatus(speechStatusMessage("blocked"));
-            wait();
-          })
+        ? {
+            get paused() {
+              return synth.paused;
+            },
+            resume: () => synth.resume(),
+            speak: (text: string) => {
+              const utterance = new SpeechSynthesisUtterance(text);
+              const voice = voiceRef.current;
+              if (voice) {
+                utterance.voice = voice;
+                utterance.lang = voice.lang;
+              }
+              utterance.rate = 0.95;
+              const last = created.length === texts.length - 1;
+              utterance.onstart = () => {
+                heardStart = true;
+                if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+                setVoiceBlocked(false);
+                logDiag("start");
+              };
+              utterance.onend = () => {
+                logDiag("end");
+                if (last) afterSpeech();
+              };
+              utterance.onerror = (event) => {
+                const code = event.error || "unknown";
+                logDiag(`error:${code}`);
+                setLastError(code);
+                if (code !== "interrupted" && code !== "canceled") {
+                  setVoiceBlocked(true);
+                  setSpeechStatus("Voice blocked");
+                }
+                if (last) afterSpeech();
+              };
+              created.push(utterance);
+              synth.speak(utterance);
+            },
+          }
         : null,
       texts,
     );
@@ -206,29 +250,61 @@ export function ArenaCaller({
       try {
         const audio = new Audio(clip.audioUrl);
         audioRef.current = audio;
-        audio.onended = wait;
+        audio.onended = () => {
+          if (!texts.length) afterSpeech();
+        };
         void audio.play().catch(() => {
           setSpeechStatus(speechStatusMessage("blocked"));
-          wait();
+          setVoiceBlocked(true);
         });
-      } catch {
+      } catch (err) {
         setSpeechStatus(speechStatusMessage("blocked"));
+        setLastError(err instanceof Error ? err.message : String(err));
       }
     }
-    setSpeechStatus(speechStatusMessage(outcome));
-    setPhase(clips.length ? "speaking" : "waiting");
-    if (!texts.length || outcome !== "ok") wait();
-    else window.setTimeout(wait, Math.max(2500, texts.join(" ").length * 70));
+    if (outcome === "ok" && texts.length && !heardStart) {
+      startTimerRef.current = window.setTimeout(() => {
+        if (!heardStart) {
+          setVoiceBlocked(true);
+          setSpeechStatus("Voice blocked");
+          logDiag("no start within 1.5s");
+        }
+      }, 1500);
+    }
+    if (outcome !== "ok") {
+      setSpeechStatus(speechStatusMessage(outcome));
+      setVoiceBlocked(true);
+    } else if (texts.length) {
+      setSpeechStatus(null);
+      setPhase("speaking");
+    } else {
+      setPhase("waiting");
+      window.setTimeout(afterSpeech, 0);
+    }
   }
 
   function go(next: number, replay = false) {
     const last = Math.max(0, movementsRef.current.length - 1);
     const clamped = Math.min(last, Math.max(0, next));
     if (!replay && clamped === indexRef.current && armed) return;
-    speakAt(clamped);
+    try {
+      speakAt(clamped);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setLastError(message);
+      logDiag(`js:${message}`);
+      setVoiceBlocked(true);
+      setSpeechStatus("Voice blocked");
+    }
     indexRef.current = clamped;
     setIndex(clamped);
     setArmed(true);
+  }
+
+  function pressDown() {
+    if (!armed) return;
+    interruptCallerSpeech(window.speechSynthesis);
+    stopRecognition();
   }
 
   useEffect(() => {
@@ -240,13 +316,23 @@ export function ArenaCaller({
     const remember = () => {
       try {
         const voices = synth.getVoices();
-        voiceRef.current = [...voices].sort((a, b) => voiceScore(b) - voiceScore(a))[0] ?? null;
-      } catch {
+        setVoiceCount(voices.length);
+        const chosen = chooseVoice(voices);
+        voiceRef.current = chosen;
+        setVoiceLabel(chosen ? `${chosen.name} (${chosen.lang})` : "default (lang unset)");
+      } catch (err) {
         voiceRef.current = null;
+        setVoiceLabel("default (lang unset)");
+        setLastError(err instanceof Error ? err.message : String(err));
       }
     };
     remember();
     synth.addEventListener?.("voiceschanged", remember);
+    const onError = (event: ErrorEvent) => {
+      setLastError(event.message);
+      logDiag(`js:${event.message}`);
+    };
+    window.addEventListener("error", onError);
     let lock: { release: () => Promise<void> } | null = null;
     let dropped = false;
     try {
@@ -263,6 +349,7 @@ export function ArenaCaller({
     return () => {
       dropped = true;
       synth.removeEventListener?.("voiceschanged", remember);
+      window.removeEventListener("error", onError);
       try {
         void lock?.release();
       } catch {
@@ -305,9 +392,16 @@ export function ArenaCaller({
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-4 pt-2">
         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</p>
-        <p className="font-display mt-1 text-3xl leading-tight font-medium">
+        <button
+          type="button"
+          className="font-display mt-1 text-left text-3xl leading-tight font-medium"
+          onClick={() => {
+            titleTaps.current += 1;
+            if (titleTaps.current >= 5) setDebug(true);
+          }}
+        >
           {letters || `Movement ${movement.n}`}
-        </p>
+        </button>
         <p className="mt-2 text-xl leading-snug">{instruction}</p>
         {coach && spokenCue?.text && (
           <p className="mt-3 text-base leading-relaxed text-accent">{spokenCue.text}</p>
@@ -328,10 +422,20 @@ export function ArenaCaller({
           <button
             type="button"
             className="mt-4 min-h-16 w-full rounded-xl border border-line text-base font-semibold"
+            onPointerDown={pressDown}
             onClick={() => go(index + 1)}
             aria-label="Next movement"
           >
             Next
+          </button>
+        )}
+        {voiceBlocked && (
+          <button
+            type="button"
+            className="mt-2 min-h-12 w-full rounded-xl border border-line text-base font-semibold"
+            onClick={() => go(index, true)}
+          >
+            Retry voice
           </button>
         )}
         <p className="mt-auto py-3 text-center text-sm text-muted">
@@ -344,12 +448,23 @@ export function ArenaCaller({
           {auto ? ` · auto ${clampGap(gap)}s` : ""}
         </p>
         <p className="pb-2 text-center text-xs text-muted">{SPEECH_SILENT_HINT}</p>
+        {debug && (
+          <pre className="mb-2 max-h-40 overflow-auto rounded-lg bg-ink p-2 text-[10px] leading-snug text-accent-fg" data-testid="caller-debug">
+            {`speechSynthesis: ${typeof window !== "undefined" && window.speechSynthesis ? "yes" : "no"}
+voices: ${voiceCount}
+voice: ${voiceLabel}
+recognition: ${recognitionCtor() ? recState : "unsupported"}
+last error: ${lastError || "none"}
+${diagLines.join("\n")}`}
+          </pre>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
           disabled={!armed || index <= 0}
+          onPointerDown={pressDown}
           onClick={() => go(index - 1)}
         >
           Back
@@ -358,6 +473,7 @@ export function ArenaCaller({
           type="button"
           className="min-h-12 rounded-lg border border-line text-sm font-semibold disabled:opacity-40"
           disabled={!armed}
+          onPointerDown={pressDown}
           onClick={() => go(index, true)}
         >
           Repeat

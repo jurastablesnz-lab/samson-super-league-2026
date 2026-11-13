@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampGap, hearsNext, movementCall, primeCallerSpeech, speechStatusMessage, voiceScore } from "./arena-caller.ts";
+import {
+  chooseVoice,
+  clampGap,
+  hearsNext,
+  interruptCallerSpeech,
+  movementCall,
+  primeCallerSpeech,
+  speechStatusMessage,
+  voiceScore,
+} from "./arena-caller.ts";
 import type { Movement } from "./tests/types.ts";
 
 const movement = {
@@ -43,14 +52,15 @@ test("next is a word, and the auto gap stays in a usable range", () => {
   assert.equal(clampGap(90), 60);
 });
 
-test("speech is primed inside the tap even when cancel throws", () => {
+test("speech is primed in the tap and does not cancel in that same turn", () => {
   const spoken: string[] = [];
   let resumed = false;
+  let cancelled = false;
   const outcome = primeCallerSpeech(
     {
       paused: true,
       cancel() {
-        throw new Error("nothing to cancel");
+        cancelled = true;
       },
       resume() {
         resumed = true;
@@ -63,9 +73,33 @@ test("speech is primed inside the tap even when cancel throws", () => {
   );
   assert.equal(outcome, "ok");
   assert.equal(resumed, true);
+  assert.equal(cancelled, false);
   assert.deepEqual(spoken, ["Enter at A", "Susan, sit for the halt"]);
   assert.match(speechStatusMessage("blocked") ?? "", /isn't on silent/);
   assert.equal(primeCallerSpeech(null, ["Hello"]), "unavailable");
+  assert.equal(chooseVoice([]), null);
+  const only = { lang: "en-GB", name: "Daniel" };
+  assert.equal(chooseVoice([only]), only);
+});
+
+test("an idle caller does not cancel, and a speaking one cancels without speaking", () => {
+  let cancelled = false;
+  interruptCallerSpeech({
+    speaking: false,
+    pending: false,
+    cancel() {
+      cancelled = true;
+    },
+  });
+  assert.equal(cancelled, false);
+  interruptCallerSpeech({
+    speaking: true,
+    cancel() {
+      cancelled = true;
+      throw new Error("cancel");
+    },
+  });
+  assert.equal(cancelled, true);
 });
 
 test("a New Zealand natural voice outranks a generic English one", () => {

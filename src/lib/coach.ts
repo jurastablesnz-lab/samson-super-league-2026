@@ -1,7 +1,8 @@
 /**
  * Personal caller cues. The browser never sees the xAI key.
  * Approved riders and admins only. Admins are not counted against COACH_CUES_PER_DAY.
- * Set COACH_TTS=xai to cache xAI speech for the cues (same XAI_API_KEY). Optional XAI_TTS_VOICE (default eve).
+ * Spoken lines use xAI TTS when XAI_API_KEY is set. COACH_TTS=browser keeps the phone voice.
+ * Optional XAI_TTS_VOICE (default ara, the warm English voice). COACH_TTS_CHARS_PER_DAY caps riders.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "./auth/middleware";
@@ -91,5 +92,34 @@ export const saveCoachCues = createServerFn({ method: "POST" })
       return { ok: true as const, cues };
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : "Could not save the cues." };
+    }
+  });
+
+export const speakCallerLines = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { lines?: string[] }) => ({
+    lines: (Array.isArray(input?.lines) ? input.lines : []).slice(0, 8).map((line) => text(line, 500)),
+  }))
+  .handler(async ({ context, data }) => {
+    const { sql, user, approved } = await actor(context.userId);
+    const { ensureCallerSpeech, synthesizeXai } = await import("./coach-speech.server");
+    const { readTtsObject, writeTtsObject } = await import("./media-r2.server");
+    try {
+      return await ensureCallerSpeech(
+        sql,
+        { userId: user.id, isAdmin: user.isAdmin, approved },
+        data.lines,
+        {
+          coachTts: process.env.COACH_TTS,
+          apiKey: process.env.XAI_API_KEY,
+          voice: process.env.XAI_TTS_VOICE,
+          charsPerDay: process.env.COACH_TTS_CHARS_PER_DAY,
+        },
+        (line, voice) => synthesizeXai(process.env.XAI_API_KEY ?? "", voice, line),
+        writeTtsObject,
+        readTtsObject,
+      );
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : "The voice could not be prepared." };
     }
   });

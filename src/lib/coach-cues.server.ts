@@ -239,48 +239,11 @@ async function askXai(apiKey: string, evidence: string, movements: CueMovement[]
   return json.choices?.[0]?.message?.content ?? "";
 }
 
-async function attachSpeech(cues: CoachCue[]): Promise<(CoachCue & { audioBase64?: string })[]> {
-  if (coachTtsMode(process.env.COACH_TTS) !== "xai") return cues;
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) return cues;
-  const voice = process.env.XAI_TTS_VOICE?.trim() || "eve";
-  let budget = 1_200_000;
-  const spoken: (CoachCue & { audioBase64?: string })[] = [];
-  for (const cue of cues) {
-    if (!cue.text || budget < 20_000) {
-      spoken.push(cue);
-      continue;
-    }
-    try {
-      const res = await fetch("https://api.x.ai/v1/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ text: cue.text, voice_id: voice, language: "en" }),
-      });
-      if (!res.ok) {
-        spoken.push(cue);
-        continue;
-      }
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.byteLength === 0 || bytes.byteLength > 120_000) {
-        spoken.push(cue);
-        continue;
-      }
-      const audioBase64 = Buffer.from(bytes).toString("base64");
-      budget -= audioBase64.length;
-      spoken.push(budget >= 0 ? { ...cue, audioBase64 } : cue);
-    } catch {
-      spoken.push(cue);
-    }
-  }
-  return spoken;
-}
-
 export async function refreshCues(
   sql: Sql,
   actor: { userId: string; isAdmin: boolean; approved: boolean },
   input: { horseId: string; testId: string; testName: string; movements: CueMovement[] },
-): Promise<{ ok: true; cues: (CoachCue & { audioBase64?: string })[]; tts: "browser" | "xai" } | { ok: false; error: string }> {
+): Promise<{ ok: true; cues: CoachCue[]; tts: "browser" | "xai" } | { ok: false; error: string }> {
   const gate = sheetReadGate(actor);
   if (!gate.ok) return gate;
   const horse = await horseRow(sql, actor.userId, input.horseId, actor.isAdmin);
@@ -324,6 +287,6 @@ export async function refreshCues(
     values (${horse.id}, ${input.testId}, ${horse.user_id}, ${JSON.stringify(cues)}::jsonb)
     on conflict (horse_id, test_id) do update
       set cues = excluded.cues, updated_at = now()`;
-  const tts = coachTtsMode(process.env.COACH_TTS);
-  return { ok: true, cues: await attachSpeech(cues), tts };
+  const tts = coachTtsMode(process.env.COACH_TTS, process.env.XAI_API_KEY);
+  return { ok: true, cues, tts };
 }

@@ -37,8 +37,64 @@ export function coachCueLimitMessage(limit: number): string {
   return `You've used today's ${limit} ${noun}. You can refresh more tomorrow.`;
 }
 
-export function coachTtsMode(raw: string | undefined): "browser" | "xai" {
-  return raw?.trim().toLowerCase() === "xai" ? "xai" : "browser";
+/** About ten Novice tests of instructions plus cues. xAI TTS is about $15 per million characters. */
+export const DEFAULT_COACH_TTS_CHARS_PER_DAY = 40_000;
+
+/** Warmer English voices than eve (energetic British). The first one present is used. */
+export const WARMER_ENGLISH_VOICES = ["ara", "lumen", "ursa"] as const;
+
+export function coachTtsMode(raw: string | undefined, apiKey?: string | null): "browser" | "xai" {
+  const set = raw?.trim().toLowerCase();
+  if (set === "browser") return "browser";
+  if (set === "xai") return "xai";
+  return apiKey?.trim() ? "xai" : "browser";
+}
+
+export function coachTtsCharsPerDay(raw: string | undefined): number {
+  const value = Number(raw?.trim());
+  if (!Number.isInteger(value) || value < 1) return DEFAULT_COACH_TTS_CHARS_PER_DAY;
+  return value;
+}
+
+export function coachTtsLimitMessage(limit: number): string {
+  return `You've used today's ${limit.toLocaleString("en-NZ")} voice characters. New lines use this phone's voice until tomorrow.`;
+}
+
+/** An explicit XAI_TTS_VOICE wins. Otherwise the warmest known English voice, or eve. */
+export function coachTtsVoice(explicit?: string | null, known: readonly string[] = ["ara", "lumen", "ursa", "eve"]): string {
+  const set = explicit?.trim().toLowerCase() ?? "";
+  if (set) return set.slice(0, 32);
+  const have = new Set(known.map((id) => id.toLowerCase()));
+  return WARMER_ENGLISH_VOICES.find((id) => have.has(id)) ?? "eve";
+}
+
+export async function claimTtsChars(
+  sql: Sql,
+  input: { userId: string; limit: number; day: string; chars: number },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const chars = Math.max(0, Math.round(input.chars));
+  if (chars < 1) return { ok: true };
+  const rows = await sql<{ chars: number }>`
+    insert into coach_tts_days (user_id, read_on, chars)
+    select ${input.userId}, ${input.day}::date, ${chars}::int
+    where ${chars}::int <= ${input.limit}::int
+    on conflict (user_id, read_on) do update
+      set chars = coach_tts_days.chars + ${chars}::int, updated_at = now()
+      where coach_tts_days.chars + ${chars}::int <= ${input.limit}::int
+    returning chars`;
+  if (!rows.length) return { ok: false, error: coachTtsLimitMessage(input.limit) };
+  return { ok: true };
+}
+
+export async function releaseTtsChars(
+  sql: Sql,
+  input: { userId: string; day: string; chars: number },
+): Promise<void> {
+  const chars = Math.max(0, Math.round(input.chars));
+  if (chars < 1) return;
+  await sql`update coach_tts_days
+    set chars = greatest(0, chars - ${chars}::int), updated_at = now()
+    where user_id = ${input.userId} and read_on = ${input.day}::date`;
 }
 
 export function riderFirstName(name: string | null | undefined): string {

@@ -10,6 +10,8 @@ import {
   SPEECH_SILENT_HINT,
 } from "@/lib/arena-caller";
 import type { CallClip } from "@/lib/arena-caller";
+import { callerSpeechLines, resolveClipUrl, TEST_SOUND_TEXT } from "@/lib/caller-speech";
+import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
 import type { Movement } from "@/lib/tests/types";
 
 const UNLOCK_BEEP =
@@ -87,6 +89,8 @@ export function ArenaCaller({
   const [voiceLabel, setVoiceLabel] = useState("default (lang unset)");
   const [recState, setRecState] = useState("idle");
   const [lastError, setLastError] = useState("");
+  const [prep, setPrep] = useState<{ done: number; total: number } | null>(null);
+  const [prepNote, setPrepNote] = useState<string | null>(null);
   const directivesRef = useRef(directives);
   const coachRef = useRef(coach);
   const autoRef = useRef(auto);
@@ -98,7 +102,7 @@ export function ArenaCaller({
   const recRef = useRef<SpeechRec | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const beepRef = useRef<HTMLAudioElement | null>(null);
+  const urlsRef = useRef<Record<string, string>>({});
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const startTimerRef = useRef<number | null>(null);
   const titleTaps = useRef(0);
@@ -180,117 +184,184 @@ export function ArenaCaller({
     }
   }
 
-  function speakAt(at: number) {
-    unlockAudio();
+  function quietAudio() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.onplaying = null;
+    try {
+      audio.pause();
+    } catch {
+      // The previous clip had already ended.
+    }
+  }
+
+  function speakBrowser(text: string, onDone: () => void) {
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = voiceRef.current;
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
+    utterance.rate = 0.95;
+    utterancesRef.current = [utterance];
+    let heard = false;
+    let done = false;
+    const finishLine = () => {
+      if (done) return;
+      done = true;
+      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+      onDone();
+    };
+    utterance.onstart = () => {
+      heard = true;
+      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+      setVoiceBlocked(false);
+      setVoiceLine("Voice: speaking");
+      logDiag("start");
+    };
+    utterance.onend = () => {
+      setVoiceLine("Voice: ended");
+      logDiag("end");
+      finishLine();
+    };
+    utterance.onerror = (event) => {
+      const code = event.error || "unknown";
+      setLastError(code);
+      logDiag(`error:${code}`);
+      if (code !== "interrupted" && code !== "canceled") {
+        setVoiceLine(`Voice: error ${code}`);
+        setVoiceBlocked(true);
+        setSpeechStatus("Voice blocked");
+      }
+      finishLine();
+    };
+    const outcome = primeCallerSpeech(
+      synth
+        ? {
+            resume: () => synth.resume(),
+            speak: () => synth.speak(utterance),
+          }
+        : null,
+      [text],
+    );
+    if (outcome !== "ok") {
+      setVoiceLine(outcome === "unavailable" ? "Voice: not started" : "Voice: blocked");
+      setVoiceBlocked(true);
+      setSpeechStatus(speechStatusMessage(outcome));
+      finishLine();
+      return;
+    }
+    setPhase("speaking");
+    if (!heard) {
+      startTimerRef.current = window.setTimeout(() => {
+        if (heard || done) return;
+        setVoiceBlocked(true);
+        setSpeechStatus("Voice blocked");
+        setVoiceLine("Voice: blocked");
+        logDiag("no start within 1.5s");
+        interruptCallerSpeech(window.speechSynthesis);
+        finishLine();
+      }, 1500);
+    }
+  }
+
+  function playClips(clips: CallClip[], at: number) {
+    quietAudio();
+    stopRecognition();
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
     if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
     startTimerRef.current = null;
-    try {
-      audioRef.current?.pause();
-    } catch {
-      // The previous clip had already ended.
-    }
     const gen = ++speakGen.current;
-    const clips = clipsFor(at);
-    const texts = clips.filter((clip) => !clip.audioUrl && clip.text.trim()).map((clip) => clip.text);
-    const synth = typeof window === "undefined" ? undefined : window.speechSynthesis;
-    const created: SpeechSynthesisUtterance[] = [];
-    utterancesRef.current = created;
-    let heardStart = false;
+    const audio = audioRef.current;
     let finished = false;
-    const afterSpeech = () => {
+    const finish = () => {
       if (finished || gen !== speakGen.current) return;
       finished = true;
       setPhase("waiting");
+      setVoiceLine((line) => (line.startsWith("Voice: error") || line === "Voice: blocked" ? line : "Voice: ended"));
       listenAfterSpeech();
       if (autoRef.current && at < movementsRef.current.length - 1) {
         timerRef.current = window.setTimeout(() => go(at + 1), clampGap(gapRef.current) * 1000);
       }
     };
-    const outcome = primeCallerSpeech(
-      synth
-        ? {
-            get paused() {
-              return synth.paused;
-            },
-            resume: () => synth.resume(),
-            speak: (text: string) => {
-              const utterance = new SpeechSynthesisUtterance(text);
-              const voice = voiceRef.current;
-              if (voice) {
-                utterance.voice = voice;
-                utterance.lang = voice.lang;
-              }
-              utterance.rate = 0.95;
-              const last = created.length === texts.length - 1;
-              utterance.onstart = () => {
-                heardStart = true;
-                if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
-                setVoiceBlocked(false);
-                setVoiceLine("Voice: speaking");
-                logDiag("start");
-              };
-              utterance.onend = () => {
-                setVoiceLine("Voice: ended");
-                logDiag("end");
-                if (last) afterSpeech();
-              };
-              utterance.onerror = (event) => {
-                const code = event.error || "unknown";
-                logDiag(`error:${code}`);
-                setLastError(code);
-                setVoiceLine(`Voice: error ${code}`);
-                if (code !== "interrupted" && code !== "canceled") {
-                  setVoiceBlocked(true);
-                  setSpeechStatus("Voice blocked");
-                }
-                if (last) afterSpeech();
-              };
-              created.push(utterance);
-              synth.speak(utterance);
-            },
-          }
-        : null,
-      texts,
-    );
-    for (const clip of clips) {
-      if (!clip.audioUrl) continue;
-      try {
-        const audio = new Audio(clip.audioUrl);
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (!texts.length) afterSpeech();
+    const step = (i: number, inGesture: boolean) => {
+      if (gen !== speakGen.current) return;
+      const clip = clips[i];
+      if (!clip) return finish();
+      const url = resolveClipUrl(clip, urlsRef.current);
+      if (url && audio) {
+        let committed = false;
+        const fallback = () => {
+          if (committed || gen !== speakGen.current) return;
+          committed = true;
+          quietAudio();
+          speakBrowser(clip.text, () => step(i + 1, false));
         };
-        void audio.play().catch(() => {
-          setSpeechStatus(speechStatusMessage("blocked"));
-          setVoiceBlocked(true);
-        });
-      } catch (err) {
-        setSpeechStatus(speechStatusMessage("blocked"));
-        setLastError(err instanceof Error ? err.message : String(err));
-      }
-    }
-    if (outcome === "ok" && texts.length && !heardStart) {
-      startTimerRef.current = window.setTimeout(() => {
-        if (!heardStart) {
+        const mark = () => {
+          if (gen !== speakGen.current || committed) return;
+          committed = true;
+          if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+          setVoiceBlocked(false);
+          setSpeechStatus(null);
+          setVoiceLine("Voice: speaking");
+          logDiag("audio");
+        };
+        audio.onended = () => {
+          if (gen !== speakGen.current) return;
+          setVoiceLine("Voice: ended");
+          step(i + 1, false);
+        };
+        audio.onerror = () => fallback();
+        audio.onplaying = mark;
+        audio.src = url;
+        const pending = audio.play();
+        setPhase("speaking");
+        pending?.then(mark).catch(() => fallback());
+        startTimerRef.current = window.setTimeout(() => {
+          if (committed || gen !== speakGen.current) return;
           setVoiceBlocked(true);
           setSpeechStatus("Voice blocked");
           setVoiceLine("Voice: blocked");
           logDiag("no start within 1.5s");
+          fallback();
+        }, 1500);
+        return;
+      }
+      if (inGesture && audio) {
+        try {
+          audio.src = UNLOCK_BEEP;
+          void audio.play();
+        } catch (err) {
+          setLastError(err instanceof Error ? err.message : String(err));
         }
-      }, 1500);
+      }
+      if (!clip.text.trim()) {
+        step(i + 1, inGesture);
+        return;
+      }
+      speakBrowser(clip.text, () => step(i + 1, false));
+    };
+    if (!clips.length) {
+      if (audio) {
+        try {
+          audio.src = UNLOCK_BEEP;
+          void audio.play();
+        } catch {
+          // Nothing to say. The element is still unlocked for a later line.
+        }
+      }
+      finish();
+      return;
     }
-    if (outcome !== "ok") {
-      setSpeechStatus(speechStatusMessage(outcome));
-      setVoiceBlocked(true);
-    } else if (texts.length) {
-      setSpeechStatus(null);
-      setPhase("speaking");
-    } else {
-      setPhase("waiting");
-      window.setTimeout(afterSpeech, 0);
-    }
+    step(0, true);
+  }
+
+  function speakAt(at: number) {
+    playClips(clipsFor(at), at);
   }
 
   function go(next: number, replay = false) {
@@ -311,80 +382,51 @@ export function ArenaCaller({
     setArmed(true);
   }
 
-  function unlockAudio() {
-    try {
-      if (!beepRef.current) {
-        const audio = new Audio(UNLOCK_BEEP);
-        audio.preload = "auto";
-        beepRef.current = audio;
-      }
-      beepRef.current.currentTime = 0;
-      void beepRef.current.play();
-    } catch (err) {
-      setLastError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
   function testSound() {
-    unlockAudio();
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance("Hello Susan, testing");
-    const voice = voiceRef.current;
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
-    }
-    utterance.rate = 0.95;
-    utterancesRef.current = [utterance];
-    let heard = false;
-    utterance.onstart = () => {
-      heard = true;
-      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
-      setVoiceBlocked(false);
-      setVoiceLine("Voice: speaking");
-      logDiag("start");
-    };
-    utterance.onend = () => {
-      setVoiceLine("Voice: ended");
-      logDiag("end");
-    };
-    utterance.onerror = (event) => {
-      const code = event.error || "unknown";
-      setVoiceLine(`Voice: error ${code}`);
-      setLastError(code);
-      setVoiceBlocked(true);
-      logDiag(`error:${code}`);
-    };
-    const outcome = primeCallerSpeech(
-      synth
-        ? {
-            resume: () => synth.resume(),
-            speak: () => synth.speak(utterance),
-          }
-        : null,
-      ["Hello Susan, testing"],
-    );
-    if (outcome !== "ok") {
-      setVoiceLine(outcome === "unavailable" ? "Voice: not started" : "Voice: blocked");
-      setVoiceBlocked(true);
-      setSpeechStatus(outcome === "unavailable" ? speechStatusMessage("unavailable") : "Voice blocked");
+    quietAudio();
+    stopRecognition();
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
+    const gen = ++speakGen.current;
+    const audio = audioRef.current;
+    const url = urlsRef.current[TEST_SOUND_TEXT];
+    if (url && audio) {
+      let committed = false;
+      audio.onplaying = () => {
+        if (gen !== speakGen.current || committed) return;
+        committed = true;
+        if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
+        setVoiceBlocked(false);
+        setVoiceLine("Voice: speaking");
+        logDiag("audio");
+      };
+      audio.onended = () => {
+        if (gen === speakGen.current) setVoiceLine("Voice: ended");
+      };
+      audio.onerror = () => {
+        if (!committed && gen === speakGen.current) speakBrowser(TEST_SOUND_TEXT, () => undefined);
+      };
+      audio.src = url;
+      const pending = audio.play();
+      pending?.catch(() => {
+        if (!committed && gen === speakGen.current) speakBrowser(TEST_SOUND_TEXT, () => undefined);
+      });
       return;
     }
-    if (!heard) {
-      if (startTimerRef.current != null) window.clearTimeout(startTimerRef.current);
-      startTimerRef.current = window.setTimeout(() => {
-        if (!heard) {
-          setVoiceBlocked(true);
-          setSpeechStatus("Voice blocked");
-          setVoiceLine("Voice: blocked");
-          logDiag("no start within 1.5s");
-        }
-      }, 1500);
+    if (audio) {
+      try {
+        audio.src = UNLOCK_BEEP;
+        void audio.play();
+      } catch (err) {
+        setLastError(err instanceof Error ? err.message : String(err));
+      }
     }
+    speakBrowser(TEST_SOUND_TEXT, () => undefined);
   }
 
   function pressDown() {
     if (!armed) return;
+    speakGen.current += 1;
+    quietAudio();
     interruptCallerSpeech(window.speechSynthesis);
     stopRecognition();
   }
@@ -438,6 +480,7 @@ export function ArenaCaller({
         // Already released.
       }
       stopRecognition();
+      quietAudio();
       try {
         synth.cancel();
       } catch {
@@ -445,6 +488,21 @@ export function ArenaCaller({
       }
     };
   }, []);
+
+  useEffect(() => {
+    let dead = false;
+    const lines = callerSpeechLines(movements, cues);
+    void prefetchCallerSpeech(lines, (done, total) => {
+      if (!dead) setPrep({ done, total });
+    }).then((result) => {
+      if (dead) return;
+      urlsRef.current = { ...urlsRef.current, ...result.urls };
+      if (result.note) setPrepNote(result.note);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [movements, cues]);
 
   if (!movement) return null;
 
@@ -454,6 +512,7 @@ export function ArenaCaller({
       role="dialog"
       aria-label={`Caller for ${title}`}
     >
+      <audio ref={audioRef} playsInline preload="auto" className="pointer-events-none absolute h-0 w-0" />
       <div className="flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" className="min-h-11 text-sm font-semibold text-accent" onClick={onClose}>
           Close
@@ -501,7 +560,12 @@ export function ArenaCaller({
         <p className="text-center text-sm font-semibold" data-testid="voice-status">
           {voiceLine}
         </p>
-        <p className="text-center text-xs text-muted">{speechStatus ?? SPEECH_SILENT_HINT}</p>
+        <p className="text-center text-xs text-muted">{prepNote ?? speechStatus ?? SPEECH_SILENT_HINT}</p>
+        {prep && prep.total > 0 && (
+          <p className="text-center text-xs text-muted" data-testid="voice-prep">
+            {prep.done >= prep.total ? "Voice ready" : `Preparing voice ${prep.done} of ${prep.total}`}
+          </p>
+        )}
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"

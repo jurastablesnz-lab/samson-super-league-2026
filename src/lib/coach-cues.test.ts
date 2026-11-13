@@ -11,7 +11,12 @@ import {
   cueIsGrounded,
   evidenceScript,
   mergeCoachCues,
+  claimTtsChars,
+  coachTtsCharsPerDay,
+  coachTtsLimitMessage,
+  coachTtsVoice,
   cueRiderName,
+  releaseTtsChars,
   rewriteCueText,
   riderFirstName,
   sheetMatchesTest,
@@ -79,6 +84,8 @@ test("coaching is only for an approved rider, and an admin is not limited", () =
   assert.equal(coachCuesPerDay(undefined), 8);
   assert.equal(coachCuesPerDay("3"), 3);
   assert.equal(coachTtsMode(undefined), "browser");
+  assert.equal(coachTtsMode(undefined, "xai-key"), "xai");
+  assert.equal(coachTtsMode("browser", "xai-key"), "browser");
   assert.equal(coachTtsMode("xai"), "xai");
   assert.equal(riderFirstName("Susan Leach"), "Susan");
   assert.equal(
@@ -123,6 +130,20 @@ test("a rider stops at the daily coaching refreshes", async () => {
     );
     const blocked = await claimCoachGeneration(sql, { userId: "rider", limit: 1, day: "2026-11-12" });
     assert.deepEqual(blocked, { ok: false, error: coachCueLimitMessage(1) });
+    assert.equal(coachTtsCharsPerDay(undefined), 40_000);
+    assert.equal(coachTtsCharsPerDay("8000"), 8000);
+    assert.equal(coachTtsVoice(undefined), "ara");
+    assert.equal(coachTtsVoice("Eve"), "eve");
+    assert.equal(coachTtsVoice(undefined, ["eve", "leo"]), "eve");
+    assert.deepEqual(await claimTtsChars(sql, { userId: "rider", limit: 20, day: "2026-11-13", chars: 12 }), {
+      ok: true,
+    });
+    const over = await claimTtsChars(sql, { userId: "rider", limit: 20, day: "2026-11-13", chars: 9 });
+    assert.deepEqual(over, { ok: false, error: coachTtsLimitMessage(20) });
+    await releaseTtsChars(sql, { userId: "rider", day: "2026-11-13", chars: 12 });
+    assert.deepEqual(await claimTtsChars(sql, { userId: "rider", limit: 20, day: "2026-11-13", chars: 9 }), {
+      ok: true,
+    });
   } finally {
     await pg.close();
   }

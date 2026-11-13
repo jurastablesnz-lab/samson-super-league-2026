@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   ListPartsCommand,
+  PutObjectCommand,
   S3Client,
   UploadPartCommand,
   type Part,
@@ -52,6 +53,31 @@ function s3(env: R2Env): S3Client {
 
 export function cloudConfigured(): boolean {
   return readR2Env(process.env) !== null;
+}
+
+/** One spoken line, shared by every rider who asks for the same words. */
+export async function writeTtsObject(hash: string, bytes: Uint8Array): Promise<string | null> {
+  const env = readR2Env(process.env);
+  if (!env || !/^[a-f0-9]{64}$/.test(hash)) return null;
+  const key = `tts/${hash}.mp3`;
+  await s3(env).send(
+    new PutObjectCommand({
+      Bucket: env.bucket,
+      Key: key,
+      Body: bytes,
+      ContentType: "audio/mpeg",
+    }),
+  );
+  return key;
+}
+
+export async function readTtsObject(key: string): Promise<Uint8Array | null> {
+  const env = readR2Env(process.env);
+  if (!env || !/^tts\/[a-f0-9]{64}\.mp3$/.test(key)) return null;
+  const out = await s3(env).send(new GetObjectCommand({ Bucket: env.bucket, Key: key }));
+  const body = out.Body;
+  if (!body) return null;
+  return body.transformToByteArray();
 }
 
 export function storagePort(): StoragePort | null {

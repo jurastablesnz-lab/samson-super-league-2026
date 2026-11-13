@@ -14,6 +14,16 @@ export function sttLimitMessage(limit: number): string {
   return `You've used today's ${minutes} minutes of voice commands. The buttons still work, and you can say more tomorrow.`;
 }
 
+/** iOS reports audio/mp4;codecs=mp4a.40.2. The service wants the base type. */
+export function bareAudioMime(raw: string): string {
+  const base = raw.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (base === "audio/mp4" || base === "audio/m4a" || base === "audio/x-m4a" || base === "audio/aac") return "audio/mp4";
+  if (base === "audio/webm") return "audio/webm";
+  if (base === "audio/mpeg" || base === "audio/mp3") return "audio/mpeg";
+  if (base === "audio/wav" || base === "audio/wave" || base === "audio/x-wav") return "audio/wav";
+  return "";
+}
+
 export function clipSeconds(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(8, Math.max(1, Math.round(value)));

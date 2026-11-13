@@ -7,6 +7,13 @@ export const TEST_SOUND_TEXT = "Hello Susan, testing";
 /** xAI lists TTS at about $15 per million characters. */
 export const TTS_USD_PER_MILLION_CHARS = 15;
 
+/** True when playback has reached the end even if the ended event never arrives. */
+export function clipLooksFinished(current: number, duration: number): boolean {
+  if (!Number.isFinite(duration) || duration <= 0 || duration === Infinity) return false;
+  if (!Number.isFinite(current) || current < 0) return false;
+  return current >= duration - 0.25;
+}
+
 /** Words for the voice, and the cache key. The same shorthand always becomes the same line. */
 export function speechText(text: string): string {
   return spokenLine(text).slice(0, 500);

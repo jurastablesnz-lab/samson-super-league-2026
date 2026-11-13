@@ -75,7 +75,7 @@ export function micHelp(input: { status: MicStatus; mode: CommandMode; standalon
     }
     return "This browser cannot hear commands. The buttons still work.";
   }
-  return "Tap here to say next, back, or repeat.";
+  return "Tap start. That also turns the microphone on.";
 }
 
 export type VadState = { hot: number; cool: number; recording: boolean; ms: number };

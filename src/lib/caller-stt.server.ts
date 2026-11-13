@@ -1,6 +1,6 @@
 import type { Sql } from "./db.ts";
 import { refundAiMicros, reserveMonthlySpend, sttUsd } from "./ai-cost.ts";
-import { claimSttSeconds, clipSeconds, coachSttSecondsPerDay, releaseSttSeconds, transcriptFromStt } from "./caller-stt.ts";
+import { bareAudioMime, claimSttSeconds, clipSeconds, coachSttSecondsPerDay, releaseSttSeconds, transcriptFromStt } from "./caller-stt.ts";
 import { aucklandDay, sheetReadGate } from "./sheet-reads.ts";
 
 const MAX_BYTES = 400_000;
@@ -28,7 +28,7 @@ export async function transcribeClip(
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
   });
-  if (!res.ok) return "";
+  if (!res.ok) throw new Error(`Couldn't reach voice service (${res.status}).`);
   return transcriptFromStt(await res.json());
 }
 
@@ -43,10 +43,8 @@ export async function hearClip(
   if (!gate.ok) return gate;
   const apiKey = env.apiKey?.trim() ?? "";
   if (!apiKey) return { ok: false, error: "Voice commands are not available right now." };
-  const mime = input.mime.trim().toLowerCase();
-  if (!/^audio\/(mp4|m4a|aac|webm|wav|mpeg|mp3)$/.test(mime)) {
-    return { ok: false, error: "That recording could not be read." };
-  }
+  const mime = bareAudioMime(input.mime);
+  if (!mime) return { ok: false, error: "That recording could not be read." };
   let bytes: Uint8Array;
   try {
     bytes = new Uint8Array(Buffer.from(input.audioBase64, "base64"));
@@ -79,11 +77,17 @@ export async function hearClip(
   try {
     const text = await transcribeClip(apiKey, bytes, mime, fetchImpl);
     return { ok: true, text };
-  } catch {
+  } catch (err) {
     if (gate.limited) {
       await releaseSttSeconds(sql, { userId: actor.userId, day, seconds });
       await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
     }
-    return { ok: false, error: "That word could not be heard. The buttons still work." };
+    const message = err instanceof Error ? err.message : "";
+    return {
+      ok: false,
+      error: message.startsWith("Couldn't reach voice service")
+        ? message
+        : "Couldn't reach voice service.",
+    };
   }
 }

@@ -48,6 +48,7 @@ export function createCallerEar(options: {
   openMic?: () => Promise<MediaStream>;
   transcribe?: (blob: Blob, seconds: number) => Promise<string>;
   onCommand: (command: RideCommand, heard: string) => void;
+  onHeard?: (heard: string) => void;
   onStatus: (status: MicStatus) => void;
   onLog: (line: string) => void;
   schedule?: (fn: () => void, ms: number) => number;
@@ -76,6 +77,7 @@ export function createCallerEar(options: {
   }
 
   function accept(heard: string) {
+    options.onHeard?.(heard);
     const command = commandFromTranscript(heard, suspended);
     log(`mic: heard ${JSON.stringify(heard)}`);
     if (!command) return;
@@ -165,15 +167,23 @@ export function createCallerEar(options: {
   }
 
   function finishClip(blob: Blob, seconds: number) {
-    if (discardClip || blob.size < 2000 || !options.transcribe) return;
+    if (discardClip || !options.transcribe) return;
+    if (blob.size < 400) {
+      log(`mic: clip too small (${blob.size})`);
+      options.onHeard?.("");
+      return;
+    }
     log("mic: sending a clip");
     void options
       .transcribe(blob, seconds)
       .then((text) => {
         if (text) accept(text);
+        else options.onHeard?.("");
       })
       .catch((err) => {
-        log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
+        const message = err instanceof Error ? err.message : String(err);
+        log(`mic: error ${message}`);
+        options.onHeard?.(message);
       });
   }
 
@@ -182,6 +192,11 @@ export function createCallerEar(options: {
     const current = recorder;
     recorder = null;
     if (!current || current.state === "inactive") return;
+    try {
+      current.requestData();
+    } catch {
+      // Some browsers only deliver data from stop().
+    }
     try {
       current.stop();
     } catch {
@@ -207,7 +222,7 @@ export function createCallerEar(options: {
         };
         recorder = next;
         discardClip = false;
-        next.start();
+        next.start(250);
         log("mic: clip");
       } catch (err) {
         log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
@@ -286,6 +301,7 @@ export function createCallerEar(options: {
     },
     resume() {
       suspended = false;
+      void context?.resume();
       if (!want || stopped) return;
       if (mode === "webkit") beginWebkit();
       else if (stream) options.onStatus("listening");

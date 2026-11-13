@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   callerSpeechLines,
+  clipLooksFinished,
   instructionText,
   resolveClipUrl,
   speechHash,
@@ -9,7 +10,16 @@ import {
   TEST_SOUND_TEXT,
   ttsCostUsd,
 } from "./caller-speech.ts";
+import { bareAudioMime } from "./caller-stt.ts";
 import { TEST_2B } from "./tests/level-2/novice-2B.ts";
+
+test("playback counts as finished near the end, and an iPhone recording type is accepted", () => {
+  assert.equal(clipLooksFinished(4.8, 5), true);
+  assert.equal(clipLooksFinished(1, 5), false);
+  assert.equal(clipLooksFinished(1, Number.NaN), false);
+  assert.equal(bareAudioMime("audio/mp4;codecs=mp4a.40.2"), "audio/mp4");
+  assert.equal(bareAudioMime("audio/webm;codecs=opus"), "audio/webm");
+});
 
 test("a line keeps its hash for the same voice and text", async () => {
   const first = await speechHash("ara", "  Enter at A  ");

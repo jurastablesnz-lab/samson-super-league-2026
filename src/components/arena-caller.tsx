@@ -9,10 +9,11 @@ import {
   SPEECH_SILENT_HINT,
 } from "@/lib/arena-caller";
 import type { CallClip } from "@/lib/arena-caller";
-import { callerSpeechLines, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
+import { callerSpeechLines, clipLooksFinished, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
 import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
 import { callerDevice, micHelp, type MicStatus, type RideCommand } from "@/lib/caller-commands";
 import { createCallerEar, type CallerEar } from "@/lib/caller-ear";
+import { bareAudioMime } from "@/lib/caller-stt";
 import { hearCallerClip } from "@/lib/coach";
 import type { Movement } from "@/lib/tests/types";
 
@@ -116,6 +117,7 @@ export function ArenaCaller({
   const commandRef = useRef<(command: RideCommand) => void>(() => undefined);
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
   const startTimerRef = useRef<number | null>(null);
+  const clipEndRef = useRef<number | null>(null);
   const titleTaps = useRef(0);
   const speakGen = useRef(0);
   directivesRef.current = directives;
@@ -166,17 +168,61 @@ export function ArenaCaller({
     recRef.current = null;
   }
 
+  function clearClipEnd() {
+    if (clipEndRef.current != null) window.clearTimeout(clipEndRef.current);
+    clipEndRef.current = null;
+  }
+
   function quietAudio() {
     const audio = audioRef.current;
     if (!audio) return;
     audio.onended = null;
     audio.onerror = null;
     audio.onplaying = null;
+    audio.ontimeupdate = null;
+    audio.onpause = null;
+    audio.onloadedmetadata = null;
+    audio.ondurationchange = null;
     try {
       audio.pause();
     } catch {
       // The previous clip had already ended.
     }
+  }
+
+  /** iOS often never fires ended on a reused audio element. Watch the clock as well. */
+  function followPlayback(audio: HTMLAudioElement, gen: number, onDone: () => void) {
+    let settled = false;
+    const clearWatch = () => {
+      settled = true;
+      clearClipEnd();
+      audio.onended = null;
+      audio.ontimeupdate = null;
+      audio.onpause = null;
+      audio.onloadedmetadata = null;
+      audio.ondurationchange = null;
+    };
+    const finish = () => {
+      if (settled || gen !== speakGen.current) return;
+      clearWatch();
+      onDone();
+    };
+    const arm = () => {
+      const dur = audio.duration;
+      const ms = Number.isFinite(dur) && dur > 0 && dur < 180 ? Math.ceil(dur * 1000) + 800 : 20000;
+      clearClipEnd();
+      clipEndRef.current = window.setTimeout(finish, ms);
+    };
+    audio.onloadedmetadata = arm;
+    audio.ondurationchange = arm;
+    audio.ontimeupdate = () => {
+      if (clipLooksFinished(audio.currentTime, audio.duration)) finish();
+    };
+    audio.onpause = () => {
+      if (audio.ended || clipLooksFinished(audio.currentTime, audio.duration)) finish();
+    };
+    audio.onended = () => finish();
+    return { arm, cancel: clearWatch, done: () => settled };
   }
 
   function speakBrowser(text: string, onDone: () => void) {
@@ -257,6 +303,7 @@ export function ArenaCaller({
   }
 
   function playClips(clips: CallClip[], at: number) {
+    clearClipEnd();
     quietAudio();
     earRef.current?.suspend();
     stopRecognition();
@@ -284,9 +331,11 @@ export function ArenaCaller({
       const url = resolveClipUrl(clip, urlsRef.current);
       if (url && audio) {
         let committed = false;
+        let playback: { cancel: () => void; done: () => boolean; arm: () => void } | null = null;
         const fallback = () => {
-          if (committed || gen !== speakGen.current) return;
+          if (playback?.done() || committed || gen !== speakGen.current) return;
           committed = true;
+          playback?.cancel();
           quietAudio();
           speakBrowser(clip.text, () => step(i + 1, false));
         };
@@ -299,17 +348,28 @@ export function ArenaCaller({
           setVoiceLine("Voice: speaking");
           noteVoice(ttsVoiceRef.current || "xai", clip.text);
         };
-        audio.onended = () => {
-          if (gen !== speakGen.current) return;
+        playback = followPlayback(audio, gen, () => {
           setVoiceLine("Voice: ended");
           step(i + 1, false);
+        });
+        audio.onerror = () => {
+          if (!playback.done()) fallback();
         };
-        audio.onerror = () => fallback();
         audio.onplaying = mark;
         audio.src = url;
+        try {
+          audio.currentTime = 0;
+        } catch {
+          // The new source is not seekable yet.
+        }
         const pending = audio.play();
         setPhase("speaking");
-        pending?.then(mark).catch(() => fallback());
+        pending?.then(() => {
+          mark();
+          playback.arm();
+        }).catch(() => {
+          if (!playback.done()) fallback();
+        });
         startTimerRef.current = window.setTimeout(() => {
           if (committed || gen !== speakGen.current) return;
           setVoiceBlocked(true);
@@ -372,7 +432,9 @@ export function ArenaCaller({
   }
 
   function testSound() {
+    clearClipEnd();
     quietAudio();
+    earRef.current?.suspend();
     stopRecognition();
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     const gen = ++speakGen.current;
@@ -388,16 +450,21 @@ export function ArenaCaller({
         setVoiceLine("Voice: speaking");
         noteVoice(ttsVoiceRef.current || "xai", TEST_SOUND_TEXT);
       };
-      audio.onended = () => {
-        if (gen === speakGen.current) setVoiceLine("Voice: ended");
-      };
+      const playback = followPlayback(audio, gen, () => {
+        setVoiceLine("Voice: ended");
+        earRef.current?.resume();
+      });
       audio.onerror = () => {
-        if (!committed && gen === speakGen.current) speakBrowser(TEST_SOUND_TEXT, () => undefined);
+        if (!committed && !playback.done() && gen === speakGen.current) {
+          speakBrowser(TEST_SOUND_TEXT, () => earRef.current?.resume());
+        }
       };
       audio.src = url;
       const pending = audio.play();
       pending?.catch(() => {
-        if (!committed && gen === speakGen.current) speakBrowser(TEST_SOUND_TEXT, () => undefined);
+        if (playback.done() || gen !== speakGen.current) return;
+        playback.cancel();
+        speakBrowser(TEST_SOUND_TEXT, () => earRef.current?.resume());
       });
       return;
     }
@@ -409,7 +476,7 @@ export function ArenaCaller({
         setLastError(err instanceof Error ? err.message : String(err));
       }
     }
-    speakBrowser(TEST_SOUND_TEXT, () => undefined);
+    speakBrowser(TEST_SOUND_TEXT, () => earRef.current?.resume());
   }
 
   function pressDown() {
@@ -449,17 +516,19 @@ export function ArenaCaller({
           reader.onerror = () => reject(reader.error ?? new Error("Could not read the clip"));
           reader.readAsDataURL(blob);
         });
-        const result = await hearCallerClip({ data: { audio, mime: blob.type || "audio/mp4", seconds } });
+        const result = await hearCallerClip({
+          data: { audio, mime: bareAudioMime(blob.type) || "audio/mp4", seconds },
+        });
         if (!result.ok) {
-          if (/Monthly limit|tomorrow/.test(result.error)) {
-            setMicStatus("paused");
-            setMicNote(result.error);
-          }
+          setMicNote(result.error);
+          if (/Monthly limit|tomorrow/.test(result.error)) setMicStatus("paused");
           logDiag(`mic: ${result.error}`);
           return "";
         }
-        setMicNote(null);
         return result.text;
+      },
+      onHeard: (heard) => {
+        setMicNote(heard ? `Heard: "${heard}"` : "Heard nothing. Say next, back, or again.");
       },
       onCommand: (command) => commandRef.current(command),
       onStatus: (status) => {
@@ -561,7 +630,7 @@ export function ArenaCaller({
       role="dialog"
       aria-label={`Caller for ${title}`}
     >
-      <audio ref={audioRef} playsInline preload="auto" className="pointer-events-none absolute h-0 w-0" />
+      <audio ref={audioRef} playsInline preload="auto" className="pointer-events-none fixed top-0 left-0 h-px w-px opacity-0" />
       <div className="flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" className="min-h-11 text-sm font-semibold text-accent" onClick={onClose}>
           Close
@@ -592,18 +661,29 @@ export function ArenaCaller({
         >
           {letters || `Movement ${movement.n}`}
         </button>
-        <div className="mt-2 max-h-[28%] shrink-0 overflow-y-auto">
-          <p className="text-xl leading-snug">{instruction}</p>
+        <div className="mt-2 shrink-0">
+          <p className="text-xl leading-snug break-words">{instruction}</p>
           {coach && spokenCue?.text && (
-            <p className="mt-2 text-base leading-relaxed text-accent">{spokenCue.text}</p>
+            <p className="mt-2 text-base leading-relaxed break-words text-accent">{spokenCue.text}</p>
           )}
           {directives && movement.directive.trim() && (
-            <p className="mt-2 text-base leading-relaxed text-muted">{movement.directive}</p>
+            <p className="mt-2 text-base leading-relaxed break-words text-muted">{movement.directive}</p>
           )}
         </div>
-        <div className="caller-arena mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden pointer-events-none [&_svg]:pointer-events-none [&_svg]:mx-auto [&_svg]:h-full [&_svg]:max-h-full [&_svg]:w-auto [&_svg]:max-w-full">
-          {children(movement)}
-        </div>
+        {armed ? (
+          <button
+            type="button"
+            className="caller-arena mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden pointer-events-auto [&_svg]:pointer-events-none [&_svg]:mx-auto [&_svg]:h-full [&_svg]:max-h-full [&_svg]:w-auto [&_svg]:max-w-full"
+            aria-label="Next movement"
+            onClick={() => go(index + 1)}
+          >
+            {children(movement)}
+          </button>
+        ) : (
+          <div className="caller-arena mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden pointer-events-none [&_svg]:pointer-events-none [&_svg]:mx-auto [&_svg]:h-full [&_svg]:max-h-full [&_svg]:w-auto [&_svg]:max-w-full">
+            {children(movement)}
+          </div>
+        )}
       </div>
       <div className="relative z-20 shrink-0 border-t border-line bg-bg px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <p className="text-center text-sm font-semibold" data-testid="voice-status">
@@ -635,7 +715,10 @@ export function ArenaCaller({
             <button
               type="button"
               className="relative z-30 min-h-14 rounded-xl bg-accent text-base font-semibold text-accent-fg"
-              onClick={() => go(0, true)}
+              onClick={() => {
+                go(0, true);
+                earRef.current?.arm();
+              }}
             >
               Tap to start
             </button>
@@ -698,29 +781,33 @@ export function ArenaCaller({
               onChange={(event) => setDirectives(event.target.checked)}
             />
           </label>
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={auto}
-              onChange={(event) => setAuto(event.target.checked)}
-            />
-            Auto
-          </label>
-          <label className="flex min-h-11 items-center justify-end gap-2 text-sm">
-            Gap
-            <input
-              type="number"
-              min={2}
-              max={60}
-              inputMode="numeric"
-              value={gap}
-              onChange={(event) => setGap(clampGap(Number(event.target.value)))}
-              className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right tabular-nums"
-              aria-label="Seconds before the next movement"
-            />
-            s
-          </label>
+          <div className="col-span-2 flex min-h-11 items-center gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-5"
+                checked={auto}
+                onChange={(event) => setAuto(event.target.checked)}
+              />
+              Auto
+            </label>
+            {auto && (
+              <label className="ml-auto flex items-center gap-2">
+                Gap
+                <input
+                  type="number"
+                  min={2}
+                  max={60}
+                  inputMode="numeric"
+                  value={gap}
+                  onChange={(event) => setGap(clampGap(Number(event.target.value)))}
+                  className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right tabular-nums"
+                  aria-label="Seconds before the next movement"
+                />
+                s
+              </label>
+            )}
+          </div>
         </div>
         {debug && (
           <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-ink p-2 text-[10px] leading-snug text-accent-fg" data-testid="caller-debug">

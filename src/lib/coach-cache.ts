@@ -4,7 +4,14 @@ import { putMediaBlob, readCoachCache, writeCoachCache } from "./media-db";
 
 export type CachedCue = CoachCue & { audioUrl?: string };
 
-type CacheRow = { cues: { n: number; text: string; source: "ai" | "edit"; audioId?: string }[] };
+type CacheRow = {
+  cues: { n: number; text: string; source: "ai" | "edit"; audioId?: string; spoken?: string }[];
+};
+
+function spokenOf(spoken?: string): { spoken?: string } {
+  const words = spoken?.trim();
+  return words ? { spoken: words } : {};
+}
 
 function cacheKey(horseId: string, testId: string) {
   return `${horseId}:${testId}`;
@@ -34,11 +41,12 @@ async function withAudio(
       blobId = audioId(horseId, testId, cue.n, cue.text);
       await putMediaBlob(blobId, new Blob([bytes], { type: "audio/mpeg" })).catch(() => undefined);
     }
-    stored.push({ n: cue.n, text: cue.text, source: cue.source, audioId: blobId || undefined });
+    stored.push({ n: cue.n, text: cue.text, source: cue.source, audioId: blobId || undefined, ...spokenOf(cue.spoken) });
     playable.push({
       n: cue.n,
       text: cue.text,
       source: cue.source,
+      ...spokenOf(cue.spoken),
       audioUrl: blobId ? undefined : cue.audioUrl,
     });
   }
@@ -61,12 +69,13 @@ export async function cachedCallerCues(horseId: string, testId: string): Promise
   const { getMediaBlob } = await import("./media-db");
   return Promise.all(
     row.cues.map(async (cue) => {
-      if (!cue.audioId) return { n: cue.n, text: cue.text, source: cue.source };
+      if (!cue.audioId) return { n: cue.n, text: cue.text, source: cue.source, ...spokenOf(cue.spoken) };
       const blob = await getMediaBlob(cue.audioId).catch(() => undefined);
       return {
         n: cue.n,
         text: cue.text,
         source: cue.source,
+        ...spokenOf(cue.spoken),
         audioUrl: blob ? URL.createObjectURL(blob) : undefined,
       };
     }),

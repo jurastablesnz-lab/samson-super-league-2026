@@ -41,6 +41,9 @@ test("the caller speaks the written steps, and the directive only when asked", (
     ["A Enter in working trot. X Halt, salute", "Susan, sit deep for the halt."],
   );
   assert.equal(coached[1].audioUrl, "/audio/cue-1.mp3");
+  const said = movementCall(movement, false, { spoken: "ay, enter, halt and salute" });
+  assert.equal(said[0].text, "ay, enter, halt and salute");
+  assert.equal(said[0].audioUrl, "/audio/2a-1.mp3");
 });
 
 test("next is a word, and the auto gap stays in a usable range", () => {

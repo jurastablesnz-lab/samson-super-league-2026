@@ -7,6 +7,8 @@ export type CoachCue = {
   n: number;
   text: string;
   source: "ai" | "edit";
+  /** How this movement is said, when the automatic reading is wrong. */
+  spoken?: string;
 };
 
 export type CueEvidence = {
@@ -238,16 +240,28 @@ export function acceptCues(
   });
 }
 
-/** An edited line stays, including a blank a coach cleared. */
+function withSpoken(cue: CoachCue, spoken?: string): CoachCue {
+  const words = (spoken ?? cue.spoken ?? "").trim();
+  if (!words) {
+    const { spoken: _omit, ...rest } = cue;
+    return rest;
+  }
+  return { ...cue, spoken: words };
+}
+
+/** An edited line stays, including a blank a coach cleared. A spoken override stays too. */
 export function mergeCoachCues(previous: CoachCue[], generated: { n: number; text: string }[]): CoachCue[] {
   const edits = new Map(previous.filter((cue) => cue.source === "edit").map((cue) => [cue.n, cue]));
+  const spoken = new Map(previous.map((cue) => [cue.n, cue.spoken?.trim() ?? ""]));
   const seen = new Set<number>();
   const merged = generated.map((cue) => {
     seen.add(cue.n);
-    return edits.get(cue.n) ?? { n: cue.n, text: cue.text, source: "ai" as const };
+    const edit = edits.get(cue.n);
+    if (edit) return withSpoken(edit);
+    return withSpoken({ n: cue.n, text: cue.text, source: "ai" as const }, spoken.get(cue.n));
   });
   for (const edit of edits.values()) {
-    if (!seen.has(edit.n)) merged.push(edit);
+    if (!seen.has(edit.n)) merged.push(withSpoken(edit));
   }
   return merged.sort((a, b) => a.n - b.n);
 }

@@ -158,11 +158,15 @@ async function readStored(sql: Sql, horseId: string, testId: string): Promise<Co
   if (!Array.isArray(cues)) return [];
   return cues
     .filter((cue) => cue && Number.isInteger(cue.n) && (cue.source === "ai" || cue.source === "edit"))
-    .map((cue) => ({
-      n: cue.n,
-      text: clip(String(cue.text ?? ""), 320),
-      source: cue.source,
-    }));
+    .map((cue) => {
+      const spoken = clip(String(cue.spoken ?? ""), 400);
+      return {
+        n: cue.n,
+        text: clip(String(cue.text ?? ""), 320),
+        source: cue.source,
+        ...(spoken ? { spoken } : {}),
+      };
+    });
 }
 
 export async function loadStoredCues(
@@ -188,17 +192,21 @@ export async function saveEditedCues(
   actor: { userId: string; isAdmin: boolean },
   horseId: string,
   testId: string,
-  cues: { n: number; text: string }[],
+  cues: { n: number; text: string; spoken?: string }[],
 ): Promise<CoachCue[]> {
   if (!actor.isAdmin) throw new Error("Admins only");
   const horse = await horseRow(sql, actor.userId, horseId, true);
   if (!horse) throw new Error("Horse not found");
   const previous = await readStored(sql, horse.id, testId);
-  const edits: CoachCue[] = cues.slice(0, 40).map((cue) => ({
-    n: cue.n,
-    text: clip(cue.text, 320),
-    source: "edit" as const,
-  }));
+  const edits: CoachCue[] = cues.slice(0, 40).map((cue) => {
+    const spoken = clip(cue.spoken ?? "", 400);
+    return {
+      n: cue.n,
+      text: clip(cue.text, 320),
+      source: "edit" as const,
+      ...(spoken ? { spoken } : {}),
+    };
+  });
   const byNumber = new Map(previous.map((cue) => [cue.n, cue]));
   for (const edit of edits) byNumber.set(edit.n, edit);
   const next = [...byNumber.values()].sort((a, b) => a.n - b.n);

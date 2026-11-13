@@ -10,7 +10,7 @@ import {
   SPEECH_SILENT_HINT,
 } from "@/lib/arena-caller";
 import type { CallClip } from "@/lib/arena-caller";
-import { callerSpeechLines, resolveClipUrl, TEST_SOUND_TEXT } from "@/lib/caller-speech";
+import { callerSpeechLines, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
 import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
 import type { Movement } from "@/lib/tests/types";
 
@@ -62,7 +62,7 @@ export function ArenaCaller({
 }: {
   title: string;
   movements: Movement[];
-  cues?: { n: number; text: string; audioUrl?: string }[];
+  cues?: { n: number; text: string; audioUrl?: string; spoken?: string }[];
   onClose: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -133,7 +133,11 @@ export function ArenaCaller({
     const current = movementsRef.current[at];
     if (!current) return [];
     const cue = cuesRef.current.find((item) => item.n === current.n);
-    return movementCall(current, directivesRef.current, coachRef.current && cue?.text ? cue : null);
+    return movementCall(current, directivesRef.current, {
+      text: coachRef.current && cue?.text ? cue.text : "",
+      audioUrl: coachRef.current ? cue?.audioUrl : undefined,
+      spoken: cue?.spoken,
+    });
   }
 
   function stopRecognition() {
@@ -198,8 +202,13 @@ export function ArenaCaller({
   }
 
   function speakBrowser(text: string, onDone: () => void) {
+    const line = speechText(text);
+    if (!line) {
+      onDone();
+      return;
+    }
     const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(line);
     const voice = voiceRef.current;
     if (voice) {
       utterance.voice = voice;
@@ -245,7 +254,7 @@ export function ArenaCaller({
             speak: () => synth.speak(utterance),
           }
         : null,
-      [text],
+      [line],
     );
     if (outcome !== "ok") {
       setVoiceLine(outcome === "unavailable" ? "Voice: not started" : "Voice: blocked");

@@ -75,6 +75,11 @@ test("a coach edit survives a refresh, and a cleared line stays cleared", () => 
     { n: 1, text: "Susan, softer hand.", source: "edit" },
     { n: 2, text: "", source: "edit" },
   ]);
+  const kept = mergeCoachCues(
+    [{ n: 1, text: "Old cue.", source: "ai", spoken: "ay, halt and salute" }],
+    [{ n: 1, text: "Generated halt cue." }],
+  );
+  assert.deepEqual(kept, [{ n: 1, text: "Generated halt cue.", source: "ai", spoken: "ay, halt and salute" }]);
 });
 
 test("coaching is only for an approved rider, and an admin is not limited", () => {

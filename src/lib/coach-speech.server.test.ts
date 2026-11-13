@@ -40,7 +40,7 @@ test("speech is generated once, cached, and an unapproved rider gets none", asyn
     assert.equal(first.clips.length, 1);
     assert.equal(first.clips[0].cached, false);
     assert.equal(typeof first.clips[0].audioBase64, "string");
-    assert.deepEqual(calls, ["Enter at A"]);
+    assert.deepEqual(calls, ["Enter at ay"]);
     const again = await ensureCallerSpeech(
       sql,
       { userId: "rider", isAdmin: false, approved: true },
@@ -49,7 +49,7 @@ test("speech is generated once, cached, and an unapproved rider gets none", asyn
       synthesize,
     );
     assert.equal(again.ok && again.clips[0]?.cached, true);
-    assert.deepEqual(calls, ["Enter at A"]);
+    assert.deepEqual(calls, ["Enter at ay"]);
     const hash = await speechHash("ara", "Enter at A");
     assert.equal(again.ok && again.clips[0]?.hash, hash);
     const browser = await ensureCallerSpeech(

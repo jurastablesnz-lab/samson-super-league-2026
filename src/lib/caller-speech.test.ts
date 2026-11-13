@@ -33,8 +33,13 @@ test("the caller prepares the instruction and the cue, not the directive", () =>
     ],
     [{ n: 1, text: "Keep the halt still." }],
   );
-  assert.deepEqual(lines, [TEST_SOUND_TEXT, "A Enter in working trot. X Halt, salute", "Keep the halt still."]);
-  assert.equal(instructionText({ steps: [{ at: "A", do: "Enter in working trot" }] }), "A Enter in working trot");
+  assert.deepEqual(lines, [TEST_SOUND_TEXT, "ay Enter in working trot. ex Halt, salute", "Keep the halt still."]);
+  assert.equal(instructionText({ steps: [{ at: "A", do: "Enter in working trot" }] }), "ay Enter in working trot");
+  const overridden = callerSpeechLines(
+    [{ n: 1, steps: [{ at: "P", do: "Circle left 15m" }] }],
+    [{ n: 1, spoken: "pee circle left fifteen metres" }],
+  );
+  assert.deepEqual(overridden, [TEST_SOUND_TEXT, "pee circle left fifteen metres"]);
   assert.equal(resolveClipUrl({ text: "Keep the halt still." }, { "Keep the halt still.": "blob:cue" }), "blob:cue");
   assert.equal(resolveClipUrl({ text: "A Enter", audioUrl: "/file.mp3" }, {}), "/file.mp3");
 });

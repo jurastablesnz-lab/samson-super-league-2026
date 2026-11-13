@@ -1,4 +1,5 @@
 import type { CallClip } from "./arena-caller.ts";
+import { spokenLine } from "./spoken-line.ts";
 
 /** What Test sound says. Cached like every other line. */
 export const TEST_SOUND_TEXT = "Hello Susan, testing";
@@ -6,8 +7,9 @@ export const TEST_SOUND_TEXT = "Hello Susan, testing";
 /** xAI lists TTS at about $15 per million characters. */
 export const TTS_USD_PER_MILLION_CHARS = 15;
 
+/** Words for the voice, and the cache key. The same shorthand always becomes the same line. */
 export function speechText(text: string): string {
-  return text.replace(/\s+/g, " ").trim().slice(0, 500);
+  return spokenLine(text).slice(0, 500);
 }
 
 export function instructionText(movement: { steps: { at?: string; do?: string }[] }): string {
@@ -22,14 +24,15 @@ export function instructionText(movement: { steps: { at?: string; do?: string }[
 /** Instruction and personal cue for every movement, plus the test phrase. Directives stay on the phone voice. */
 export function callerSpeechLines(
   movements: { n: number; steps: { at?: string; do?: string }[] }[],
-  cues: { n: number; text?: string }[],
+  cues: { n: number; text?: string; spoken?: string }[],
 ): string[] {
   const lines = [TEST_SOUND_TEXT];
   for (const movement of movements) {
-    const instruction = instructionText(movement);
+    const cue = cues.find((item) => item.n === movement.n);
+    const instruction = speechText(cue?.spoken?.trim() || instructionText(movement));
     if (instruction) lines.push(instruction);
-    const cue = speechText(cues.find((item) => item.n === movement.n)?.text ?? "");
-    if (cue) lines.push(cue);
+    const personal = speechText(cue?.text ?? "");
+    if (personal) lines.push(personal);
   }
   return [...new Set(lines)];
 }

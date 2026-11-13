@@ -86,15 +86,20 @@ export function CoachCueEditor({
   onSaved: (cues: CachedCue[]) => void;
 }) {
   const [draft, setDraft] = useState<Record<number, string>>({});
+  const [spoken, setSpoken] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const movementKey = movements.map((movement) => movement.n).join(",");
   useEffect(() => {
     const next: Record<number, string> = {};
+    const said: Record<number, string> = {};
     for (const movement of movements) {
-      next[movement.n] = cues.find((cue) => cue.n === movement.n)?.text ?? "";
+      const cue = cues.find((item) => item.n === movement.n);
+      next[movement.n] = cue?.text ?? "";
+      said[movement.n] = cue?.spoken ?? "";
     }
     setDraft(next);
+    setSpoken(said);
     // movementKey is the stable list of movement numbers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cues, movementKey]);
@@ -106,7 +111,11 @@ export function CoachCueEditor({
       data: {
         horseId,
         testId,
-        cues: movements.map((movement) => ({ n: movement.n, text: draft[movement.n] ?? "" })),
+        cues: movements.map((movement) => ({
+          n: movement.n,
+          text: draft[movement.n] ?? "",
+          spoken: spoken[movement.n] ?? "",
+        })),
       },
     });
     setBusy(false);
@@ -120,17 +129,28 @@ export function CoachCueEditor({
         Edits replace the generated line for that movement. A blank line stays blank.
       </p>
       {movements.map((movement) => (
-        <label key={movement.n} className="block text-sm">
-          <span className="font-semibold">
-            {movement.n}. {movement.label}
-          </span>
-          <textarea
-            className="mt-1 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm"
-            rows={2}
-            value={draft[movement.n] ?? ""}
-            onChange={(event) => setDraft((current) => ({ ...current, [movement.n]: event.target.value }))}
-          />
-        </label>
+        <div key={movement.n} className="text-sm">
+          <label className="block">
+            <span className="font-semibold">
+              {movement.n}. {movement.label}
+            </span>
+            <textarea
+              className="mt-1 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm"
+              rows={2}
+              value={draft[movement.n] ?? ""}
+              onChange={(event) => setDraft((current) => ({ ...current, [movement.n]: event.target.value }))}
+            />
+          </label>
+          <label className="mt-1 block text-xs text-muted">
+            Spoken text, if this movement should be said differently
+            <input
+              className="mt-1 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg"
+              value={spoken[movement.n] ?? ""}
+              placeholder="Blank uses the automatic reading"
+              onChange={(event) => setSpoken((current) => ({ ...current, [movement.n]: event.target.value }))}
+            />
+          </label>
+        </div>
       ))}
       {error && <p className="text-xs text-danger">{error}</p>}
       <button

@@ -6,12 +6,13 @@ export type CallClip = { text: string; audioUrl?: string };
 export function movementCall(
   movement: Movement,
   directives: boolean,
-  cue?: { text?: string; audioUrl?: string } | null,
+  cue?: { text?: string; audioUrl?: string; spoken?: string } | null,
 ): CallClip[] {
-  const instruction = movement.steps
+  const written = movement.steps
     .map((step) => [step.at, step.do].filter(Boolean).join(" "))
     .filter(Boolean)
     .join(". ");
+  const instruction = cue?.spoken?.trim() || written;
   const clips: CallClip[] = [];
   if (instruction) clips.push({ text: instruction, audioUrl: movement.audioUrl });
   const personal = cue?.text?.trim() ?? "";

@@ -70,12 +70,13 @@ export const refreshCoachCues = createServerFn({ method: "POST" })
 
 export const saveCoachCues = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { horseId?: string; testId?: string; cues?: { n?: number; text?: string }[] }) => ({
+  .validator((input: { horseId?: string; testId?: string; cues?: { n?: number; text?: string; spoken?: string }[] }) => ({
     horseId: text(input?.horseId, 80),
     testId: text(input?.testId, 40),
     cues: (Array.isArray(input?.cues) ? input.cues : []).slice(0, 40).map((cue) => ({
       n: Number(cue?.n) || 0,
       text: text(cue?.text, 320),
+      spoken: text(cue?.spoken, 400),
     })),
   }))
   .handler(async ({ context, data }) => {

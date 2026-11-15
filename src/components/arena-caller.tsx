@@ -11,7 +11,7 @@ import {
 import type { CallClip } from "@/lib/arena-caller";
 import { callerSpeechLines, clipLooksFinished, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
 import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
-import { callerDevice, micHelp, type MicStatus, type RideCommand } from "@/lib/caller-commands";
+import { callerDevice, hearCommand, micHelp, type MicStatus, type RideCommand } from "@/lib/caller-commands";
 import { createCallerEar, type CallerEar } from "@/lib/caller-ear";
 import { bareAudioMime } from "@/lib/caller-stt";
 import { hearCallerClip } from "@/lib/coach";
@@ -528,7 +528,12 @@ export function ArenaCaller({
         return result.text;
       },
       onHeard: (heard) => {
-        setMicNote(heard ? `Heard: "${heard}"` : "Heard nothing. Say next, back, or again.");
+        if (!heard) {
+          setMicNote("Heard nothing. Say next, back, or again.");
+          return;
+        }
+        const command = hearCommand(heard);
+        setMicNote(command ? `Heard: "${heard}" -> ${command}` : `Heard: "${heard}"`);
       },
       onCommand: (command) => commandRef.current(command),
       onStatus: (status) => {

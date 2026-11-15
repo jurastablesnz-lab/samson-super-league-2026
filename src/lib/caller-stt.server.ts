@@ -1,6 +1,13 @@
 import type { Sql } from "./db.ts";
 import { refundAiMicros, reserveMonthlySpend, sttUsd } from "./ai-cost.ts";
-import { bareAudioMime, claimSttSeconds, clipSeconds, coachSttSecondsPerDay, releaseSttSeconds, transcriptFromStt } from "./caller-stt.ts";
+import {
+  bareAudioMime,
+  claimSttSeconds,
+  clipSeconds,
+  coachSttSecondsPerDay,
+  releaseSttSeconds,
+  transcriptFromStt,
+} from "./caller-stt.ts";
 import { aucklandDay, sheetReadGate } from "./sheet-reads.ts";
 
 const MAX_BYTES = 400_000;
@@ -22,6 +29,8 @@ export async function transcribeClip(
   new Uint8Array(copy).set(bytes);
   const form = new FormData();
   form.append("model", "grok-voice-transcribe-2.0");
+  form.append("language", "en");
+  for (const term of ["next", "back", "repeat", "again"]) form.append("keyterm", term);
   form.append("file", new Blob([copy], { type: mime || "audio/mp4" }), fileName(mime));
   const res = await fetchImpl("https://api.x.ai/v1/stt", {
     method: "POST",
@@ -70,7 +79,11 @@ export async function hearClip(
     charged = reserved;
     const claim = await claimSttSeconds(sql, { userId: actor.userId, limit, day, seconds });
     if (!claim.ok) {
-      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+      await refundAiMicros(sql, {
+        userId: actor.userId,
+        month: charged.month,
+        micros: charged.micros,
+      });
       return claim;
     }
   }
@@ -80,7 +93,11 @@ export async function hearClip(
   } catch (err) {
     if (gate.limited) {
       await releaseSttSeconds(sql, { userId: actor.userId, day, seconds });
-      await refundAiMicros(sql, { userId: actor.userId, month: charged.month, micros: charged.micros });
+      await refundAiMicros(sql, {
+        userId: actor.userId,
+        month: charged.month,
+        micros: charged.micros,
+      });
     }
     const message = err instanceof Error ? err.message : "";
     return {

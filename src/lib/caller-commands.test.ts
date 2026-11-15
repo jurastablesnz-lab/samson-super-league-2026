@@ -11,7 +11,15 @@ import {
 } from "./caller-commands.ts";
 import { createCallerEar } from "./caller-ear.ts";
 import { asSql, database } from "./test-database.ts";
-import { claimSttSeconds, sttLimitMessage } from "./caller-stt.ts";
+import {
+  beginPcm,
+  claimSttSeconds,
+  createPcmRing,
+  encodeWavPcm,
+  endPcm,
+  pushPcm,
+  sttLimitMessage,
+} from "./caller-stt.ts";
 import { hearClip, transcribeClip } from "./caller-stt.server.ts";
 
 test("short riding words move the caller, and a long echo does not", () => {
@@ -32,6 +40,35 @@ test("short riding words move the caller, and a long echo does not", () => {
   assert.equal(commandFromTranscript("next", false), "next");
 });
 
+test("a clipped or misheard next still advances once", () => {
+  for (const heard of [
+    "Text.",
+    "Fixed.",
+    "text",
+    "fixed",
+    "necks",
+    "nex",
+    "nexus",
+    "neck",
+    "NEXT",
+    "next one",
+  ]) {
+    assert.equal(hearCommand(heard), "next", heard);
+  }
+  assert.equal(hearCommand("next next next"), "next");
+  assert.equal(hearCommand("next, next"), "next");
+  assert.equal(hearCommand("bak"), "back");
+  assert.equal(hearCommand("bark"), "back");
+  assert.equal(hearCommand("agen"), "repeat");
+  assert.equal(hearCommand("test"), null);
+  assert.equal(hearCommand("test sound"), null);
+  assert.equal(hearCommand("left"), null);
+  assert.equal(hearCommand("rest"), null);
+  assert.equal(hearCommand("pack"), null);
+  assert.equal(hearCommand("bank"), null);
+  assert.equal(hearCommand("the text of the movement please"), null);
+});
+
 test("an iPhone uses the microphone, and a home-screen app says how to listen", () => {
   assert.equal(commandMode({ ios: true, hasRecognition: true, hasMic: true }), "mic");
   assert.equal(commandMode({ ios: false, hasRecognition: true, hasMic: true }), "webkit");
@@ -41,8 +78,14 @@ test("an iPhone uses the microphone, and a home-screen app says how to listen", 
     micHelp({ status: "unsupported", mode: "none", standalone: true }).includes("home-screen"),
     true,
   );
-  assert.equal(micHelp({ status: "listening", mode: "mic", standalone: true }).startsWith("Listening"), true);
-  assert.equal(micHelp({ status: "permission", mode: "mic", standalone: false }).includes("Microphone"), true);
+  assert.equal(
+    micHelp({ status: "listening", mode: "mic", standalone: true }).startsWith("Listening"),
+    true,
+  );
+  assert.equal(
+    micHelp({ status: "permission", mode: "mic", standalone: false }).includes("Microphone"),
+    true,
+  );
 });
 
 test("a command is a short burst, and Ara speaking throws it away", () => {
@@ -69,7 +112,12 @@ test("recognition restarts after it ends, and ignores a word while Ara speaks", 
     continuous = false;
     interimResults = false;
     lang = "";
-    onresult: ((event: { resultIndex: number; results: { 0: { transcript: string }; isFinal?: boolean }[] }) => void) | null = null;
+    onresult:
+      | ((event: {
+          resultIndex: number;
+          results: { 0: { transcript: string }; isFinal?: boolean }[];
+        }) => void)
+      | null = null;
     onend: (() => void) | null = null;
     onerror: ((event: { error?: string }) => void) | null = null;
     started = 0;
@@ -91,7 +139,9 @@ test("recognition restarts after it ends, and ignores a word while Ara speaks", 
     ios: false,
     hasRecognition: true,
     hasMic: false,
-    Recognition: FakeRec as unknown as NonNullable<Parameters<typeof createCallerEar>[0]["Recognition"]>,
+    Recognition: FakeRec as unknown as NonNullable<
+      Parameters<typeof createCallerEar>[0]["Recognition"]
+    >,
     onCommand: (command) => commands.push(command),
     onStatus: () => undefined,
     onLog: (line) => logs.push(line),
@@ -105,7 +155,15 @@ test("recognition restarts after it ends, and ignores a word while Ara speaks", 
   assert.equal(ear.mode, "webkit");
   ear.arm();
   assert.equal(recs[0].started, 1);
-  recs[0].onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "okay next" }, isFinal: true }] });
+  recs[0].onresult?.({
+    resultIndex: 0,
+    results: [{ 0: { transcript: "okay next" }, isFinal: true }],
+  });
+  assert.deepEqual(commands, ["next"]);
+  recs[0].onresult?.({
+    resultIndex: 0,
+    results: [{ 0: { transcript: "next next" }, isFinal: true }],
+  });
   assert.deepEqual(commands, ["next"]);
   recs[0].onend?.();
   assert.equal(pending.length > 0, true);
@@ -114,7 +172,23 @@ test("recognition restarts after it ends, and ignores a word while Ara speaks", 
   ear.suspend();
   recs[1]?.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "next" }, isFinal: true }] });
   assert.deepEqual(commands, ["next"]);
-  assert.equal(logs.some((line) => line.startsWith("mic: command")), true);
+  assert.equal(
+    logs.some((line) => line.startsWith("mic: command")),
+    true,
+  );
+});
+
+test("a command clip keeps the audio from before the detector opens", () => {
+  const ring = createPcmRing();
+  pushPcm(ring, new Float32Array([1, 2]), 10);
+  pushPcm(ring, new Float32Array([3]), 10);
+  beginPcm(ring);
+  pushPcm(ring, new Float32Array([4]), 10);
+  const kept = endPcm(ring, false);
+  assert.deepEqual(Array.from(kept ?? []), [1, 2, 3, 4]);
+  pushPcm(ring, new Float32Array([9, 9, 9, 9, 9]), 10);
+  beginPcm(ring);
+  assert.equal(endPcm(ring, true), null);
 });
 
 test("a rider's command audio stops at the daily minutes, and a transcript is read", async () => {
@@ -124,13 +198,33 @@ test("a rider's command audio stops at the daily minutes, and a transcript is re
     await pg.query(
       `insert into "user" (id, name, email, "emailVerified") values ('rider', 'Susan', 'susan@example.com', true)`,
     );
-    assert.deepEqual(await claimSttSeconds(sql, { userId: "rider", limit: 4, day: "2026-11-13", seconds: 3 }), {
-      ok: true,
+    assert.deepEqual(
+      await claimSttSeconds(sql, { userId: "rider", limit: 4, day: "2026-11-13", seconds: 3 }),
+      {
+        ok: true,
+      },
+    );
+    const blocked = await claimSttSeconds(sql, {
+      userId: "rider",
+      limit: 4,
+      day: "2026-11-13",
+      seconds: 2,
     });
-    const blocked = await claimSttSeconds(sql, { userId: "rider", limit: 4, day: "2026-11-13", seconds: 2 });
     assert.deepEqual(blocked, { ok: false, error: sttLimitMessage(4) });
     const wav = new Uint8Array(800);
-    const heard = await transcribeClip("key", wav, "audio/wav", async () => new Response(JSON.stringify({ text: "okay next" }), { status: 200 }));
+    const clip = encodeWavPcm(new Float32Array([0, 0.5, -0.5]), 16000);
+    const header = new Uint8Array(await clip.arrayBuffer());
+    assert.equal(String.fromCharCode(...header.slice(0, 4)), "RIFF");
+    assert.equal(clip.type, "audio/wav");
+    assert.equal(clip.size, 44 + 6);
+    const heard = await transcribeClip("key", wav, "audio/wav", async (_url, init) => {
+      const form = init?.body as FormData;
+      const keys = [...form.keys()];
+      assert.equal(keys.at(-1), "file");
+      assert.equal(form.get("language"), "en");
+      assert.deepEqual(form.getAll("keyterm"), ["next", "back", "repeat", "again"]);
+      return new Response(JSON.stringify({ text: "okay next" }), { status: 200 });
+    });
     assert.equal(heard, "okay next");
     const via = await hearClip(
       sql,

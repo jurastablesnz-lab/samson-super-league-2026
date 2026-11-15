@@ -8,6 +8,7 @@ import {
   type RideCommand,
   type VadState,
 } from "./caller-commands.ts";
+import { beginPcm, createPcmRing, encodeWavPcm, endPcm, pushPcm } from "./caller-stt.ts";
 
 type Rec = {
   continuous: boolean;
@@ -38,7 +39,8 @@ export type CallerEar = {
  * Hears next, back, and repeat between movements.
  * On an iPhone the recogniser is not used: playing Ara through an audio element
  * stops it, and a home-screen app does not have it. The microphone records a
- * short clip instead. The first arm() must run inside a tap.
+ * short clip instead, including a little audio from before the voice detector
+ * opens so the start of "next" is not cut off. The first arm() must run inside a tap.
  */
 export function createCallerEar(options: {
   ios: boolean;
@@ -71,6 +73,10 @@ export function createCallerEar(options: {
   let vad: VadState = idleVad();
   let timer: number | null = null;
   let context: AudioContext | null = null;
+  let processor: ScriptProcessorNode | null = null;
+  let mute: GainNode | null = null;
+  let usePcm = false;
+  const ring = createPcmRing();
 
   function log(line: string) {
     options.onLog(line);
@@ -79,7 +85,7 @@ export function createCallerEar(options: {
   function accept(heard: string) {
     options.onHeard?.(heard);
     const command = commandFromTranscript(heard, suspended);
-    log(`mic: heard ${JSON.stringify(heard)}`);
+    log(`mic: heard ${JSON.stringify(heard)}${command ? ` -> ${command}` : ""}`);
     if (!command) return;
     const at = now();
     if (at < latch) return;
@@ -204,13 +210,41 @@ export function createCallerEar(options: {
     }
   }
 
+  function notePcm(frame: Float32Array) {
+    pushPcm(ring, frame, context?.sampleRate || 48000);
+  }
+
+  function openPcm() {
+    beginPcm(ring);
+    discardClip = false;
+    log("mic: clip");
+  }
+
+  function closePcm(discard: boolean) {
+    const samples = endPcm(ring, discard);
+    if (!samples) return;
+    const rate = context?.sampleRate || 48000;
+    finishClip(encodeWavPcm(samples, rate), Math.max(1, samples.length / rate));
+  }
+
+  function stopCapture(discard: boolean) {
+    if (ring.capture) closePcm(discard);
+    stopRecorder(discard);
+  }
+
   function onRms(rms: number) {
     const stepped = stepVad(vad, rms, 100, suspended);
     vad = stepped.next;
-    if (stepped.action === "start" && stream && !recorder) {
+    if (stepped.action === "start" && stream && !recorder && !ring.capture) {
+      if (usePcm && ring.samples > 0) {
+        openPcm();
+        return;
+      }
       try {
         const mime = mimeType();
-        const next = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        const next = mime
+          ? new MediaRecorder(stream, { mimeType: mime })
+          : new MediaRecorder(stream);
         const started = now();
         const chunks: Blob[] = [];
         next.ondataavailable = (event) => {
@@ -228,8 +262,8 @@ export function createCallerEar(options: {
         log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    if (stepped.action === "stop") stopRecorder(false);
-    if (stepped.action === "discard") stopRecorder(true);
+    if (stepped.action === "stop") stopCapture(false);
+    if (stepped.action === "discard") stopCapture(true);
   }
 
   function listenLevel() {
@@ -238,6 +272,23 @@ export function createCallerEar(options: {
     analyser.fftSize = 1024;
     const source = context.createMediaStreamSource(stream);
     source.connect(analyser);
+    if (typeof context.createScriptProcessor === "function") {
+      try {
+        const node = context.createScriptProcessor(4096, 1, 1);
+        const gain = context.createGain();
+        gain.gain.value = 0;
+        node.onaudioprocess = (event) => notePcm(event.inputBuffer.getChannelData(0));
+        source.connect(node);
+        node.connect(gain);
+        gain.connect(context.destination);
+        processor = node;
+        mute = gain;
+        usePcm = true;
+      } catch (err) {
+        usePcm = false;
+        log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
     const data = new Float32Array(analyser.fftSize);
     timer = window.setInterval(() => {
       analyser.getFloatTimeDomainData(data);
@@ -252,16 +303,21 @@ export function createCallerEar(options: {
       options.onStatus("unsupported");
       return;
     }
-    const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx || typeof MediaRecorder === "undefined") {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) {
       options.onStatus("unsupported");
       return;
     }
     if (!context) context = new AudioCtx();
     void context.resume();
-    const open = options.openMic ?? (() => navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
-    }));
+    const open =
+      options.openMic ??
+      (() =>
+        navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+        }));
     void open()
       .then((opened) => {
         if (stopped || !want) {
@@ -274,9 +330,14 @@ export function createCallerEar(options: {
         listenLevel();
       })
       .catch((err) => {
-        const name = err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
+        const name =
+          err && typeof err === "object" && "name" in err
+            ? String((err as { name: string }).name)
+            : "";
         log(`mic: error ${name || (err instanceof Error ? err.message : String(err))}`);
-        options.onStatus(name === "NotAllowedError" || name === "SecurityError" ? "permission" : "unsupported");
+        options.onStatus(
+          name === "NotAllowedError" || name === "SecurityError" ? "permission" : "unsupported",
+        );
       });
   }
 
@@ -296,7 +357,7 @@ export function createCallerEar(options: {
     suspend() {
       suspended = true;
       vad = idleVad();
-      stopRecorder(true);
+      stopCapture(true);
       stopWebkit();
     },
     resume() {
@@ -311,8 +372,16 @@ export function createCallerEar(options: {
       want = false;
       suspended = false;
       stopWebkit();
-      stopRecorder(true);
+      stopCapture(true);
       if (timer != null) window.clearInterval(timer);
+      try {
+        processor?.disconnect();
+        mute?.disconnect();
+      } catch {
+        // Already closed.
+      }
+      processor = null;
+      mute = null;
       stream?.getTracks().forEach((track) => track.stop());
       stream = null;
       void context?.close();

@@ -13,18 +13,70 @@ function words(transcript: string): string {
     .trim();
 }
 
+function edits(a: string, b: string): number {
+  const row = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j += 1) row[j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const next = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = row[j];
+      row[j] = next;
+    }
+  }
+  return row[b.length];
+}
+
+/** One-word mishearings of "next" from a phone outdoors. Not ordinary words like "test". */
+function isNextWord(word: string): boolean {
+  if (word === "next" || word === "nexts") return true;
+  if (
+    word === "text" ||
+    word === "texts" ||
+    word === "tex" ||
+    word === "fixed" ||
+    word === "fixt" ||
+    word === "necks" ||
+    word === "neck" ||
+    word === "nex" ||
+    word === "nxt" ||
+    word === "nect" ||
+    word === "nexus"
+  ) {
+    return true;
+  }
+  return word.length >= 4 && word.length <= 6 && edits(word, "next") <= 1;
+}
+
+function isRepeatWord(word: string): boolean {
+  return (
+    word === "repeat" ||
+    word === "again" ||
+    word === "agen" ||
+    word === "agin" ||
+    (word.length >= 5 && edits(word, "repeat") <= 1)
+  );
+}
+
 /**
  * What the rider asked for. Short phrases only, so a long echo of the movement
- * is not treated as a command. "go back" is back, not next.
+ * is not treated as a command. "go back" is back, not next. "next next" is one next.
  */
 export function hearCommand(transcript: string): RideCommand | null {
   const said = words(transcript);
   if (!said) return null;
-  const count = said.split(" ").length;
-  if (count > 6) return null;
-  if (/\b(repeat|again)\b/.test(said)) return "repeat";
-  if (/\b(back|previous)\b/.test(said)) return "back";
-  if (/\bnext\b/.test(said)) return "next";
+  const parts = said.split(" ");
+  if (parts.length > 6) return null;
+  if (parts.some(isRepeatWord)) return "repeat";
+  if (parts.some((word) => word === "back" || word === "previous")) return "back";
+  if (
+    parts.length <= 3 &&
+    parts.some((word) => word === "bak" || word === "bac" || word === "bark")
+  )
+    return "back";
+  if (parts.some((word) => word === "next" || word === "nexts")) return "next";
+  if (parts.length <= 3 && parts.some(isNextWord)) return "next";
   if (/^(go|go on|continue)$/.test(said)) return "next";
   return null;
 }
@@ -40,7 +92,11 @@ export function commandFromTranscript(transcript: string, speaking: boolean): Ri
  * an audio clip stops recognition afterwards. The microphone plus a short
  * transcription works in both places. Other browsers keep the free recogniser.
  */
-export function commandMode(input: { ios: boolean; hasRecognition: boolean; hasMic: boolean }): CommandMode {
+export function commandMode(input: {
+  ios: boolean;
+  hasRecognition: boolean;
+  hasMic: boolean;
+}): CommandMode {
   if (input.ios && input.hasMic) return "mic";
   if (input.hasRecognition) return "webkit";
   if (input.hasMic) return "mic";
@@ -56,13 +112,19 @@ export function callerDevice(input: {
 }): { ios: boolean; standalone: boolean } {
   const ua = input.userAgent ?? "";
   const ios =
-    /iPad|iPhone|iPod/.test(ua) || (input.platform === "MacIntel" && (input.maxTouchPoints ?? 0) > 1);
+    /iPad|iPhone|iPod/.test(ua) ||
+    (input.platform === "MacIntel" && (input.maxTouchPoints ?? 0) > 1);
   return { ios, standalone: !!(input.standalone || input.displayStandalone) };
 }
 
-export function micHelp(input: { status: MicStatus; mode: CommandMode; standalone: boolean }): string {
+export function micHelp(input: {
+  status: MicStatus;
+  mode: CommandMode;
+  standalone: boolean;
+}): string {
   if (input.status === "listening") return "Listening. Say next, back, or repeat.";
-  if (input.status === "paused") return "Voice commands are paused until tomorrow. The buttons still work.";
+  if (input.status === "paused")
+    return "Voice commands are paused until tomorrow. The buttons still work.";
   if (input.status === "permission") {
     if (input.mode === "webkit") {
       return "Turn on Dictation in Settings, General, Keyboard, and allow the microphone for Safari. Tap here to try again.";
@@ -82,7 +144,7 @@ export type VadState = { hot: number; cool: number; recording: boolean; ms: numb
 
 const START_RMS = 0.025;
 const KEEP_RMS = 0.015;
-const START_MS = 160;
+const START_MS = 80;
 const END_MS = 700;
 const MIN_MS = 350;
 const MAX_MS = 3500;

@@ -15,7 +15,13 @@ import {
   type TargetShow,
 } from "@/lib/plan-builder";
 import { saveSetup } from "@/lib/rider";
-import { isPublishedTest, testAddDecision, testsForLevelPublished } from "@/lib/test-registry";
+import {
+  isPublishedTest,
+  suggestLibraryTests,
+  testAddDecision,
+  testsForLevelPublished,
+  trainUpTests,
+} from "@/lib/test-registry";
 import type { Workspace } from "@/lib/rider-types";
 import { SHOWS, TODAY, iso } from "@/lib/season";
 import { cn } from "@/lib/utils";
@@ -391,36 +397,58 @@ function TestsStep({
   const [customError, setCustomError] = useState<string | null>(null);
   const options = testsForLevelPublished(horse.level, approvedTestIds, isAdmin);
   const selected = horse.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
-  const extras = selected.filter((test) => !options.includes(test));
+  const up = trainUpTests(horse.level, approvedTestIds, isAdmin);
+  const upNames = new Set(up?.tests ?? []);
+  const extras = selected.filter((test) => !options.includes(test) && !upNames.has(test));
   const drafts = testsForLevel(horse.level).filter((test) => !isPublishedTest(test, approvedTestIds));
+  const suggestions = suggestLibraryTests(custom, { isAdmin, approvedIds: approvedTestIds }).filter(
+    (name) => !selected.includes(name),
+  );
   const toggle = (t: string) =>
     onChange({ tests: horse.tests.includes(t) ? horse.tests.filter((x) => x !== t) : [...horse.tests, t] });
+  const addLibraryTest = (name: string) => {
+    if (horse.tests.includes(name)) {
+      setCustomError(`${name} is already on this horse.`);
+      setCustom("");
+      return;
+    }
+    setCustomError(null);
+    onChange({ tests: [...horse.tests, name] });
+    setCustom("");
+  };
+  const submitTyped = (raw: string) => {
+    const decision = testAddDecision(raw, { isAdmin, approvedIds: approvedTestIds });
+    if (decision.ok) {
+      addLibraryTest(decision.name);
+      return;
+    }
+    const matches = suggestLibraryTests(raw, { isAdmin, approvedIds: approvedTestIds });
+    if (matches.length === 1) {
+      addLibraryTest(matches[0]);
+      return;
+    }
+    setCustomError(matches.length > 1 ? `Pick ${matches.join(", ")} from the list.` : decision.error);
+  };
+  const chip = (t: string) => (
+    <Chip key={t} on={selected.includes(t)} onClick={() => toggle(t)}>
+      {t}
+      {isAdmin && !isPublishedTest(t, approvedTestIds) && (
+        <span className="ml-1 text-xs font-normal text-warn">· Draft</span>
+      )}
+      {selected.indexOf(t) === 0 && <span className="ml-1 text-xs font-normal">· main</span>}
+      {selected.indexOf(t) === 1 && <span className="ml-1 text-xs font-normal">· homework</span>}
+    </Chip>
+  );
   return (
     <>
       <Title>{horse.name}: tests to load</Title>
       <p className="text-sm text-muted">
-        Select the tests you want in your pocket at {horse.level || "this level"}. Also want access to tests a level above
-        or below for this horse? Add them in the “Another test” field below.
+        Select the tests you want in your pocket at {horse.level || "this level"}. The first one is the main test
+        and the second is homework.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
-        {options.map((t) => (
-          <Chip key={t} on={selected.includes(t)} onClick={() => toggle(t)}>
-            {t}
-            {isAdmin && !isPublishedTest(t, approvedTestIds) && (
-              <span className="ml-1 text-xs font-normal text-warn">· Draft</span>
-            )}
-            {selected.indexOf(t) === 0 && <span className="ml-1 text-xs font-normal">· main</span>}
-            {selected.indexOf(t) === 1 && <span className="ml-1 text-xs font-normal">· homework</span>}
-          </Chip>
-        ))}
-        {extras.map((t) => (
-          <Chip key={t} on={selected.includes(t)} onClick={() => toggle(t)}>
-            {t}
-            {isAdmin && !isPublishedTest(t, approvedTestIds) && (
-              <span className="ml-1 text-xs font-normal text-warn">· Draft</span>
-            )}
-          </Chip>
-        ))}
+        {options.map(chip)}
+        {extras.map(chip)}
       </div>
       {options.length === 0 && (
         <p className="text-sm text-muted">
@@ -429,25 +457,65 @@ function TestsStep({
             : "No published tests for this level yet."}
         </p>
       )}
+      {up && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Train up a level</p>
+          <p className="text-sm text-muted">
+            {up.level} tests to school before you move up. Ticking one adds it after the tests already chosen, so it
+            does not replace the main test or the homework.
+          </p>
+          {up.tests.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">{up.tests.map(chip)}</div>
+          ) : (
+            <p className="text-sm text-muted">
+              {up.waiting.join(", ")} are in the library but not published yet. An admin needs to approve them before
+              a rider can train them.
+            </p>
+          )}
+          {isAdmin && up.waiting.length > 0 && (
+            <p className="text-xs text-muted">
+              Drafts are visible to you. Riders see a test here after you approve it on the Admin page.
+            </p>
+          )}
+        </div>
+      )}
       <form
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const decision = testAddDecision(custom, { isAdmin, approvedIds: approvedTestIds });
-          if (!decision.ok) {
-            setCustomError(decision.error);
-            return;
-          }
-          setCustomError(null);
-          if (!horse.tests.includes(decision.name)) onChange({ tests: [...horse.tests, decision.name] });
-          setCustom("");
+          submitTyped(custom);
         }}
       >
-        <input className={inputCls} placeholder="Another test (type its name)" value={custom} onChange={(e) => setCustom(e.target.value)} />
+        <input
+          className={inputCls}
+          placeholder="Type a test code, such as 3A"
+          value={custom}
+          aria-label="Find a test"
+          autoComplete="off"
+          onChange={(e) => {
+            setCustom(e.target.value);
+            setCustomError(null);
+          }}
+        />
         <button type="submit" className="cursor-pointer rounded-lg border border-line px-3 text-sm font-semibold" aria-label="Add test">
           <Plus className="size-4" />
         </button>
       </form>
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {suggestions.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="cursor-pointer rounded-lg border border-line px-3 py-2 text-sm font-semibold"
+              onClick={() => addLibraryTest(name)}
+            >
+              {name}
+              {isAdmin && !isPublishedTest(name, approvedTestIds) ? " · Draft" : ""}
+            </button>
+          ))}
+        </div>
+      )}
       {customError && <p className="text-sm text-danger">{customError}</p>}
     </>
   );

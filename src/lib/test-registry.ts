@@ -2,7 +2,7 @@
  * Every test a rider can be offered. Sheets live in code; publication lives in
  * `test_approvals`. A test that is not in that table is a draft.
  */
-import { TESTS_BY_LEVEL, testsForLevel } from "./plan-builder.ts";
+import { TESTS_BY_LEVEL, nextLevel, testsForLevel } from "./plan-builder.ts";
 import {
   ADVANCED_FS,
   ADVANCED_MEDIUM_FS,
@@ -227,12 +227,21 @@ export function visibleDiagramIds(opts: {
       (/para|\bgrade\b/i.test(opts.level) ? testsForLevel(opts.level) : []));
   const levelIds = new Set(levelNames.map((name) => testIdForName(name)));
   const selected = new Set((opts.tests ?? []).map((name) => testIdForName(name)));
+  const visible = catalogTests().filter((item) => {
+    if (!item.viewId) return false;
+    if (!opts.isAdmin && !approved.has(item.id)) return false;
+    if (scoped && !levelIds.has(item.id) && !selected.has(item.id)) return false;
+    return true;
+  });
   const ids: string[] = [];
-  for (const item of catalogTests()) {
-    if (!item.viewId) continue;
-    if (!opts.isAdmin && !approved.has(item.id)) continue;
-    if (scoped && !levelIds.has(item.id) && !selected.has(item.id)) continue;
-    if (!ids.includes(item.viewId)) ids.push(item.viewId);
+  const push = (viewId: string) => {
+    if (!ids.includes(viewId)) ids.push(viewId);
+  };
+  for (const item of visible) {
+    if (!scoped || levelIds.has(item.id)) push(item.viewId as string);
+  }
+  for (const item of visible) {
+    if (scoped && selected.has(item.id) && !levelIds.has(item.id)) push(item.viewId as string);
   }
   return ids;
 }
@@ -290,6 +299,52 @@ export function testAddDecision(
     };
   }
   return { ok: true, name };
+}
+
+/** Library tests matching a typed code, best match first. Drafts stay out unless `isAdmin`. */
+export function suggestLibraryTests(
+  raw: string,
+  opts: { isAdmin: boolean; approvedIds: Iterable<string> },
+): string[] {
+  const key = raw.trim().toLowerCase();
+  if (!key) return [];
+  const ranked: { name: string; score: number }[] = [];
+  const seen = new Set<string>();
+  const take = (label: string) => {
+    const name = canonicalPickerName(label);
+    if (!name || seen.has(name.toLowerCase())) return;
+    if (!opts.isAdmin && !isPublishedTest(name, opts.approvedIds)) return;
+    const folded = name.toLowerCase();
+    const alias = label.toLowerCase();
+    const score = folded.startsWith(key) || alias.startsWith(key) ? 0 : folded.includes(key) || alias.includes(key) ? 1 : -1;
+    if (score < 0) return;
+    seen.add(folded);
+    ranked.push({ name, score });
+  };
+  for (const list of Object.values(TESTS_BY_LEVEL)) {
+    for (const name of list) take(name);
+  }
+  for (const test of catalogTests()) {
+    take(test.name);
+    for (const alias of test.aliases) take(alias);
+  }
+  ranked.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+  return ranked.map((item) => item.name).slice(0, 8);
+}
+
+/** The next competition level, with the real tests a rider may school. */
+export function trainUpTests(
+  level: string,
+  approvedIds: Iterable<string>,
+  includeDrafts = false,
+): { level: string; tests: string[]; waiting: string[] } | null {
+  const up = nextLevel(level);
+  if (!up) return null;
+  return {
+    level: up,
+    tests: testsForLevelPublished(up, approvedIds, includeDrafts),
+    waiting: testsForLevel(up).filter((name) => !isPublishedTest(name, approvedIds)),
+  };
 }
 
 /** Names a rider may choose at this level. Drafts stay out unless `includeDrafts`. */

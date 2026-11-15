@@ -6,9 +6,11 @@ import {
   canonicalPickerName,
   catalogTests,
   isPublishedTest,
+  suggestLibraryTests,
   testAddDecision,
   testIdForName,
   testsForLevelPublished,
+  trainUpTests,
   visibleDiagramIds,
 } from "./test-registry.ts";
 
@@ -74,6 +76,40 @@ test("a Level 2 horse sees 2A, 2B, 2C and the musical freestyle sheet", () => {
     }),
     ["2a", "2b", "2c", "mfs"],
   );
+  assert.deepEqual(
+    visibleDiagramIds({
+      level: "Level 2",
+      tests: ["2A", "2B", "3A"],
+      approvedIds: approved,
+      isAdmin: true,
+    }),
+    ["2a", "2b", "2c", "mfs", "3a"],
+  );
+  assert.equal(
+    visibleDiagramIds({ level: "Level 2", tests: ["2A", "3A"], approvedIds: approved }).includes("3a"),
+    false,
+  );
+});
+
+test("Level 3 is the next level up, and its tests wait for approval", () => {
+  const rider = trainUpTests("Level 2", approved, false);
+  assert.equal(rider?.level, "Level 3");
+  assert.deepEqual(rider?.tests, []);
+  assert.deepEqual(rider?.waiting, ["3A", "3B", "3C", "Level 3 musical freestyle"]);
+  assert.deepEqual(trainUpTests("Level 2", approved, true)?.tests, [
+    "3A",
+    "3B",
+    "3C",
+    "Level 3 musical freestyle",
+  ]);
+  assert.deepEqual(suggestLibraryTests("3A", { isAdmin: true, approvedIds: approved }), ["3A"]);
+  assert.deepEqual(suggestLibraryTests("3A", { isAdmin: false, approvedIds: approved }), []);
+  assert.deepEqual(suggestLibraryTests("3", { isAdmin: true, approvedIds: approved }).slice(0, 3), [
+    "3A",
+    "3B",
+    "3C",
+  ]);
+  assert.equal(nextLevel("Level 2"), "Level 3");
 });
 
 test("riders only see published names, and new registry tests start unpublished", () => {

@@ -242,6 +242,56 @@ export function isPublishedTest(nameOrId: string, approvedIds: Iterable<string>)
   return new Set(approvedIds).has(id);
 }
 
+function offeredNames(): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const list of Object.values(TESTS_BY_LEVEL)) {
+    for (const name of list) names.set(name.toLowerCase(), name);
+  }
+  return names;
+}
+
+/**
+ * The name the setup list and the admin picker store.
+ * "Elementary 3A" and "3a" both become "3A". An unknown name returns null.
+ */
+export function canonicalPickerName(raw: string): string | null {
+  const key = raw.trim().toLowerCase();
+  if (!key) return null;
+  const offered = offeredNames();
+  const exact = offered.get(key);
+  if (exact) return exact;
+  const test = catalogTests().find(
+    (item) =>
+      item.id === key ||
+      item.name.toLowerCase() === key ||
+      item.aliases.some((alias) => alias.toLowerCase() === key),
+  );
+  if (!test) return null;
+  for (const alias of [test.name, ...test.aliases]) {
+    const listed = offered.get(alias.toLowerCase());
+    if (listed) return listed;
+  }
+  return test.aliases[0] ?? test.name;
+}
+
+/** Whether a typed test can be added, and the message to show when it cannot. */
+export function testAddDecision(
+  raw: string,
+  opts: { isAdmin: boolean; approvedIds: Iterable<string> },
+): { ok: true; name: string } | { ok: false; error: string } {
+  const typed = raw.trim();
+  if (!typed) return { ok: false, error: "Type the test name, for example 3A." };
+  const name = canonicalPickerName(typed);
+  if (!name) return { ok: false, error: `No test called "${typed}". Check the spelling, for example 3A.` };
+  if (!opts.isAdmin && !isPublishedTest(name, opts.approvedIds)) {
+    return {
+      ok: false,
+      error: `${name} is not published yet, so it can't be added. Approve it on the Admin page first.`,
+    };
+  }
+  return { ok: true, name };
+}
+
 /** Names a rider may choose at this level. Drafts stay out unless `includeDrafts`. */
 export function testsForLevelPublished(
   level: string,

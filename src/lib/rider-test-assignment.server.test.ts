@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { asSql, database } from "./test-database.ts";
 import { assignRiderTest } from "./rider-test-assignment.ts";
+import { setTestApproval } from "./test-approvals.server.ts";
 import { requireVerifiedAdmin } from "./admin-user.server.ts";
 import type { Sql } from "./db.ts";
 async function assign(sql: Sql, adminId: string, input: Parameters<typeof assignRiderTest>[1]) {
@@ -84,15 +85,24 @@ test("admin can add/remove a horse test; non-admins and unknown horses are prote
     );
     await assert.rejects(
       assign(sql, "admin", { horseId: "horse", test: "3A", action: "add" }),
-      /level/,
+      /not published/,
     );
+    await assert.rejects(
+      assign(sql, "admin", { horseId: "horse", test: "not a test", action: "add" }),
+      /No test called/,
+    );
+    await setTestApproval(sql, "admin", "3a", true);
+    assert.deepEqual(await assign(sql, "admin", { horseId: "horse", test: "Elementary 3A", action: "add" }), {
+      horseId: "horse",
+      tests: ["2C", "3A"],
+    });
     await assert.rejects(
       assign(sql, "admin", { horseId: "horse", test: "2B", action: "remove" }),
       /not assigned/,
     );
     assert.deepEqual(
       (await pg.query("select config->'tests' as tests from plans where horse_id = 'horse'")).rows,
-      [{ tests: ["2C"] }],
+      [{ tests: ["2C", "3A"] }],
     );
   } finally {
     if (saved === undefined) delete process.env.BETA_ADMIN_EMAILS;

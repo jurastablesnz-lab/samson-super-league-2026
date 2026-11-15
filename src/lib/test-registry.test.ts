@@ -3,8 +3,10 @@ import { test } from "node:test";
 import { nextLevel, testsForLevel } from "./plan-builder.ts";
 import {
   SEEDED_APPROVED_TEST_IDS,
+  canonicalPickerName,
   catalogTests,
   isPublishedTest,
+  testAddDecision,
   testIdForName,
   testsForLevelPublished,
   visibleDiagramIds,
@@ -38,6 +40,20 @@ test("Susan’s signed-off tests are the only seeded publications", () => {
   ]) {
     assert.equal(isPublishedTest(name, approved), false, name);
   }
+});
+
+test("3A can be typed from either level, and an unpublished test says why", () => {
+  assert.equal(canonicalPickerName("3A"), "3A");
+  assert.equal(canonicalPickerName("elementary 3a"), "3A");
+  assert.equal(canonicalPickerName("2B Super 5"), "2B Super 5");
+  assert.equal(canonicalPickerName("not a test"), null);
+  assert.deepEqual(testAddDecision("3A", { isAdmin: false, approvedIds: approved }), {
+    ok: false,
+    error: "3A is not published yet, so it can't be added. Approve it on the Admin page first.",
+  });
+  assert.deepEqual(testAddDecision("3A", { isAdmin: true, approvedIds: approved }), { ok: true, name: "3A" });
+  assert.equal(testAddDecision("nope", { isAdmin: true, approvedIds: approved }).ok, false);
+  assert.deepEqual(testAddDecision("2A", { isAdmin: false, approvedIds: approved }), { ok: true, name: "2A" });
 });
 
 test("a Level 2 horse sees 2A, 2B, 2C and the musical freestyle sheet", () => {

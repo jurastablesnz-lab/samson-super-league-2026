@@ -7,6 +7,7 @@ import { PENDING_UPLOAD, removeAccountMedia, saveAccountMedia } from "@/lib/medi
 import {
   GOALS,
   describeWhen,
+  testsForLevel,
   type FloorPlanRef,
   type FreestyleRef,
   type GoalId,
@@ -14,7 +15,7 @@ import {
   type TargetShow,
 } from "@/lib/plan-builder";
 import { saveSetup } from "@/lib/rider";
-import { isPublishedTest, testsForLevelPublished } from "@/lib/test-registry";
+import { isPublishedTest, testAddDecision, testsForLevelPublished } from "@/lib/test-registry";
 import type { Workspace } from "@/lib/rider-types";
 import { SHOWS, TODAY, iso } from "@/lib/season";
 import { cn } from "@/lib/utils";
@@ -125,11 +126,13 @@ export function SetupWizard({
       if (horses.some((h) => !h.level)) return setError("Pick a level for each horse.");
     }
     if (step.kind === "tests") {
-      const chosen = horses[step.i].tests.filter(
-        (test) => workspace.isOwner || isPublishedTest(test, workspace.approvedTestIds),
+      const blocked = horses[step.i].tests.filter(
+        (test) => !workspace.isOwner && !isPublishedTest(test, workspace.approvedTestIds),
       );
-      if (chosen.length === 0) return setError("Pick at least one published test.");
-      if (chosen.length !== horses[step.i].tests.length) update(step.i, { tests: chosen });
+      if (blocked.length) {
+        return setError(`${blocked.join(", ")} is not published yet, so it can't be added.`);
+      }
+      if (horses[step.i].tests.length === 0) return setError("Pick at least one test.");
     }
     setStepIdx((n) => Math.min(steps.length - 1, n + 1));
     window.scrollTo({ top: 0 });
@@ -388,6 +391,8 @@ function TestsStep({
   const [customError, setCustomError] = useState<string | null>(null);
   const options = testsForLevelPublished(horse.level, approvedTestIds, isAdmin);
   const selected = horse.tests.filter((test) => isAdmin || isPublishedTest(test, approvedTestIds));
+  const extras = selected.filter((test) => !options.includes(test));
+  const drafts = testsForLevel(horse.level).filter((test) => !isPublishedTest(test, approvedTestIds));
   const toggle = (t: string) =>
     onChange({ tests: horse.tests.includes(t) ? horse.tests.filter((x) => x !== t) : [...horse.tests, t] });
   return (
@@ -408,22 +413,33 @@ function TestsStep({
             {selected.indexOf(t) === 1 && <span className="ml-1 text-xs font-normal">· homework</span>}
           </Chip>
         ))}
+        {extras.map((t) => (
+          <Chip key={t} on={selected.includes(t)} onClick={() => toggle(t)}>
+            {t}
+            {isAdmin && !isPublishedTest(t, approvedTestIds) && (
+              <span className="ml-1 text-xs font-normal text-warn">· Draft</span>
+            )}
+          </Chip>
+        ))}
       </div>
       {options.length === 0 && (
-        <p className="text-sm text-muted">No published tests for this level yet.</p>
+        <p className="text-sm text-muted">
+          {drafts.length
+            ? `No published tests for this level yet. ${drafts.join(", ")} still need an admin to approve them.`
+            : "No published tests for this level yet."}
+        </p>
       )}
       <form
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const t = custom.trim();
-          setCustomError(null);
-          if (!t) return;
-          if (!isAdmin && !isPublishedTest(t, approvedTestIds)) {
-            setCustomError("That test is not published yet.");
+          const decision = testAddDecision(custom, { isAdmin, approvedIds: approvedTestIds });
+          if (!decision.ok) {
+            setCustomError(decision.error);
             return;
           }
-          if (!horse.tests.includes(t)) onChange({ tests: [...horse.tests, t] });
+          setCustomError(null);
+          if (!horse.tests.includes(decision.name)) onChange({ tests: [...horse.tests, decision.name] });
           setCustom("");
         }}
       >

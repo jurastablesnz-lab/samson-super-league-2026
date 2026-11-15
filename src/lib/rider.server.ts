@@ -210,8 +210,9 @@ export async function saveSetup(
     config.horseName = name;
     config.level = level || config.level;
     if (!admin && approved) {
-      if (config.tests.some((test) => !approved.has(testIdForName(test)))) {
-        throw new Error("That test is not published yet");
+      const blocked = config.tests.filter((test) => !approved.has(testIdForName(test)));
+      if (blocked.length) {
+        throw new Error(`${blocked.join(", ")} is not published yet, so it can't be added.`);
       }
       if (!config.tests.length) {
         config.tests = testsForLevel(config.level)

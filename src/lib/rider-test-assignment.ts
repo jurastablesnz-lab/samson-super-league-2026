@@ -1,5 +1,6 @@
 import type { Sql } from "./db.ts";
-import { generatePlan, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
+import { generatePlan, sanitisePlanConfig } from "./plan-builder.ts";
+import { canonicalPickerName } from "./test-registry.ts";
 
 export type RiderTestAssignment = { horseId: string; test: string; action: "add" | "remove" };
 
@@ -18,7 +19,12 @@ export function validateRiderTestAssignment(input: RiderTestAssignment): RiderTe
 
 /** Admin assignment only: test definitions/movements are never edited or stored here. */
 export async function assignRiderTest(sql: Sql, input: RiderTestAssignment) {
-  const { horseId, test, action } = validateRiderTestAssignment(input);
+  const parsed = validateRiderTestAssignment(input);
+  const horseId = parsed.horseId;
+  const action = parsed.action;
+  const named = canonicalPickerName(parsed.test);
+  if (!named) throw new Error(`No test called "${parsed.test}".`);
+  const test = named;
   const [horse] = await sql<{
     id: string;
     user_id: string;
@@ -28,8 +34,6 @@ export async function assignRiderTest(sql: Sql, input: RiderTestAssignment) {
   }>`select h.id, h.user_id, h.name, h.level, p.config from horses h join plans p on p.horse_id = h.id and p.user_id = h.user_id where h.id = ${horseId} and not h.archived`;
   if (!horse) throw new Error("Horse not found");
   const config = sanitisePlanConfig(horse.config, { horseName: horse.name, level: horse.level });
-  if (!testsForLevel(horse.level).includes(test))
-    throw new Error("Choose a test for this horse's level");
   if (action === "add") {
     // Loaded only when an admin saves a test. A static import would pull the
     // server module into the admin page, which the browser loads as a chunk.

@@ -77,7 +77,11 @@ export const prepareRider = createServerFn({ method: "POST" })
     const approved = new Set(await publishedTestIds(sql));
     for (const horse of data.horses) {
       for (const test of horse.tests) {
-        if (!approved.has(testIdForName(test))) throw new Error("That test is not published yet");
+        if (!approved.has(testIdForName(test))) {
+          throw new Error(
+            `${test} is not published yet. Approve it on the Admin page before adding it to a rider.`,
+          );
+        }
       }
     }
     const { generatePlan, sanitisePlanConfig, testsForLevel } = await import("./plan-builder");

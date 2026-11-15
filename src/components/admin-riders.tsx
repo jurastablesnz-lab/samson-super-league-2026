@@ -10,7 +10,7 @@ import { formatUsd } from "@/lib/ai-cost";
 import { cueRiderName, riderFirstName, spokenHorseName } from "@/lib/coach-cues";
 import { testIdForName } from "@/lib/test-registry";
 import { getPublishedTests } from "@/lib/test-publication";
-import { isPublishedTest } from "@/lib/test-registry";
+import { isPublishedTest, testAddDecision } from "@/lib/test-registry";
 import { inputCls, Kicker, Panel, PrimaryButton, StatusBadge } from "./beta-ui";
 import { cn } from "@/lib/utils";
 
@@ -26,13 +26,22 @@ export function RiderAdminPanels({
   onPrepared: () => void;
 }) {
   const [published, setPublished] = useState<string[] | null>(null);
+  const [listError, setListError] = useState("");
   useEffect(() => {
     getPublishedTests()
       .then((result) => setPublished(result.ids))
-      .catch(() => setPublished([]));
+      .catch((err: unknown) => {
+        setPublished([]);
+        setListError(err instanceof Error ? err.message : "Could not load the test list.");
+      });
   }, []);
   return (
     <>
+      {listError && (
+        <p role="alert" className="mt-3 text-sm text-danger">
+          {listError}
+        </p>
+      )}
       <AddRiderForm onPrepared={onPrepared} published={published ?? []} />
       <Panel className="mt-5">
         <Kicker>Riders</Kicker>
@@ -294,6 +303,7 @@ function HorseTests({
   onChanged: () => void;
 }) {
   const [newTest, setNewTest] = useState("");
+  const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const assigned = new Set(horse.tests.map((t) => t.name));
@@ -303,6 +313,7 @@ function HorseTests({
     try {
       await setRiderHorseTest({ data: { horseId: horse.id, test, action } });
       setNewTest("");
+      setTyped("");
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -310,9 +321,17 @@ function HorseTests({
       setBusy(false);
     }
   }
-  const choices = testsForLevel(horse.level).filter(
-    (test) => !assigned.has(test) && isPublishedTest(test, published),
-  );
+  function add() {
+    const raw = typed.trim() || newTest;
+    const decision = testAddDecision(raw, { isAdmin: true, approvedIds: published });
+    if (!decision.ok) {
+      setError(decision.error);
+      return;
+    }
+    void update(decision.name, "add");
+  }
+  const choices = testsForLevel(horse.level).filter((test) => !assigned.has(test));
+  const drafts = choices.filter((test) => !isPublishedTest(test, published));
   return (
     <div className="mt-2 text-xs">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -345,18 +364,33 @@ function HorseTests({
         >
           <option value="">Choose a test…</option>
           {choices.map((t) => (
-            <option key={t}>{t}</option>
+            <option key={t} value={t}>
+              {isPublishedTest(t, published) ? t : `${t} (draft)`}
+            </option>
           ))}
         </select>
+        <input
+          className={cn(inputCls, "h-9 w-36 text-xs")}
+          aria-label={`Type a test for ${horse.name}`}
+          placeholder="Or type 3A"
+          value={typed}
+          disabled={busy}
+          onChange={(event) => setTyped(event.target.value)}
+        />
         <button
           type="button"
           className="font-semibold text-accent disabled:opacity-50"
-          disabled={busy || !newTest}
-          onClick={() => void update(newTest, "add")}
+          disabled={busy || (!newTest && !typed.trim())}
+          onClick={add}
         >
           {busy ? "Updating…" : "+ Add test"}
         </button>
       </div>
+      {drafts.length > 0 && (
+        <p className="mt-1 text-muted">
+          Draft tests can go on your own horse. Approve them on the Admin page before adding them to a rider.
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-1 text-danger">
           {error}

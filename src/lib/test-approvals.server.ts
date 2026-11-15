@@ -33,7 +33,11 @@ export async function assertTestsAssignable(sql: Sql, horseUserId: string, names
   if (await isVerifiedAdmin(horseUserId, sql)) return;
   const approved = new Set(await publishedTestIds(sql));
   for (const name of names) {
-    if (!approved.has(testIdForName(name))) throw new Error("That test is not published yet");
+    if (!approved.has(testIdForName(name))) {
+      throw new Error(
+        `${name} is not published yet. Approve it on the Admin page before adding it to a rider.`,
+      );
+    }
   }
 }
 

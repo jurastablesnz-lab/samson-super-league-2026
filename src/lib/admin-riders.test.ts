@@ -1,33 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadAdminRiders } from "./admin-riders.ts";
-import { hasMovementData } from "./admin-rider-rules.ts";
+import { hasMovementData, testsForPlan } from "./admin-rider-rules.ts";
 import { asSql, database } from "./test-database.ts";
 import { generatePlan, sanitisePlanConfig, testsForLevel } from "./plan-builder.ts";
 
-test("name-only diagnostics agree with the shared test choices", () => {
-  for (const names of Object.values([
-    "2A",
-    "2B",
-    "2C",
-    "2B Super 5",
-    "Level 2 musical freestyle",
-    "3A",
-    "FEI Grand Prix",
-  ])) {
-    for (const name of Array.isArray(names) ? names : [names])
-      assert.equal(
-        hasMovementData(name),
-        [
-          "2A",
-          "2B",
-          "2C",
-          "2B Super 5",
-          "Level 2 musical freestyle",
-          "Level 3 musical freestyle",
-        ].includes(name),
-      );
-  }
+test("a sheet the caller can ride is not name-only", () => {
+  assert.equal(hasMovementData("3A"), true);
+  assert.equal(hasMovementData("Elementary 3A"), true);
+  assert.equal(hasMovementData("4A"), true);
+  assert.equal(hasMovementData("Level 2 musical freestyle"), true);
+  assert.equal(hasMovementData("A brand new test"), false);
+  assert.equal(testsForPlan(["3A", "A brand new test"])[1]?.nameOnly, true);
 });
 
 test("admin rider summaries show score review counts, competitions, phases and setup problems", async () => {
@@ -77,7 +61,7 @@ test("admin rider summaries show score review counts, competitions, phases and s
     const horse = rider.horses[0];
     assert.deepEqual(horse.tests, [
       { name: "2A", nameOnly: false },
-      { name: "3A", nameOnly: true },
+      { name: "3A", nameOnly: false },
     ]);
     assert.equal(horse.shows[0]?.name, "Canterbury Champs");
     assert.deepEqual(
@@ -86,7 +70,10 @@ test("admin rider summaries show score review counts, competitions, phases and s
     );
     assert.ok(horse.phase);
     assert.ok(horse.problems.some((p) => p.includes("ESNZ")));
-    assert.ok(horse.problems.some((p) => p.includes("name only")));
+    assert.equal(
+      horse.problems.some((p) => p.includes("name only")),
+      false,
+    );
     assert.ok(horse.problems.some((p) => p.includes("1 EVO score")));
     assert.ok(testsForLevel("Level 2").includes("2B Super 5"));
   } finally {

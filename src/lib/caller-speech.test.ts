@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   callerSpeechLines,
   clipLooksFinished,
+  playbackStalled,
   instructionText,
   resolveClipUrl,
   speechHash,
@@ -17,6 +18,26 @@ test("playback counts as finished near the end, and an iPhone recording type is 
   assert.equal(clipLooksFinished(4.8, 5), true);
   assert.equal(clipLooksFinished(1, 5), false);
   assert.equal(clipLooksFinished(1, Number.NaN), false);
+  assert.equal(
+    playbackStalled({ startedAt: 0, now: 5000, lastProgressAt: 0, current: 0, duration: 5 }),
+    "wait",
+  );
+  assert.equal(
+    playbackStalled({ startedAt: 1000, now: 4000, lastProgressAt: 3000, current: 2, duration: 5 }),
+    "wait",
+  );
+  assert.equal(
+    playbackStalled({ startedAt: 1000, now: 4000, lastProgressAt: 1000, current: 4.9, duration: 5 }),
+    "done",
+  );
+  assert.equal(
+    playbackStalled({ startedAt: 1000, now: 8000, lastProgressAt: 2000, current: 1, duration: 5 }),
+    "done",
+  );
+  assert.equal(
+    playbackStalled({ startedAt: 1000, now: 5000, lastProgressAt: 1000, current: 0.4, duration: Number.NaN }),
+    "done",
+  );
   assert.equal(bareAudioMime("audio/mp4;codecs=mp4a.40.2"), "audio/mp4");
   assert.equal(bareAudioMime("audio/webm;codecs=opus"), "audio/webm");
 });

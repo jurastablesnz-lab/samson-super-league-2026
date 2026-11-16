@@ -84,9 +84,12 @@ export function createCallerEar(options: {
   let usePcm = false;
   let openGen = 0;
   let lastReopen = 0;
-  let lastPcmAt = 0;
   let clipPeak = 0;
+  let contextWasRunning = false;
   let sessionNoted = false;
+  let fallbackTried = false;
+  let quietSince = 0;
+  let sink: MediaStreamAudioDestinationNode | null = null;
   const ring = createPcmRing();
 
   function log(line: string) {
@@ -230,7 +233,6 @@ export function createCallerEar(options: {
   }
 
   function notePcm(frame: Float32Array) {
-    lastPcmAt = now();
     pushPcm(ring, frame, context?.sampleRate || 48000);
   }
 
@@ -292,17 +294,25 @@ export function createCallerEar(options: {
   function holdRecordSession() {
     const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
     if (!session) {
-      if (!sessionNoted) log("mic: session unavailable");
+      if (!sessionNoted) log("mic: session auto");
       sessionNoted = true;
       return;
     }
     try {
-      session.type = "play-and-record";
-      if (!sessionNoted) log("mic: session play-and-record");
+      session.type = "auto";
+      if (!sessionNoted) log("mic: session auto");
       sessionNoted = true;
     } catch (err) {
       log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  function noteContext() {
+    if (stopped || !want || mode !== "mic" || suspended) return;
+    const running = context?.state === "running";
+    if (running === contextWasRunning) return;
+    contextWasRunning = running;
+    options.onStatus(running ? "listening" : "closed");
   }
 
   function clearRing() {
@@ -319,6 +329,7 @@ export function createCallerEar(options: {
       mute?.disconnect();
       sourceNode?.disconnect();
       analyser?.disconnect();
+      sink?.disconnect();
     } catch {
       // Already closed.
     }
@@ -326,6 +337,7 @@ export function createCallerEar(options: {
     mute = null;
     sourceNode = null;
     analyser = null;
+    sink = null;
     usePcm = false;
     clearRing();
   }
@@ -348,7 +360,7 @@ export function createCallerEar(options: {
   function watchTrack(track: MediaStreamTrack) {
     track.onmute = () => {
       log("mic: muted");
-      if (!suspended) scheduleReopen("muted");
+      if (!suspended) options.onStatus("closed");
     };
     track.onended = () => {
       log("mic: ended");
@@ -373,11 +385,12 @@ export function createCallerEar(options: {
         capture.onaudioprocess = (event) => notePcm(event.inputBuffer.getChannelData(0));
         source.connect(capture);
         capture.connect(gain);
-        gain.connect(context.destination);
+        const dest = context.createMediaStreamDestination();
+        gain.connect(dest);
         processor = capture;
         mute = gain;
+        sink = dest;
         usePcm = true;
-        lastPcmAt = now();
       } catch (err) {
         usePcm = false;
         log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
@@ -386,19 +399,26 @@ export function createCallerEar(options: {
     const data = new Float32Array(node.fftSize);
     timer = window.setInterval(() => {
       if (!analyser) return;
-      if (
-        usePcm &&
-        !suspended &&
-        context?.state === "running" &&
-        lastPcmAt > 0 &&
-        now() - lastPcmAt > 1500
-      ) {
-        scheduleReopen("capture stalled");
-      }
+      noteContext();
       analyser.getFloatTimeDomainData(data);
       let sum = 0;
       for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
-      onRms(Math.sqrt(sum / data.length));
+      const rms = Math.sqrt(sum / data.length);
+      onRms(rms);
+      const hearing = !suspended && context?.state === "running";
+      if (!hearing) {
+        quietSince = 0;
+        return;
+      }
+      if (rms >= 0.002) {
+        quietSince = 0;
+        return;
+      }
+      if (!quietSince) quietSince = now();
+      else if (!fallbackTried && now() - quietSince > 3000) {
+        fallbackTried = true;
+        scheduleReopen("flat");
+      }
     }, 100) as unknown as number;
   }
 
@@ -419,20 +439,17 @@ export function createCallerEar(options: {
     context.onstatechange = () => {
       const state = context?.state ?? "";
       log(`mic: audio ${state}`);
-      if (state === "suspended" || state === "interrupted") void context?.resume();
+      noteContext();
     };
-    void context.resume();
+    void context.resume().then(() => noteContext());
     const gen = ++openGen;
     const open =
       options.openMic ??
       (() =>
         navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: true,
-            channelCount: 1,
-          },
+          audio: fallbackTried
+            ? true
+            : { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
         }));
     void open()
       .then((opened) => {
@@ -444,7 +461,7 @@ export function createCallerEar(options: {
         const track = opened.getAudioTracks()[0];
         if (track) watchTrack(track);
         const settings = track?.getSettings?.() ?? {};
-        options.onStatus("listening");
+        options.onStatus(context?.state === "running" ? "listening" : "closed");
         log(
           `mic: ready echo ${settings.echoCancellation === true ? "on" : "off"} noise ${settings.noiseSuppression === true ? "on" : "off"}`,
         );
@@ -473,7 +490,14 @@ export function createCallerEar(options: {
       }
       if (mode === "webkit") beginWebkit();
       else if (!stream) armMic();
-      else options.onStatus("listening");
+      else {
+        const pending = context?.resume();
+        void Promise.resolve(pending).then(() => {
+          const track = stream?.getAudioTracks()[0];
+          if (!track || track.readyState !== "live") armMic();
+          else options.onStatus(context?.state === "running" ? "listening" : "closed");
+        });
+      }
     },
     suspend() {
       suspended = true;
@@ -483,16 +507,19 @@ export function createCallerEar(options: {
     },
     resume() {
       suspended = false;
+      quietSince = 0;
       holdRecordSession();
-      void context?.resume();
+      const pending = context?.resume();
+      void Promise.resolve(pending).then(() => noteContext());
       if (!want || stopped) return;
       const track = stream?.getAudioTracks()[0];
-      if (mode !== "webkit" && (!track || track.readyState !== "live" || track.muted)) {
-        scheduleReopen(track?.muted ? "muted" : "ended");
+      if (mode !== "webkit" && (!track || track.readyState !== "live")) {
+        scheduleReopen("ended");
         return;
       }
       if (mode === "webkit") beginWebkit();
-      else if (stream) options.onStatus("listening");
+      else if (stream && context?.state === "running") options.onStatus("listening");
+      else if (mode === "mic") options.onStatus("closed");
     },
     stop() {
       stopped = true;

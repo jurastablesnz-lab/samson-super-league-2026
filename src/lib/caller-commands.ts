@@ -1,7 +1,7 @@
 /** A short riding command. Anything else is ignored. */
 export type RideCommand = "next" | "back" | "repeat";
 
-export type MicStatus = "off" | "listening" | "permission" | "unsupported" | "paused";
+export type MicStatus = "off" | "listening" | "permission" | "unsupported" | "paused" | "closed";
 
 export type CommandMode = "webkit" | "mic" | "none";
 
@@ -123,6 +123,7 @@ export function micHelp(input: {
   standalone: boolean;
 }): string {
   if (input.status === "listening") return "Listening. Say next, back, or repeat.";
+  if (input.status === "closed") return "Mic off — tap to enable";
   if (input.status === "paused")
     return "Voice commands are paused until tomorrow. The buttons still work.";
   if (input.status === "permission") {

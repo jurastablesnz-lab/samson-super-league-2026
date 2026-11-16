@@ -9,7 +9,14 @@ import {
   SPEECH_SILENT_HINT,
 } from "@/lib/arena-caller";
 import type { CallClip } from "@/lib/arena-caller";
-import { callerSpeechLines, clipLooksFinished, resolveClipUrl, speechText, TEST_SOUND_TEXT } from "@/lib/caller-speech";
+import {
+  callerSpeechLines,
+  clipLooksFinished,
+  playbackStalled,
+  resolveClipUrl,
+  speechText,
+  TEST_SOUND_TEXT,
+} from "@/lib/caller-speech";
 import { prefetchCallerSpeech } from "@/lib/caller-prefetch";
 import { callerDevice, hearCommand, micHelp, type MicStatus, type RideCommand } from "@/lib/caller-commands";
 import { createCallerEar, type CallerEar } from "@/lib/caller-ear";
@@ -194,9 +201,15 @@ export function ArenaCaller({
   /** iOS often never fires ended on a reused audio element. Watch the clock as well. */
   function followPlayback(audio: HTMLAudioElement, gen: number, onDone: () => void) {
     let settled = false;
+    let startedAt = 0;
+    let lastProgressAt = 0;
+    let lastCurrent = -1;
+    let poll = 0;
     const clearWatch = () => {
       settled = true;
       clearClipEnd();
+      if (poll) window.clearInterval(poll);
+      poll = 0;
       audio.onended = null;
       audio.ontimeupdate = null;
       audio.onpause = null;
@@ -208,21 +221,42 @@ export function ArenaCaller({
       clearWatch();
       onDone();
     };
+    const consider = () => {
+      const now = Date.now();
+      const current = audio.currentTime;
+      if (!startedAt && (current > 0 || audio.duration > 0)) {
+        startedAt = now;
+        lastProgressAt = now;
+        lastCurrent = current;
+      }
+      if (startedAt && Math.abs(current - lastCurrent) > 0.05) {
+        lastCurrent = current;
+        lastProgressAt = now;
+      }
+      const verdict = playbackStalled({
+        startedAt,
+        now,
+        lastProgressAt,
+        current,
+        duration: audio.duration,
+      });
+      if (verdict === "done") finish();
+    };
     const arm = () => {
       const dur = audio.duration;
-      const ms = Number.isFinite(dur) && dur > 0 && dur < 180 ? Math.ceil(dur * 1000) + 800 : 20000;
+      const ms = Number.isFinite(dur) && dur > 0 && dur < 180 ? Math.ceil(dur * 1000) + 1000 : 12_000;
       clearClipEnd();
       clipEndRef.current = window.setTimeout(finish, ms);
     };
     audio.onloadedmetadata = arm;
     audio.ondurationchange = arm;
-    audio.ontimeupdate = () => {
-      if (clipLooksFinished(audio.currentTime, audio.duration)) finish();
-    };
+    audio.ontimeupdate = consider;
     audio.onpause = () => {
       if (audio.ended || clipLooksFinished(audio.currentTime, audio.duration)) finish();
     };
     audio.onended = () => finish();
+    poll = window.setInterval(consider, 250);
+    arm();
     return { arm, cancel: clearWatch, done: () => settled };
   }
 
@@ -707,9 +741,11 @@ export function ArenaCaller({
           data-testid="mic-status"
           onClick={() => earRef.current?.arm()}
         >
-          {micNote ?? micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })}
+          {micStatus === "closed"
+            ? micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })
+            : (micNote ?? micHelp({ status: micStatus, mode: micMode, standalone: homeScreen }))}
         </button>
-        {micMode === "mic" && micStatus === "listening" && (
+        {micMode === "mic" && (micStatus === "listening" || micStatus === "closed") && (
           <div className="mt-1 flex items-center gap-2" aria-label="Microphone level" data-testid="mic-level">
             <span className="w-6 text-[10px] font-semibold text-muted">Mic</span>
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-sunken">

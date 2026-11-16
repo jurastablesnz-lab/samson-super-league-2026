@@ -87,6 +87,7 @@ test("an iPhone uses the microphone, and a home-screen app says how to listen", 
     micHelp({ status: "permission", mode: "mic", standalone: false }).includes("Microphone"),
     true,
   );
+  assert.equal(micHelp({ status: "closed", mode: "mic", standalone: true }), "Mic off — tap to enable");
 });
 
 test("a command is a short burst, and Ara speaking throws it away", () => {

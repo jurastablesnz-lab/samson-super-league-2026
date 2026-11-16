@@ -14,6 +14,31 @@ export function clipLooksFinished(current: number, duration: number): boolean {
   return current >= duration - 0.25;
 }
 
+/** Backup clock for a clip. Unknown or endless durations still finish. */
+export function clipWatchMs(duration: number): number {
+  if (Number.isFinite(duration) && duration > 0 && duration < 180) return Math.ceil(duration * 1000) + 1000;
+  return 12_000;
+}
+
+/**
+ * iOS can leave an audio element on "playing" after the session changes.
+ * Finish when the playhead reaches the end, when it stops moving, or when the
+ * backup clock runs out.
+ */
+export function playbackStalled(input: {
+  startedAt: number;
+  now: number;
+  lastProgressAt: number;
+  current: number;
+  duration: number;
+}): "done" | "wait" {
+  if (!input.startedAt) return "wait";
+  if (clipLooksFinished(input.current, input.duration)) return "done";
+  if (input.now - input.startedAt >= clipWatchMs(input.duration)) return "done";
+  if (input.current > 0.2 && input.now - input.lastProgressAt >= 3000) return "done";
+  return "wait";
+}
+
 /** Words for the voice, and the cache key. The same shorthand always becomes the same line. */
 export function speechText(text: string): string {
   return spokenLine(text).slice(0, 500);

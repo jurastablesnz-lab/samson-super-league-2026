@@ -55,6 +55,15 @@ export function beginPcm(ring: PcmRing): void {
   ring.capture = ring.chunks.slice();
 }
 
+export function peakPcm(samples: Float32Array): number {
+  let peak = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.abs(samples[i]);
+    if (value > peak) peak = value;
+  }
+  return peak;
+}
+
 export function endPcm(ring: PcmRing, discard: boolean): Float32Array | null {
   const chunks = ring.capture;
   ring.capture = null;

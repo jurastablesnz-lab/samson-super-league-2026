@@ -8,7 +8,7 @@ import {
   type RideCommand,
   type VadState,
 } from "./caller-commands.ts";
-import { beginPcm, createPcmRing, encodeWavPcm, endPcm, pushPcm } from "./caller-stt.ts";
+import { beginPcm, createPcmRing, encodeWavPcm, endPcm, peakPcm, pushPcm } from "./caller-stt.ts";
 
 type Rec = {
   continuous: boolean;
@@ -40,7 +40,9 @@ export type CallerEar = {
  * On an iPhone the recogniser is not used: playing Ara through an audio element
  * stops it, and a home-screen app does not have it. The microphone records a
  * short clip instead, including a little audio from before the voice detector
- * opens so the start of "next" is not cut off. The first arm() must run inside a tap.
+ * opens so the start of "next" is not cut off. The microphone stays open for the
+ * whole caller session. Playing Ara must not leave that stream muted. The first
+ * arm() must run inside a tap.
  */
 export function createCallerEar(options: {
   ios: boolean;
@@ -51,6 +53,8 @@ export function createCallerEar(options: {
   transcribe?: (blob: Blob, seconds: number) => Promise<string>;
   onCommand: (command: RideCommand, heard: string) => void;
   onHeard?: (heard: string) => void;
+  onError?: (message: string) => void;
+  onLevel?: (rms: number) => void;
   onStatus: (status: MicStatus) => void;
   onLog: (line: string) => void;
   schedule?: (fn: () => void, ms: number) => number;
@@ -75,7 +79,14 @@ export function createCallerEar(options: {
   let context: AudioContext | null = null;
   let processor: ScriptProcessorNode | null = null;
   let mute: GainNode | null = null;
+  let sourceNode: MediaStreamAudioSourceNode | null = null;
+  let analyser: AnalyserNode | null = null;
   let usePcm = false;
+  let openGen = 0;
+  let lastReopen = 0;
+  let lastPcmAt = 0;
+  let clipPeak = 0;
+  let sessionNoted = false;
   const ring = createPcmRing();
 
   function log(line: string) {
@@ -172,8 +183,15 @@ export function createCallerEar(options: {
     return types.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
   }
 
-  function finishClip(blob: Blob, seconds: number) {
+  function finishClip(blob: Blob, seconds: number, peak: number) {
+    log(`mic: clip ${seconds.toFixed(1)}s ${blob.size}b peak ${peak.toFixed(3)}`);
     if (discardClip || !options.transcribe) return;
+    if (peak < 0.008) {
+      log("mic: silent — reopening the microphone");
+      options.onHeard?.("");
+      scheduleReopen("silent");
+      return;
+    }
     if (blob.size < 400) {
       log(`mic: clip too small (${blob.size})`);
       options.onHeard?.("");
@@ -183,13 +201,14 @@ export function createCallerEar(options: {
     void options
       .transcribe(blob, seconds)
       .then((text) => {
+        log(`mic: stt ${text ? JSON.stringify(text) : "empty"}`);
         if (text) accept(text);
         else options.onHeard?.("");
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
         log(`mic: error ${message}`);
-        options.onHeard?.(message);
+        options.onError?.(message);
       });
   }
 
@@ -211,6 +230,7 @@ export function createCallerEar(options: {
   }
 
   function notePcm(frame: Float32Array) {
+    lastPcmAt = now();
     pushPcm(ring, frame, context?.sampleRate || 48000);
   }
 
@@ -224,7 +244,7 @@ export function createCallerEar(options: {
     const samples = endPcm(ring, discard);
     if (!samples) return;
     const rate = context?.sampleRate || 48000;
-    finishClip(encodeWavPcm(samples, rate), Math.max(1, samples.length / rate));
+    finishClip(encodeWavPcm(samples, rate), Math.max(1, samples.length / rate), peakPcm(samples));
   }
 
   function stopCapture(discard: boolean) {
@@ -233,8 +253,11 @@ export function createCallerEar(options: {
   }
 
   function onRms(rms: number) {
+    options.onLevel?.(rms);
+    if (ring.capture || recorder) clipPeak = Math.max(clipPeak, rms);
     const stepped = stepVad(vad, rms, 100, suspended);
     vad = stepped.next;
+    if (stepped.action === "start") clipPeak = rms;
     if (stepped.action === "start" && stream && !recorder && !ring.capture) {
       if (usePcm && ring.samples > 0) {
         openPcm();
@@ -252,7 +275,7 @@ export function createCallerEar(options: {
         };
         next.onstop = () => {
           const blob = new Blob(chunks, { type: next.mimeType || mime || "audio/mp4" });
-          finishClip(blob, Math.max(1, (now() - started) / 1000));
+          finishClip(blob, Math.max(1, (now() - started) / 1000), clipPeak);
         };
         recorder = next;
         discardClip = false;
@@ -266,31 +289,112 @@ export function createCallerEar(options: {
     if (stepped.action === "discard") stopCapture(true);
   }
 
+  function holdRecordSession() {
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (!session) {
+      if (!sessionNoted) log("mic: session unavailable");
+      sessionNoted = true;
+      return;
+    }
+    try {
+      session.type = "play-and-record";
+      if (!sessionNoted) log("mic: session play-and-record");
+      sessionNoted = true;
+    } catch (err) {
+      log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  function clearRing() {
+    ring.chunks.length = 0;
+    ring.samples = 0;
+    ring.capture = null;
+  }
+
+  function tearGraph() {
+    if (timer != null) window.clearInterval(timer);
+    timer = null;
+    try {
+      processor?.disconnect();
+      mute?.disconnect();
+      sourceNode?.disconnect();
+      analyser?.disconnect();
+    } catch {
+      // Already closed.
+    }
+    processor = null;
+    mute = null;
+    sourceNode = null;
+    analyser = null;
+    usePcm = false;
+    clearRing();
+  }
+
+  function scheduleReopen(reason: string) {
+    if (stopped || !want) return;
+    if (now() - lastReopen < 3000) {
+      log(`mic: still closed (${reason})`);
+      return;
+    }
+    lastReopen = now();
+    log(`mic: reopen ${reason}`);
+    stopCapture(true);
+    tearGraph();
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+    armMic();
+  }
+
+  function watchTrack(track: MediaStreamTrack) {
+    track.onmute = () => {
+      log("mic: muted");
+      if (!suspended) scheduleReopen("muted");
+    };
+    track.onended = () => {
+      log("mic: ended");
+      scheduleReopen("ended");
+    };
+    track.onunmute = () => log("mic: unmuted");
+  }
+
   function listenLevel() {
     if (!context || !stream) return;
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 1024;
+    const node = context.createAnalyser();
+    node.fftSize = 1024;
     const source = context.createMediaStreamSource(stream);
-    source.connect(analyser);
+    source.connect(node);
+    analyser = node;
+    sourceNode = source;
     if (typeof context.createScriptProcessor === "function") {
       try {
-        const node = context.createScriptProcessor(4096, 1, 1);
+        const capture = context.createScriptProcessor(4096, 1, 1);
         const gain = context.createGain();
         gain.gain.value = 0;
-        node.onaudioprocess = (event) => notePcm(event.inputBuffer.getChannelData(0));
-        source.connect(node);
-        node.connect(gain);
+        capture.onaudioprocess = (event) => notePcm(event.inputBuffer.getChannelData(0));
+        source.connect(capture);
+        capture.connect(gain);
         gain.connect(context.destination);
-        processor = node;
+        processor = capture;
         mute = gain;
         usePcm = true;
+        lastPcmAt = now();
       } catch (err) {
         usePcm = false;
         log(`mic: error ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    const data = new Float32Array(analyser.fftSize);
+    const data = new Float32Array(node.fftSize);
     timer = window.setInterval(() => {
+      if (!analyser) return;
+      if (
+        usePcm &&
+        !suspended &&
+        context?.state === "running" &&
+        lastPcmAt > 0 &&
+        now() - lastPcmAt > 1500
+      ) {
+        scheduleReopen("capture stalled");
+      }
       analyser.getFloatTimeDomainData(data);
       let sum = 0;
       for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
@@ -310,23 +414,40 @@ export function createCallerEar(options: {
       options.onStatus("unsupported");
       return;
     }
+    holdRecordSession();
     if (!context) context = new AudioCtx();
+    context.onstatechange = () => {
+      const state = context?.state ?? "";
+      log(`mic: audio ${state}`);
+      if (state === "suspended" || state === "interrupted") void context?.resume();
+    };
     void context.resume();
+    const gen = ++openGen;
     const open =
       options.openMic ??
       (() =>
         navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true,
+            channelCount: 1,
+          },
         }));
     void open()
       .then((opened) => {
-        if (stopped || !want) {
+        if (gen !== openGen || stopped || !want) {
           opened.getTracks().forEach((track) => track.stop());
           return;
         }
         stream = opened;
+        const track = opened.getAudioTracks()[0];
+        if (track) watchTrack(track);
+        const settings = track?.getSettings?.() ?? {};
         options.onStatus("listening");
-        log("mic: ready");
+        log(
+          `mic: ready echo ${settings.echoCancellation === true ? "on" : "off"} noise ${settings.noiseSuppression === true ? "on" : "off"}`,
+        );
         listenLevel();
       })
       .catch((err) => {
@@ -362,8 +483,14 @@ export function createCallerEar(options: {
     },
     resume() {
       suspended = false;
+      holdRecordSession();
       void context?.resume();
       if (!want || stopped) return;
+      const track = stream?.getAudioTracks()[0];
+      if (mode !== "webkit" && (!track || track.readyState !== "live" || track.muted)) {
+        scheduleReopen(track?.muted ? "muted" : "ended");
+        return;
+      }
       if (mode === "webkit") beginWebkit();
       else if (stream) options.onStatus("listening");
     },
@@ -371,17 +498,10 @@ export function createCallerEar(options: {
       stopped = true;
       want = false;
       suspended = false;
+      openGen += 1;
       stopWebkit();
       stopCapture(true);
-      if (timer != null) window.clearInterval(timer);
-      try {
-        processor?.disconnect();
-        mute?.disconnect();
-      } catch {
-        // Already closed.
-      }
-      processor = null;
-      mute = null;
+      tearGraph();
       stream?.getTracks().forEach((track) => track.stop());
       stream = null;
       void context?.close();

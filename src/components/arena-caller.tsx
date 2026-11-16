@@ -98,6 +98,7 @@ export function ArenaCaller({
   const [lastVoice, setLastVoice] = useState("none");
   const [micStatus, setMicStatus] = useState<MicStatus>("off");
   const [micNote, setMicNote] = useState<string | null>(null);
+  const [micLevel, setMicLevel] = useState(0);
   const [micMode, setMicMode] = useState<"webkit" | "mic" | "none">("none");
   const [homeScreen, setHomeScreen] = useState(false);
   const directivesRef = useRef(directives);
@@ -519,14 +520,14 @@ export function ArenaCaller({
         const result = await hearCallerClip({
           data: { audio, mime: bareAudioMime(blob.type) || "audio/mp4", seconds },
         });
-        if (!result.ok) {
-          setMicNote(result.error);
-          if (/Monthly limit|tomorrow/.test(result.error)) setMicStatus("paused");
-          logDiag(`mic: ${result.error}`);
-          return "";
-        }
+        if (!result.ok) throw new Error(result.error);
         return result.text;
       },
+      onError: (message) => {
+        setMicNote(message);
+        if (/Monthly limit|tomorrow/.test(message)) setMicStatus("paused");
+      },
+      onLevel: (level) => setMicLevel(level),
       onHeard: (heard) => {
         if (!heard) {
           setMicNote("Heard nothing. Say next, back, or again.");
@@ -708,6 +709,17 @@ export function ArenaCaller({
         >
           {micNote ?? micHelp({ status: micStatus, mode: micMode, standalone: homeScreen })}
         </button>
+        {micMode === "mic" && micStatus === "listening" && (
+          <div className="mt-1 flex items-center gap-2" aria-label="Microphone level" data-testid="mic-level">
+            <span className="w-6 text-[10px] font-semibold text-muted">Mic</span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-sunken">
+              <div
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${Math.min(100, Math.round(micLevel * 500))}%` }}
+              />
+            </div>
+          </div>
+        )}
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"

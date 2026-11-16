@@ -17,6 +17,7 @@ import {
   createPcmRing,
   encodeWavPcm,
   endPcm,
+  peakPcm,
   pushPcm,
   sttLimitMessage,
 } from "./caller-stt.ts";
@@ -102,6 +103,18 @@ test("a command is a short burst, and Ara speaking throws it away", () => {
   assert.equal(stepped.action, "none");
   const recording = stepVad(idleVad(), 0.05, 200, false);
   assert.equal(stepVad(recording.next, 0.05, 100, true).action, "discard");
+});
+
+test("steady wind does not keep opening a clip", () => {
+  let state = idleVad();
+  for (let i = 0; i < 50; i += 1) state = stepVad(state, 0.05, 100, false).next;
+  let starts = 0;
+  for (let i = 0; i < 20; i += 1) {
+    const stepped = stepVad(state, 0.05, 100, false);
+    if (stepped.action === "start") starts += 1;
+    state = stepped.next;
+  }
+  assert.equal(starts, 0);
 });
 
 test("recognition restarts after it ends, and ignores a word while Ara speaks", async () => {
@@ -217,6 +230,7 @@ test("a rider's command audio stops at the daily minutes, and a transcript is re
     assert.equal(String.fromCharCode(...header.slice(0, 4)), "RIFF");
     assert.equal(clip.type, "audio/wav");
     assert.equal(clip.size, 44 + 6);
+    assert.equal(peakPcm(new Float32Array([0.25, -0.5, 0.125])), 0.5);
     const heard = await transcribeClip("key", wav, "audio/wav", async (_url, init) => {
       const form = init?.body as FormData;
       const keys = [...form.keys()];

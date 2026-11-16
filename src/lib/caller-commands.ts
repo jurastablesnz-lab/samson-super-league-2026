@@ -140,17 +140,32 @@ export function micHelp(input: {
   return "Tap start. That also turns the microphone on.";
 }
 
-export type VadState = { hot: number; cool: number; recording: boolean; ms: number };
+export type VadState = {
+  hot: number;
+  cool: number;
+  recording: boolean;
+  ms: number;
+  /** Slow ambient level, so wind does not look like a command. */
+  floor: number;
+  peak: number;
+};
 
-const START_RMS = 0.025;
-const KEEP_RMS = 0.015;
 const START_MS = 80;
 const END_MS = 700;
 const MIN_MS = 350;
 const MAX_MS = 3500;
 
 export function idleVad(): VadState {
-  return { hot: 0, cool: 0, recording: false, ms: 0 };
+  return { hot: 0, cool: 0, recording: false, ms: 0, floor: 0.008, peak: 0 };
+}
+
+function trackFloor(floor: number, rms: number): number {
+  const next = rms < floor ? floor * 0.85 + rms * 0.15 : floor * 0.985 + rms * 0.015;
+  return Math.max(0.004, next);
+}
+
+function resting(floor: number): VadState {
+  return { hot: 0, cool: 0, recording: false, ms: 0, floor, peak: 0 };
 }
 
 /** Decide when a short command has started and finished. Suspended means Ara is speaking. */
@@ -160,19 +175,26 @@ export function stepVad(
   dt: number,
   suspended: boolean,
 ): { next: VadState; action: "start" | "stop" | "discard" | "none" } {
+  const floor = trackFloor(state.floor || 0.008, rms);
   if (suspended) {
-    return { next: idleVad(), action: state.recording ? "discard" : "none" };
+    return { next: resting(state.floor || floor), action: state.recording ? "discard" : "none" };
   }
   if (!state.recording) {
-    if (rms < START_RMS) return { next: idleVad(), action: "none" };
+    const startAt = Math.max(0.012, floor * 2.5);
+    if (rms < startAt) return { next: resting(floor), action: "none" };
     const hot = state.hot + dt;
-    if (hot < START_MS) return { next: { hot, cool: 0, recording: false, ms: 0 }, action: "none" };
-    return { next: { hot: 0, cool: 0, recording: true, ms: 0 }, action: "start" };
+    if (hot < START_MS) return { next: { hot, cool: 0, recording: false, ms: 0, floor, peak: 0 }, action: "none" };
+    return { next: { hot: 0, cool: 0, recording: true, ms: 0, floor, peak: rms }, action: "start" };
   }
+  const peak = Math.max(state.peak, rms);
   const ms = state.ms + dt;
-  if (ms >= MAX_MS) return { next: idleVad(), action: "stop" };
-  if (rms >= KEEP_RMS) return { next: { hot: 0, cool: 0, recording: true, ms }, action: "none" };
+  const keepAt = Math.max(0.008, state.floor * 1.5);
+  if (ms >= MAX_MS) {
+    const burst = peak > Math.max(0.02, state.floor * 3);
+    return { next: resting(floor), action: burst ? "stop" : "discard" };
+  }
+  if (rms >= keepAt) return { next: { hot: 0, cool: 0, recording: true, ms, floor, peak }, action: "none" };
   const cool = state.cool + dt;
-  if (cool < END_MS) return { next: { hot: 0, cool, recording: true, ms }, action: "none" };
-  return { next: idleVad(), action: ms >= MIN_MS ? "stop" : "discard" };
+  if (cool < END_MS) return { next: { hot: 0, cool, recording: true, ms, floor, peak }, action: "none" };
+  return { next: resting(floor), action: ms >= MIN_MS ? "stop" : "discard" };
 }

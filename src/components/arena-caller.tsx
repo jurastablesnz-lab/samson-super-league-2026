@@ -22,6 +22,8 @@ import { callerDevice, hearCommand, micHelp, type MicStatus, type RideCommand } 
 import { createCallerEar, type CallerEar } from "@/lib/caller-ear";
 import { bareAudioMime } from "@/lib/caller-stt";
 import { hearCallerClip } from "@/lib/coach";
+import { PocketOverlay } from "@/components/pocket-overlay";
+import { POCKET_HINT, createScreenWakeLock } from "@/lib/pocket-mode";
 import type { Movement } from "@/lib/tests/types";
 
 const UNLOCK_BEEP =
@@ -108,6 +110,8 @@ export function ArenaCaller({
   const [micLevel, setMicLevel] = useState(0);
   const [micMode, setMicMode] = useState<"webkit" | "mic" | "none">("none");
   const [homeScreen, setHomeScreen] = useState(false);
+  const [pocket, setPocket] = useState(false);
+  const [pocketOffer, setPocketOffer] = useState(true);
   const directivesRef = useRef(directives);
   const coachRef = useRef(coach);
   const autoRef = useRef(auto);
@@ -611,28 +615,24 @@ export function ArenaCaller({
       logDiag(`js:${event.message}`);
     };
     window.addEventListener("error", onError);
-    let lock: { release: () => Promise<void> } | null = null;
-    let dropped = false;
-    try {
-      void navigator.wakeLock
-        ?.request("screen")
-        .then((sentinel) => {
-          if (dropped) void sentinel.release().catch(() => undefined);
-          else lock = sentinel;
-        })
-        .catch(() => undefined);
-    } catch {
-      // Wake Lock is optional. A throw here must not kill the caller.
-    }
+    const wake = createScreenWakeLock({
+      request: () => {
+        if (!navigator.wakeLock?.request) return Promise.reject(new Error("unsupported"));
+        return navigator.wakeLock.request("screen");
+      },
+      isVisible: () => document.visibilityState === "visible",
+      onVisible: (listener) => {
+        const onChange = () => {
+          if (document.visibilityState === "visible") listener();
+        };
+        document.addEventListener("visibilitychange", onChange);
+        return () => document.removeEventListener("visibilitychange", onChange);
+      },
+    });
     return () => {
-      dropped = true;
+      wake.release();
       synth.removeEventListener?.("voiceschanged", remember);
       window.removeEventListener("error", onError);
-      try {
-        void lock?.release();
-      } catch {
-        // Already released.
-      }
       stopRecognition();
       quietAudio();
       try {
@@ -834,6 +834,43 @@ export function ArenaCaller({
               onChange={(event) => setDirectives(event.target.checked)}
             />
           </label>
+          <div className="col-span-2 flex flex-col gap-1">
+            {pocketOffer && !pocket && (
+              <p className="text-xs text-muted">
+                Ride with the phone in a pocket?{" "}
+                <button
+                  type="button"
+                  className="font-semibold text-accent"
+                  onClick={() => {
+                    setPocket(true);
+                    setPocketOffer(false);
+                  }}
+                >
+                  Use pocket mode
+                </button>
+                {" · "}
+                <button
+                  type="button"
+                  className="font-semibold text-muted"
+                  onClick={() => setPocketOffer(false)}
+                >
+                  Not now
+                </button>
+              </p>
+            )}
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-line bg-bg text-sm font-semibold"
+              data-testid="pocket-mode-button"
+              onClick={() => {
+                setPocket(true);
+                setPocketOffer(false);
+              }}
+            >
+              Pocket mode
+            </button>
+            <p className="text-xs text-muted">{POCKET_HINT}</p>
+          </div>
           <div className="col-span-2 flex min-h-11 items-center gap-2 text-sm">
             <label className="flex items-center gap-2">
               <input
@@ -878,6 +915,12 @@ ${diagLines.join("\n")}`}
           </pre>
         )}
       </div>
+      {pocket && (
+        <PocketOverlay
+          movement={letters || `Movement ${movement.n}`}
+          onUnlock={() => setPocket(false)}
+        />
+      )}
     </div>
   );
 }

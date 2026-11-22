@@ -104,6 +104,9 @@ export type BetaAccess = {
   application: Omit<Application, "adminNotes"> | null;
   /** localStorage key for this user's training data. */
   storageKey: string;
+  /** Coach Portal application, separate from the rider beta. */
+  coachStatus: "pending" | "approved" | "declined" | null;
+  isCoach: boolean;
 };
 
 const STATUSES: BetaStatus[] = ["pending", "approved", "declined", "waitlist"];
@@ -269,6 +272,8 @@ export const getBetaAccess = createServerFn({ method: "GET" })
         status: null,
         application: null,
         storageKey: LEGACY_KEY,
+        coachStatus: null,
+        isCoach: false,
       };
     }
     const sql = await getSql();
@@ -283,6 +288,8 @@ export const getBetaAccess = createServerFn({ method: "GET" })
       void _n;
       application = rest;
     }
+    const coach = await sql<{ status: "pending" | "approved" | "declined" }>`
+      select status from coaches where user_id = ${user.id}`;
     return {
       email: user.email,
       name: user.name,
@@ -291,6 +298,8 @@ export const getBetaAccess = createServerFn({ method: "GET" })
       status,
       application,
       storageKey,
+      coachStatus: coach[0]?.status ?? null,
+      isCoach: coach[0]?.status === "approved",
     };
   });
 

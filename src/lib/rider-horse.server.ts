@@ -127,6 +127,8 @@ type CoachRow = {
   film: string;
   homework: string;
   leave_it: string;
+  author_name?: string | null;
+  author_role?: string | null;
 };
 const toCoach = (r: CoachRow): CoachVisitRecord => ({
   id: r.id,
@@ -137,6 +139,8 @@ const toCoach = (r: CoachRow): CoachVisitRecord => ({
   film: r.film,
   homework: r.homework,
   leaveIt: r.leave_it,
+  authorName: r.author_name ?? "",
+  authorRole: r.author_role === "coach" ? "coach" : "rider",
 });
 
 /** One horse's log. Refuses another rider's horse before reading anything. */
@@ -246,9 +250,13 @@ export async function saveCoachVisitFor(
       where id = ${id} and user_id = ${userId} and horse_id = ${horseId} returning id`;
     if (!rows.length) throw new Error("Visit not found");
   } else {
-    await sql`insert into coach_visits (id, user_id, horse_id, visit_date, end_date, title, focus, film, homework, leave_it)
-      values (${newId()}, ${userId}, ${horseId}, ${v.date}, ${v.endDate}, ${v.title}, ${v.focus}, ${v.film},
-        ${v.homework}, ${v.leaveIt})`;
+    await sql`insert into coach_visits (
+      id, user_id, horse_id, visit_date, end_date, title, focus, film, homework, leave_it,
+      author_user_id, author_name, author_role
+    ) values (
+      ${newId()}, ${userId}, ${horseId}, ${v.date}, ${v.endDate}, ${v.title}, ${v.focus}, ${v.film},
+      ${v.homework}, ${v.leaveIt}, ${userId}, '', 'rider'
+    )`;
   }
   return readHorseLog(sql, userId, horseId);
 }

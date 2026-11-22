@@ -156,7 +156,14 @@ const COACH_HOW = [
   "Write the homework down before you leave.",
 ];
 
-type VisitDay = { date: string; endDate?: string; title: string; focus: string };
+type VisitDay = {
+  date: string;
+  endDate?: string;
+  title: string;
+  focus: string;
+  authorName?: string;
+  authorRole?: string;
+};
 
 /**
  * Lay this horse's coach visits onto a copy of its week plan.
@@ -178,13 +185,15 @@ export function applyCoachVisits(plan: GeneratedPlan, visits: VisitDay[]): Gener
       const visit = byDay.get(s.day);
       if (!visit || coachBlocked(plan.shows, s.day)) return s;
       changed = true;
+      const by = visit.authorRole === "coach" && visit.authorName?.trim() ? visit.authorName.trim() : "";
       return session(
         s.day,
         "coach",
-        visit.title.trim() || "Coach",
+        visit.title.trim() || (by ? by : "Coach"),
         visit.focus.trim() || "Ride the lesson, then leave it.",
         60,
         COACH_HOW,
+        by ? `Set by ${by}` : undefined,
       );
     });
     if (!changed) return week;

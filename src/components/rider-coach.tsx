@@ -7,6 +7,7 @@ import type { GeneratedPlan } from "@/lib/plan-builder";
 import { iso, TODAY } from "@/lib/season";
 import { cn } from "@/lib/utils";
 import { inputCls, Kicker, PrimaryButton } from "./beta-ui";
+import { YourCoaches } from "./rider-coach-links";
 import { fmtDay } from "./setup-wizard";
 
 type View = "visits" | "videos" | "sheets";
@@ -57,6 +58,7 @@ export function CoachTab({
   ];
   return (
     <div className="flex flex-col gap-4">
+      <YourCoaches />
       <div className="grid grid-cols-3 gap-1 rounded-xl bg-sunken p-1" role="tablist" aria-label="Coach">
         {tabs.map((tab) => (
           <button
@@ -290,6 +292,9 @@ function VisitList({
             <div>
               <Kicker>{datesLabel(visit)}</Kicker>
               <h2 className="font-display mt-1 text-xl font-medium">{visit.title || "Coach"}</h2>
+              {visit.authorRole === "coach" && visit.authorName && (
+                <p className="mt-1 text-xs font-semibold text-accent">Set by {visit.authorName} in the Coach Portal</p>
+              )}
             </div>
             <div className="flex gap-2">
               <button type="button" className="cursor-pointer text-xs font-semibold text-accent" onClick={() => onEdit(visit)}>

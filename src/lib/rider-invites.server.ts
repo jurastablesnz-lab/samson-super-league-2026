@@ -147,7 +147,7 @@ export async function claimInvitation(
   await sql.query("begin");
   try {
     await sql.query(
-      "set constraints horses_user_id_fkey, ride_notes_user_id_fkey, judge_sheets_user_id_fkey, coach_visits_user_id_fkey, horse_competitions_user_id_fkey deferred",
+      "set constraints horses_user_id_fkey, ride_notes_user_id_fkey, judge_sheets_user_id_fkey, coach_visits_user_id_fkey, horse_competitions_user_id_fkey, coaches_user_id_fkey, coach_links_rider_user_id_fkey, coach_links_coach_user_id_fkey deferred",
     );
     const invites = await sql<{
       id: string;
@@ -183,11 +183,32 @@ export async function claimInvitation(
         invite.workspace_user_id,
       ]);
     }
+    await sql.query("update coach_visits set author_user_id = $1 where author_user_id = $2", [
+      identity.id,
+      invite.workspace_user_id,
+    ]);
+    await sql.query("update coach_links set rider_user_id = $1 where rider_user_id = $2", [
+      identity.id,
+      invite.workspace_user_id,
+    ]);
+    await sql.query("update coach_links set coach_user_id = $1 where coach_user_id = $2", [
+      identity.id,
+      invite.workspace_user_id,
+    ]);
+    await sql.query(
+      `update coaches set user_id = $1 where user_id = $2 and not exists (select 1 from coaches where user_id = $1)`,
+      [identity.id, invite.workspace_user_id],
+    );
+    await sql.query("delete from coaches where user_id = $1", [invite.workspace_user_id]);
     await sql`insert into beta_applications (user_id, email, full_name, phone, region, rider_grade, competition_level, horse_list, horses, esnz_member, coach, goals, heard_from, consent, consent_at, status, admin_notes, decided_at, decided_by, created_at, updated_at)
       select ${identity.id}, email, full_name, phone, region, rider_grade, competition_level, horse_list, horses, esnz_member, coach, goals, heard_from, consent, consent_at, status, admin_notes, decided_at, decided_by, created_at, now() from beta_applications where user_id = ${invite.workspace_user_id}
       on conflict (user_id) do update set full_name = excluded.full_name, horses = excluded.horses, horse_list = excluded.horse_list, goals = excluded.goals, heard_from = excluded.heard_from, status = 'approved', decided_at = excluded.decided_at, decided_by = excluded.decided_by, updated_at = now()`;
-    await sql`insert into riders (user_id, display_name, setup_completed_at, last_active_at) select ${identity.id}, display_name, setup_completed_at, now() from riders where user_id = ${invite.workspace_user_id}
-      on conflict (user_id) do update set last_active_at = now(), updated_at = now(), display_name = case when riders.display_name = '' then excluded.display_name else riders.display_name end`;
+    await sql`insert into riders (user_id, display_name, setup_completed_at, last_active_at, under_18, guardian_note)
+      select ${identity.id}, display_name, setup_completed_at, now(), under_18, guardian_note from riders where user_id = ${invite.workspace_user_id}
+      on conflict (user_id) do update set last_active_at = now(), updated_at = now(),
+        display_name = case when riders.display_name = '' then excluded.display_name else riders.display_name end,
+        under_18 = riders.under_18 or excluded.under_18,
+        guardian_note = case when riders.guardian_note = '' then excluded.guardian_note else riders.guardian_note end`;
     await sql`update rider_invitations set workspace_user_id = ${identity.id} where id = ${invite.id}`;
     await sql`delete from riders where user_id = ${invite.workspace_user_id}`;
     await sql`delete from "user" where id = ${invite.workspace_user_id} and id like 'invite-%'`;

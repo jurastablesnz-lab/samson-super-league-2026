@@ -31,13 +31,15 @@ function Privacy() {
           every device. Show results we import from EVO Events are matched to your horses. Judge-sheet photos stay
           on the device you added them from. Videos, freestyle music and floor plans stay on that device until they
           have been copied to private storage on your account. Only you and the Virtual Dressage NZ team can open those
-          files.
+          files, unless you share videos with a coach you have connected. That coach can play only those videos, and
+          only while the connection is on.
         </p>
 
         <H>Who sees it</H>
         <p>
-          Only you and the Virtual Dressage NZ team. If you choose to connect a coach in future, they will see only what
-          you choose to share with them. When you ask for a judge-sheet summary, the photo is sent securely to our AI
+          Only you and the Virtual Dressage NZ team, plus a coach you connect in the Coach Portal. That coach sees only
+          the parts you choose — plan, scores, judges' work-ons, ride notes, coach visits, videos — and you can change
+          or remove them at any time. When you ask for a judge-sheet summary, the photo is sent securely to our AI
           provider to read it and is not used for anything else. We never rate or comment on individual judges.
         </p>
 

@@ -60,6 +60,28 @@ test("coach visits land on school days only, for the visits passed in", () => {
   }
 });
 
+test("a focus set by a coach is named on that horse's week plan", () => {
+  const plan = generatePlan(
+    {
+      horseName: "Kahu",
+      level: "Level 2",
+      tests: ["2A"],
+      shows: [],
+      goals: [],
+      startDate: "2027-01-04",
+    },
+    new Date("2027-01-04T00:00:00Z"),
+  );
+  const coached = applyCoachVisits(plan, [
+    { date: "2027-01-12", title: "", focus: "The halt", authorName: "Alex Ng", authorRole: "coach" },
+  ]);
+  const session = coached.weeks.flatMap((week) => week.sessions).find((item) => item.day === "2027-01-12");
+  assert.equal(session?.kind, "coach");
+  assert.equal(session?.title, "Alex Ng");
+  assert.equal(session?.note, "Set by Alex Ng");
+  assert.equal(JSON.stringify(session).includes(" he "), false);
+});
+
 test("coach visit dates are inclusive and capped at 14 days", () => {
   assert.deepEqual(coachVisitDates("2027-03-01", "2027-03-02"), ["2027-03-01", "2027-03-02"]);
   assert.deepEqual(coachVisitDates("2027-03-01", "2027-03-20"), []);

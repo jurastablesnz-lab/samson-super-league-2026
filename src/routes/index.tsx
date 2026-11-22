@@ -22,6 +22,9 @@ function Home() {
   }
   const a = access.access;
   if (a.hasAccess) return <TrainingApp access={a} />;
+  if (!a.application && (a.isCoach || a.coachStatus)) {
+    return <Navigate to="/coach" search={{ pupil: "", settings: false }} />;
+  }
   if (!a.application) return <Navigate to="/join" />;
   return <StatusView access={a} />;
 }
@@ -31,6 +34,9 @@ function AccountBar({ access }: { access: BetaAccess }) {
   return (
     <div className="flex items-center justify-end gap-3 bg-sunken px-4 py-1.5 text-[11px] text-muted">
       <span className="truncate">{access.email}</span>
+      <Link to="/coach" search={{ pupil: "", settings: false }} className="font-semibold text-accent">
+        Coach Portal
+      </Link>
       {access.isAdmin && (
         <Link to="/admin" className="font-semibold text-accent">
           Admin
@@ -82,6 +88,9 @@ function Welcome() {
           className="block rounded-lg border border-line px-4 py-3 text-center text-sm font-semibold text-ink-soft"
         >
           Sign in
+        </Link>
+        <Link to="/coach" search={{ pupil: "", settings: false }} className="block text-center text-sm font-semibold text-accent">
+          I'm a coach
         </Link>
       </Panel>
     </BrandShell>

@@ -1,4 +1,5 @@
 import type { Sql } from "./db.ts";
+import { coachMayPlayVideo } from "./coach-access.server.ts";
 import {
   MEDIA_LIMITS,
   PART_SIZE,
@@ -172,7 +173,10 @@ export async function playbackUrl(
   if (!port) return "";
   const row = await rowFor(sql, assertMediaId(mediaId));
   if (!row || row.status !== "ready") return "";
-  if (row.user_id !== actor.userId && !actor.isAdmin) throw new Error("That file is private.");
+  if (row.user_id !== actor.userId && !actor.isAdmin) {
+    const shared = await coachMayPlayVideo(sql, actor.userId, row);
+    if (!shared) throw new Error("That file is private.");
+  }
   return port.readUrl(row.object_key, row.mime, row.file_name);
 }
 

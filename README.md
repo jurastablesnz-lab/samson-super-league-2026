@@ -32,6 +32,27 @@ Competition videos, sheet photos and freestyle music files stay in the browser t
   Postgres — see `migrations/0004_rider_workspace.sql`.
 - `/admin` — approve riders and import EVO Events results CSVs (see `docs/evo-results-import.md`).
 - Admin access requires **Google** sign-in with an address in `BETA_ADMIN_EMAILS`.
+- `/coach` — **Coach Portal**. A coach account is separate from a rider place (one person can be both).
+  Riders invite a coach from the Coach tab, or a coach requests a pupil and the rider accepts.
+  The rider chooses what is shared (plan, scores, judges' work-ons, ride notes, coach visits, videos)
+  and can change or remove that at any time. The coach can set the next focus and homework, which
+  shows on the pupil's Coach tab and week plan under the coach's name. No payments: the coach fee
+  is NZ$50 a month, billed outside the app. `coaches.subscription_status` is reserved for that later.
+
+### Try the Coach Portal
+
+With auth off locally (`VITE_AUTH_ENABLED=false` and no `DATABASE_URL`), sign in is the dev user.
+Open `/coach` and use **Add a sample pupil**. That also puts a coach-set focus on a demo horse called
+Tui so the rider Coach tab and week plan show the attribution.
+
+Against Neon, after the migration has run:
+
+```
+COACH_SEED_EMAIL=you@example.com npm run seed:coach
+```
+
+The address must already be a signed-up user. The script approves them as a coach and links the
+sample pupil Mia Chen. It does not change that user's own horses.
 
 ## Environment
 
@@ -39,7 +60,7 @@ Competition videos, sheet photos and freestyle music files stay in the browser t
 | --------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`              | Neon Postgres (prod). Migrations run on `npm run build`.                                                 |
 | `XAI_API_KEY`               | Judge-sheet reading.                                                                                     |
-| `RESEND_API_KEY`            | Password reset emails + new-application alerts. Unset → reset link becomes "Contact us", alerts skipped. |
+| `RESEND_API_KEY`            | Password reset, new-application alerts, and Coach Portal link / homework emails. Unset → those emails are skipped. |
 | `EMAIL_FROM`                | Sender, e.g. `XSalute <hello@virtualdressage.co.nz>` (domain verified in Resend).                        |
 | `BETTER_AUTH_URL`           | Public app URL (used in reset links and the admin link in alerts).                                       |
 | `GOOGLE_CLIENT_ID`          | Optional with the secret below: app-owned native Google sign-in.                                         |

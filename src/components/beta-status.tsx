@@ -53,6 +53,13 @@ export function StatusView({ access, justApplied = false }: { access: BetaAccess
           </Panel>
         </>
       )}
+      {(access?.isCoach || access?.coachStatus) && (
+        <p className="mt-4 text-center text-sm">
+          <Link to="/coach" search={{ pupil: "", settings: false }} className="font-semibold text-accent">
+            Coach Portal
+          </Link>
+        </p>
+      )}
       <p className="mt-4 text-center text-xs text-muted">
         Questions? <a className="text-accent underline underline-offset-2" href="mailto:virtualdressagenz@gmail.com">virtualdressagenz@gmail.com</a>
         {" · "}

@@ -39,7 +39,7 @@ const LETTERS: Record<string, string> = {
   O: "oh",
   P: "pee",
   Q: "cue",
-  R: "ar",
+  R: "are",
   S: "ess",
   T: "tee",
   U: "you",

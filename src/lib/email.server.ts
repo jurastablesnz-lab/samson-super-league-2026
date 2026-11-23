@@ -11,7 +11,7 @@
  *
  * Never throws: failures are logged and reported as { ok: false }.
  */
-import { env } from "./env.server";
+import { env } from "./env.server.ts";
 
 export function emailEnabled(): boolean {
   return !!env("RESEND_API_KEY");

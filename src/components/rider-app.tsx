@@ -542,6 +542,7 @@ function SessionRow({ s, done, onToggle }: { s: Session; done: boolean; onToggle
           </span>
         </div>
         <p className="mt-0.5 text-sm text-muted">{s.focus}</p>
+        {s.note?.startsWith("Set by") && <p className="mt-1 text-xs font-semibold text-accent">{s.note}</p>}
       </div>
     </li>
   );
@@ -622,6 +623,9 @@ function TodayTab({
             {visitDays > 0 ? `${visitDays} days` : visitDays === 0 ? "Today" : "This visit"}
           </p>
           {nextVisit.focus && <p className="mt-1 text-sm text-muted">{nextVisit.focus}</p>}
+          {nextVisit.authorRole === "coach" && nextVisit.authorName && (
+            <p className="mt-1 text-xs font-semibold text-accent">Set by {nextVisit.authorName}</p>
+          )}
         </button>
       )}
       <TrainingTargets horseId={horse.id} tests={plan.tests} />
@@ -653,7 +657,11 @@ function TodayTab({
               <li key={h}>{h}</li>
             ))}
           </ol>
-          {today.note && <p className="mt-3 text-sm text-warn">{today.note}</p>}
+          {today.note && (
+            <p className={cn("mt-3 text-sm", today.note.startsWith("Set by") ? "font-semibold text-accent" : "text-warn")}>
+              {today.note}
+            </p>
+          )}
         </Card>
       )}
       <Card>

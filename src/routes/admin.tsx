@@ -15,6 +15,7 @@ import { SeedResultsPanel } from "@/components/seed-results-import";
 import { getAdminRiders } from "@/lib/rider-admin";
 import type { AdminRider } from "@/lib/admin-riders";
 import { RiderAdminPanels } from "@/components/admin-riders";
+import { CoachAdmin } from "@/components/admin-coaches";
 import { TestCatalog } from "@/components/test-sheet";
 import {
   BrandShell,
@@ -104,6 +105,7 @@ function AdminDashboard() {
       </Panel>
 
       <RiderAdminPanels riders={riders} onPrepared={load} />
+      <CoachAdmin />
       <TestCatalog />
       <SeedResultsPanel />
       <EvoImportPanel />

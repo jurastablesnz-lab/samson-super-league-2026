@@ -58,7 +58,10 @@ function JoinPage() {
       <p className="mt-2 text-sm leading-relaxed text-muted">
         Bring the scores, what the judges wrote, and what your coach asked you to work on. We’ll turn that into the
         plan you ride toward your next show. A small number of free beta places are open. Create your account, tell us
-        about you and your horse, and we’ll be in touch.
+        about you and your horse, and we’ll be in touch.{" "}
+        <Link to="/coach" search={{ pupil: "", settings: false }} className="font-semibold text-accent">
+          Coaching rather than riding? Apply for the Coach Portal.
+        </Link>
       </p>
       <ApplicationForm signedIn={access.state === "ready"} defaultName={access.state === "ready" ? access.access.name ?? "" : ""} onDone={() => { setDone(true); access.reload(); }} />
     </BrandShell>

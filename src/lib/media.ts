@@ -94,9 +94,22 @@ export const mediaPlaybackUrl = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { mediaId?: string }) => ({ mediaId: text(input?.mediaId, 120) }))
   .handler(async ({ context, data }) => {
-    const { sql, port, user } = await actor(context.userId);
+    // A coach who is not also an approved rider still needs playback for a
+    // linked pupil's shared videos. Upload paths stay on requireAccess.
+    const { loadUser, resolveRiderAccess } = await import("./beta.server");
+    const { getSql } = await import("./db");
+    const { storagePort } = await import("./media-r2.server");
+    const { isApprovedCoach } = await import("./coach-access.server");
+    const user = await loadUser(context.userId);
+    const sql = await getSql();
+    if (!user.isAdmin) {
+      const { approved } = await resolveRiderAccess(context.userId);
+      if (!approved && !(await isApprovedCoach(sql, user.id))) {
+        throw new Error("Your beta place is not approved yet");
+      }
+    }
     const { playbackUrl } = await import("./media-store");
-    return { url: await playbackUrl(sql, port, { userId: user.id, isAdmin: user.isAdmin }, data.mediaId) };
+    return { url: await playbackUrl(sql, storagePort(), { userId: user.id, isAdmin: user.isAdmin }, data.mediaId) };
   });
 
 export const deleteMediaObject = createServerFn({ method: "POST" })

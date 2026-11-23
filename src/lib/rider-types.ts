@@ -76,7 +76,7 @@ export type SheetRecord = {
   photos: { id: string; label?: string }[] | null;
 };
 
-/** A coach day the rider added for one horse. Not Samson's fixed visits. */
+/** A coach day for one horse. `authorRole` is `coach` when the Coach Portal set it. */
 export type CoachVisitRecord = {
   id: string;
   date: string;
@@ -86,6 +86,8 @@ export type CoachVisitRecord = {
   film: string;
   homework: string;
   leaveIt: string;
+  authorName: string;
+  authorRole: "rider" | "coach";
 };
 
 export type HorseLog = {

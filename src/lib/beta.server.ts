@@ -68,6 +68,13 @@ export async function resolveRiderAccess(
   const sql = await (await import("./db")).getSql();
   const user = await loadUser(userId, sql);
   if (user.isAdmin || authOff()) {
+    if (userId === DEV_USER_ID && authOff()) {
+      // Auth-off local dev has no sign-up, so the shared dev user has to exist
+      // before the rider row. A real session always has a user row already.
+      await sql`insert into "user" (id, name, email, "emailVerified")
+        values (${DEV_USER_ID}, ${user.name ?? "Dev User"}, 'dev@xsalute.local', true)
+        on conflict (id) do nothing`;
+    }
     await sql`insert into riders (user_id, display_name, last_active_at) values (${userId}, ${user.name ?? ""}, now()) on conflict (user_id) do update set last_active_at = now(), updated_at = now()`;
     return { user, approved: true };
   }

@@ -26,7 +26,7 @@ const samples: [string, string][] = [
     "ell Halt, rein back 4 steps, proceed immediately in collected trot",
   ],
   ["X Halt. Immobility. Salute.", "ex Halt. Immobility. Salute."],
-  ["(Collected walk) AK/RMG(H)G(M)GHC", "Collected walk ay kay or ar em gee aitch gee em gee aitch see"],
+  ["(Collected walk) AK/RMG(H)G(M)GHC", "Collected walk ay kay or are em gee aitch gee em gee aitch see"],
   ["H-X-F Change rein", "aitch ex eff Change rein"],
   ["immobility (min. 3 secs)", "immobility minimum 3 seconds"],
   ["Halt, immobility 3–4 seconds", "Halt, immobility 3 to 4 seconds"],
@@ -36,6 +36,9 @@ const samples: [string, string][] = [
   ["L/R rein, w/ contact, approx 10m, ctr", "left or right rein, with contact, approximately 10 metre, canter"],
   ["FS and MFS", "freestyle and musical freestyle"],
   ["60 × 20 and 3 x 4", "60 by 20 and 3 times 4"],
+  ["R Medium walk", "are Medium walk"],
+  ["Between F and R", "Between eff and are"],
+  ["F-X-R Change rein", "eff ex are Change rein"],
 ];
 
 test("dressage shorthand is read as a caller would say it", () => {

@@ -13,6 +13,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PART_URL_SECONDS, PLAYBACK_SECONDS, readR2Env, type R2Env } from "./media-object.ts";
 import type { StoragePort } from "./media-store.ts";
+import type { FeedbackAudioPort } from "./feedback-store.ts";
 
 /**
  * Cloudflare R2 speaks the S3 API. The bucket stays private. The browser only
@@ -152,6 +153,48 @@ export function storagePort(): StoragePort | null {
     },
     async remove(key) {
       await api.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    },
+  };
+}
+
+/** Beta feedback voice notes: one small private object each, under feedback/. */
+export function feedbackAudioPort(): FeedbackAudioPort | null {
+  const env = readR2Env(process.env);
+  if (!env) return null;
+  const bucket = env.bucket;
+  const api = s3(env);
+  const own = (key: string) => {
+    if (!/^feedback\/[A-Za-z0-9._@:-]+\/[A-Za-z0-9-]+\.[a-z0-9]+$/.test(key)) {
+      throw new Error("That is not a feedback file.");
+    }
+    return key;
+  };
+  return {
+    async put(key, bytes, mime) {
+      await api.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: own(key),
+          Body: bytes,
+          ContentType: mime || "application/octet-stream",
+        }),
+      );
+    },
+    readUrl(key, mime, fileName) {
+      const safeName = fileName.replace(/["\r\n]/g, "") || "voice-note";
+      return getSignedUrl(
+        api,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: own(key),
+          ResponseContentType: mime || undefined,
+          ResponseContentDisposition: `inline; filename="${safeName}"`,
+        }),
+        { expiresIn: PLAYBACK_SECONDS },
+      );
+    },
+    async remove(key) {
+      await api.send(new DeleteObjectCommand({ Bucket: bucket, Key: own(key) }));
     },
   };
 }

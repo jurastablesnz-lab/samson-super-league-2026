@@ -153,9 +153,11 @@ export function stripInstallParams(url) {
   return rest ? `${path}?${rest}` : path;
 }
 
-export function renderInstallPageHtml(template, { host, url } = {}) {
+/** `appName` wins over the host-derived name (XSalute passes APP_BRAND_NAME). */
+export function renderInstallPageHtml(template, { host, url, appName } = {}) {
+  const name = String(appName ?? "").trim() || appNameFromHost(host);
   return String(template)
-    .replaceAll("{{APP_NAME}}", escapeHtml(appNameFromHost(host)))
+    .replaceAll("{{APP_NAME}}", escapeHtml(name))
     .replaceAll("{{APP_URL}}", escapeHtml(stripInstallParams(url)));
 }
 

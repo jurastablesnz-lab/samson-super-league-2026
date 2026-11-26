@@ -7,3 +7,13 @@ export function adminEmails(): string[] {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 }
+
+/**
+ * Who gets admin alerts (new applications, beta feedback): BETA_NOTIFY_EMAILS
+ * when set ("off" turns alerts off), otherwise the admin emails above.
+ */
+export function adminNotifyEmails(): string[] {
+  const raw = env("BETA_NOTIFY_EMAILS");
+  if (raw === "off") return [];
+  return raw ? raw.split(/[,\s]+/).filter(Boolean) : adminEmails();
+}

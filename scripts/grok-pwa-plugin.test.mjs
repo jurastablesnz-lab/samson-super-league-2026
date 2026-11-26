@@ -459,8 +459,20 @@ test("rejects hosts that are not plain slugs", () => {
   assert.equal(appNameFromHost('"><img src=x onerror=1>.grok.me'), "Grok App");
 });
 
+test("the iPhone install tutorial says XSalute, not Grok App", () => {
+  for (const host of ["localhost:8080", "app.xsalute.co.nz", "wild-race.grok.me"]) {
+    const html = renderInstallPage(host, "/?install=1&platform=ios");
+    assert.match(html, /<title>Add XSalute to your Home Screen<\/title>/);
+    assert.match(html, /Add XSalute to your&nbsp;Home&nbsp;Screen/);
+    assert.match(html, /name="apple-mobile-web-app-title" content="XSalute"/);
+    assert.equal(html.includes("Grok App"), false);
+  }
+  const middleware = readFileSync(new URL("../server/middleware/grok-pwa.ts", import.meta.url), "utf8");
+  assert.match(middleware, /appName: APP_BRAND_NAME/);
+});
+
 test("renders install page markup", () => {
-  const html = renderInstallPage("wild-race.grok.me", "/?install=1&platform=ios");
+  const html = renderInstallPage("wild-race.grok.me", "/?install=1&platform=ios", "");
   assert.match(html, /Add Wild Race to your/);
   assert.match(html, /\/__grok\/install\/styles\.css/);
   assert.match(html, /href="\/"/);

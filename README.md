@@ -31,6 +31,12 @@ Competition videos, sheet photos and freestyle music files stay in the browser t
 - Per-rider data (riders, horses, plans, results, ride notes, judge-sheet summaries) lives in
   Postgres — see `migrations/0004_rider_workspace.sql`.
 - `/admin` — approve riders and import EVO Events results CSVs (see `docs/evo-results-import.md`).
+- **Beta feedback** — a Feedback button in the rider header (and the setup wizard) opens a sheet for a
+  typed note and/or a voice note of up to 2 minutes (MediaRecorder; MP4/AAC on iPhone, WebM elsewhere).
+  Saved in `beta_feedback` (`migrations/0020_beta_feedback.sql`); voice notes go to the private R2 bucket
+  under `feedback/<user id>/` and play only through a 10-minute signed link in `/admin#feedback`. Each one
+  emails the alert list (`BETA_NOTIFY_EMAILS`, else the admin emails) through Resend, with a link to the
+  admin view. Voice notes are hidden when R2 is not configured; typed feedback always works.
 - Admin access requires **Google** sign-in with an address in `BETA_ADMIN_EMAILS`.
 
 ## Environment

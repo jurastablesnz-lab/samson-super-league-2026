@@ -19,6 +19,7 @@ import { FloorPlanPicker } from "@/components/floor-plan";
 import { DeviceFreestyleBar } from "@/components/freestyle-player";
 import { CoachTab } from "@/components/rider-coach";
 import { ArenaCaller } from "@/components/arena-caller";
+import { FeedbackButton } from "@/components/feedback";
 import { CoachCueEditor, useCallerCues } from "@/components/coach-cues";
 import { callerSheet, TestArena, TestsPanel } from "@/components/test-sheet";
 import { compressSheetPhoto, putMediaBlob } from "@/lib/media-db";
@@ -117,6 +118,7 @@ export function RiderHome({ storageKey }: { storageKey: string }) {
       <BrandShell>
         <Title>Couldn’t load your plan</Title>
         <p className="mt-3 text-sm text-muted">{error}</p>
+        <FeedbackButton className="mt-4" page={`Plan failed to load: ${error.slice(0, 120)}`} />
       </BrandShell>
     );
   }
@@ -126,6 +128,9 @@ export function RiderHome({ storageKey }: { storageKey: string }) {
     const first = !ws.rider.setupCompletedAt;
     return (
       <BrandShell>
+        <div className="-mt-3 mb-3 flex justify-end">
+          <FeedbackButton page={first ? "Setup wizard (first login)" : "Setup wizard (editing)"} />
+        </div>
         {first && (
           <Panel className="mb-4 space-y-1">
             <Kicker>Welcome{ws.displayName ? `, ${ws.displayName.split(" ")[0]}` : ""}</Kicker>
@@ -313,6 +318,10 @@ function RiderApp({
               PLAN · TRAIN · COMPETE · REFLECT
             </p>
           </div>
+          <FeedbackButton
+            className="ml-auto"
+            page={`${TABS.find((t) => t.id === tab)?.label ?? tab} · ${horse.name}`}
+          />
         </div>
         {horses.length > 1 && (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Horse">

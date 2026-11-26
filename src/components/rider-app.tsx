@@ -74,6 +74,7 @@ import { cn } from "@/lib/utils";
 import { BrandShell, inputCls, Kicker, Panel, PrimaryButton, Title } from "./beta-ui";
 import { PlanResults } from "./plan-results";
 import { fmtDay, fmtDuration, SetupWizard } from "./setup-wizard";
+import { NextCompetitionCard } from "./next-competition";
 import { TrainingTargets } from "./training-targets";
 
 type Tab = "today" | "season" | "tests" | "coach" | "log" | "setup";
@@ -705,7 +706,7 @@ function SeasonTab({
   const phase = phaseIn(plan.phases, TODAY);
   return (
     <div className="flex flex-col gap-4">
-      <TrainingTargets horseId={horse.id} tests={plan.tests} editor />
+      <NextCompetitionCard shows={plan.shows} />
       <PlanResults
         results={log && log.horseId === horse.id ? log.results : null}
         horseId={horse.id}

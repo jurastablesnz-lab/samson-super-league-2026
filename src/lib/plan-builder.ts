@@ -499,6 +499,16 @@ export function describeWhen(s: { start: string; end: string }) {
   return s.end && s.end !== s.start ? format(a, "d MMM") === format(parseISO(s.end), "d MMM") ? `${format(a, "d")}–${format(parseISO(s.end), "d MMM yyyy")}` : `${format(a, "d MMM")}–${format(parseISO(s.end), "d MMM yyyy")}` : format(a, "d MMM yyyy");
 }
 
+/** Competitions still on, or not yet started, earliest first. */
+export function upcomingShows(shows: TargetShow[], todayIso: string): TargetShow[] {
+  return [...shows]
+    .filter((s) => (s.end || s.start) >= todayIso)
+    .sort(
+      (a, b) =>
+        a.start.localeCompare(b.start) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+    );
+}
+
 /** Normalise untrusted wizard input into a PlanConfig (server-side validation). */
 export function sanitisePlanConfig(raw: unknown, fallback: { horseName: string; level: string }): PlanConfig {
   const r = (raw ?? {}) as Record<string, unknown>;

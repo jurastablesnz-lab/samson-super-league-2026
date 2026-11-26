@@ -527,6 +527,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
   const [name, setName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [entriesClose, setEntriesClose] = useState("");
   const [travel, setTravel] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const picked = (id: string) => horse.shows.some((s) => s.id === id);
@@ -571,6 +572,7 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg px-3 py-2 text-sm">
             <span>
               <span className="font-semibold">{s.name}</span> · {describeWhen(s)}
+              {s.entriesClose ? ` · entries close ${describeWhen({ start: s.entriesClose, end: s.entriesClose })}` : ""}
               {s.travel && " · travel day"}
             </span>
             <button
@@ -594,6 +596,9 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
             <input className={inputCls} type="date" value={end} min={start || today} onChange={(e) => setEnd(e.target.value)} />
           </Field>
         </div>
+        <Field label="Entries close" optional>
+          <input className={inputCls} type="date" value={entriesClose} onChange={(e) => setEntriesClose(e.target.value)} />
+        </Field>
         <label className="flex items-center gap-2 text-sm text-ink-soft">
           <input type="checkbox" className="size-4" checked={travel} onChange={(e) => setTravel(e.target.checked)} />
           Long trip — add a travel day before
@@ -604,16 +609,28 @@ function ShowsStep({ horse, onChange }: { horse: WizardHorse; onChange: (p: Part
           onClick={() => {
             if (start < today) return setDateError("Choose a start date from today onwards.");
             if (end && end < start) return setDateError("The finish date must be on or after the start date.");
+            if (entriesClose && start && entriesClose > start) {
+              return setDateError("Entries usually close on or before the first day.");
+            }
             setDateError(null);
             onChange({
               shows: [
                 ...horse.shows,
-                { id: `own-${Date.now()}`, name: name.trim(), start, end: end || start, travel, source: "custom" },
+                {
+                  id: `own-${Date.now()}`,
+                  name: name.trim(),
+                  start,
+                  end: end || start,
+                  entriesClose: entriesClose || undefined,
+                  travel,
+                  source: "custom",
+                },
               ],
             });
             setName("");
             setStart("");
             setEnd("");
+            setEntriesClose("");
             setTravel(false);
           }}
           className="w-full cursor-pointer rounded-lg border border-dashed border-accent/60 px-3 py-2.5 text-sm font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-50"

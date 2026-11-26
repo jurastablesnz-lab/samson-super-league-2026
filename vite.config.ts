@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
@@ -144,10 +145,40 @@ function authPopupPlugin(): Plugin {
   };
 }
 
+/** Shown with beta feedback so Susan knows which build a rider was on. */
+function appVersion(): string {
+  let sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").trim().slice(0, 7);
+  if (!sha) {
+    try {
+      sha = execSync("git rev-parse --short=7 HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim();
+    } catch {
+      sha = "";
+    }
+  }
+  const built = new Intl.DateTimeFormat("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .formatToParts(new Date())
+    .reduce<Record<string, string>>((acc, part) => ({ ...acc, [part.type]: part.value }), {});
+  const stamp = `${built.year}-${built.month}-${built.day} ${built.hour}:${built.minute} NZ`;
+  return sha ? `${sha} · ${stamp}` : stamp;
+}
+
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
+  define: {
+    __XSALUTE_VERSION__: JSON.stringify(appVersion()),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,

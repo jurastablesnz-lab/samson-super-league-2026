@@ -10,6 +10,7 @@ import {
 } from "@/lib/beta";
 import { useBetaAccess } from "@/lib/use-beta-access";
 import { CompetitionsAdmin } from "@/components/admin-competitions";
+import { FeedbackAdmin } from "@/components/admin-feedback";
 import { EvoImportPanel } from "@/components/evo-import";
 import { SeedResultsPanel } from "@/components/seed-results-import";
 import { getAdminRiders } from "@/lib/rider-admin";
@@ -103,6 +104,7 @@ function AdminDashboard() {
         </div>
       </Panel>
 
+      <FeedbackAdmin />
       <RiderAdminPanels riders={riders} onPrepared={load} />
       <TestCatalog />
       <SeedResultsPanel />

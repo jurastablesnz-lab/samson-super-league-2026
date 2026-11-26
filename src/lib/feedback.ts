@@ -71,7 +71,11 @@ export const submitFeedback = createServerFn({ method: "POST" })
         const { env } = await import("./env.server");
         const { FEEDBACK_KIND_LABELS, deviceLabel, formatDuration } =
           await import("./feedback-rules");
-        const base = env("BETTER_AUTH_URL");
+        const { parseCustomHosts, publicAppUrl } = await import("./auth/public-hosts");
+        const base = publicAppUrl(
+          env("BETTER_AUTH_URL"),
+          parseCustomHosts(env("APP_CUSTOM_HOSTS")),
+        );
         const sent = await notifyFeedback(
           adminNotifyEmails(),
           {

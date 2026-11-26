@@ -48,6 +48,7 @@ Competition videos, sheet photos and freestyle music files stay in the browser t
 | `RESEND_API_KEY`            | Password reset emails + new-application alerts. Unset → reset link becomes "Contact us", alerts skipped. |
 | `EMAIL_FROM`                | Sender, e.g. `XSalute <hello@virtualdressage.co.nz>` (domain verified in Resend).                        |
 | `BETTER_AUTH_URL`           | Public app URL (used in reset links and the admin link in alerts).                                       |
+| `APP_CUSTOM_HOSTS`          | Optional: custom domains on the same deployment (default `app.xsalute.co.nz`; `off` to disable). Sign-in works on these and on `BETTER_AUTH_URL`. |
 | `GOOGLE_CLIENT_ID`          | Optional with the secret below: app-owned native Google sign-in.                                         |
 | `GOOGLE_CLIENT_SECRET`      | Optional with the id above; both must be set to enable native Google.                                    |
 | `BETA_NOTIFY_EMAILS`        | Optional: who gets new-application alerts (default: admin emails; `off` to disable).                     |

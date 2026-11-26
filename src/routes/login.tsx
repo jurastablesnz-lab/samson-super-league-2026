@@ -12,6 +12,7 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetEnabled, setResetEnabled] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
   useEffect(() => {
     getAuthFeatures()
       .then((f) => setResetEnabled(f.passwordReset))
@@ -28,6 +29,16 @@ function LoginPage() {
     window.location.href = "/";
   }
 
+  // Never fail silently: a rejected sign-in start used to leave the button
+  // looking dead. Show a plain message instead.
+  function startProvider(providerId: string) {
+    setProviderError(null);
+    signIn(providerId, { callbackURL: "/" }).catch((err: unknown) => {
+      console.error("[login] sign-in did not start:", err);
+      setProviderError("Sign-in couldn’t start. Please try again, or use email and password below.");
+    });
+  }
+
   const google = GROK_PROVIDERS.find((p) => p.idp === "google");
   const otherProviders = GROK_PROVIDERS.filter((p) => p !== google);
 
@@ -38,11 +49,16 @@ function LoginPage() {
       {google && (
         <button
           type="button"
-          onClick={() => void signIn(google.providerId, { callbackURL: "/" })}
+          onClick={() => startProvider(google.providerId)}
           className="mt-5 w-full cursor-pointer rounded-lg bg-accent px-4 py-3 font-display text-[15px] font-extrabold text-accent-fg transition hover:brightness-110"
         >
           Continue with Google
         </button>
+      )}
+      {providerError && (
+        <p className="mt-2 text-sm text-danger" role="alert">
+          {providerError}
+        </p>
       )}
       <Panel className="mt-4">
         <p className="mb-3 text-sm text-muted">Or use email and password</p>
@@ -77,7 +93,7 @@ function LoginPage() {
             <button
               key={p.providerId}
               type="button"
-              onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
+              onClick={() => startProvider(p.providerId)}
               className="w-full cursor-pointer rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-accent"
             >
               Continue with {p.label}

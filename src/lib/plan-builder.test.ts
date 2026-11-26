@@ -8,6 +8,7 @@ import {
   sanitiseFloorPlan,
   sanitisePlanConfig,
   testsForLevel,
+  upcomingShows,
 } from "./plan-builder.ts";
 import { differenceInDays } from "date-fns";
 import { WEEKS, PHASES } from "./season.ts";
@@ -131,4 +132,22 @@ test("a floor plan is a PDF or image kept on the device, and junk is dropped", (
   assert.deepEqual(config.floorPlan, kept);
   const again = sanitisePlanConfig(config, { horseName: "Jura Samson", level: "Level 2" });
   assert.deepEqual(again.floorPlan, kept);
+});
+
+test("upcomingShows is the next current or future competition, then the one after", () => {
+  const shows = [
+    { id: "past", name: "BOP", start: "2026-10-24", end: "2026-10-25", entriesClose: "2026-09-30" },
+    { id: "later", name: "Nationals", start: "2027-02-17", end: "2027-02-21", venue: "Taupō", entriesClose: "2027-02-17" },
+    { id: "next", name: "Taranaki", start: "2026-12-05", end: "2026-12-06", venue: "New Plymouth", entriesClose: "2026-11-18" },
+    { id: "on", name: "Area Day", start: "2026-11-26", end: "2026-11-27" },
+  ];
+  const upcoming = upcomingShows(shows, "2026-11-27");
+  assert.deepEqual(
+    upcoming.map((s) => s.id),
+    ["on", "next", "later"],
+  );
+  assert.equal(upcoming[0].name, "Area Day");
+  assert.equal(upcoming[1].name, "Taranaki");
+  assert.deepEqual(upcomingShows(shows, "2027-03-01"), []);
+  assert.deepEqual(upcomingShows([], "2026-11-27"), []);
 });

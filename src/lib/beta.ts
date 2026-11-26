@@ -327,7 +327,11 @@ export const submitApplication = createServerFn({ method: "POST" })
           const { env } = await import("./env.server");
           const raw = env("BETA_NOTIFY_EMAILS");
           const to = raw === "off" ? [] : raw ? raw.split(/[,\s]+/).filter(Boolean) : adminEmails();
-          const base = env("BETTER_AUTH_URL");
+          const { parseCustomHosts, publicAppUrl } = await import("./auth/public-hosts");
+          const base = publicAppUrl(
+            env("BETTER_AUTH_URL"),
+            parseCustomHosts(env("APP_CUSTOM_HOSTS")),
+          );
           await notifyNewApplication(
             to,
             { ...data, email: user.email, horses: data.horses ?? "" },
